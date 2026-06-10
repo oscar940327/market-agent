@@ -5,7 +5,11 @@ from skills.news_skill import get_stock_news
 from strategies.breakout_strategy import check_breakout
 from strategies.volume_surge_strategy import check_volume_surge
 from strategies.pullback_strategy import check_pullback_to_ma20
-from backtesting.backtest_runner import run_pullback_backtest
+from backtesting.backtest_runner import (
+    run_breakout_backtest,
+    run_pullback_backtest,
+    run_volume_surge_backtest,
+)
 from backtesting.metrics import calculate_backtest_metrics
 from backtesting.reports import build_backtest_report, format_backtest_report
 
@@ -40,31 +44,42 @@ def run_backtest_query(ticker: str, user_query: str) -> dict:
 
     if "breakout" in query or "突破" in user_query:
         strategy = "breakout"
-    elif "volume" in query or "成交量" in user_query or "量能" in user_query:
+    elif (
+        "volume" in query
+        or "成交量" in user_query
+        or "量能" in user_query
+        or "放量" in user_query
+    ):
         strategy = "volume_surge"
     elif "pullback" in query or "回檔" in user_query or "拉回" in user_query:
         strategy = "pullback"
     else:
         strategy = "unknown"
 
-    if strategy != "pullback":
+    if strategy == "unknown":
         return {
             "intent": "backtest_query",
             "ticker": ticker,
             "strategy": strategy,
             "user_query": user_query,
-            "status": "unsupported_strategy",
-            "message": "目前第 9 關先只支援 pullback 策略回測。",
+            "status": "unknown_strategy",
+            "message": "請指定要回測的策略：breakout、volume_surge 或 pullback。",
         }
 
     price_data = get_recent_price_data(ticker, period="2y")
 
-    backtest_results = run_pullback_backtest(price_data)
+    if strategy == "breakout":
+        backtest_results = run_breakout_backtest(price_data)
+    elif strategy == "volume_surge":
+        backtest_results = run_volume_surge_backtest(price_data)
+    else:
+        backtest_results = run_pullback_backtest(price_data)
+
     metrics = calculate_backtest_metrics(backtest_results)
 
     report = build_backtest_report(
         ticker=ticker,
-        strategy_name="pullback",
+        strategy_name=strategy,
         backtest_results=backtest_results,
         metrics=metrics,
     )

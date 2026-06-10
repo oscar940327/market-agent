@@ -18,6 +18,5 @@ data/backtest_results.db
 .DS_Store
 Thumbs.db
 
-TODO.md
 current_progress.md
 project_context.md
