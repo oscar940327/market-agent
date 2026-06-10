@@ -3,8 +3,20 @@
 def detect_intent(user_query: str) -> dict:
     query = user_query.lower()
 
+    known_tickers = ["mu", "nvda", "tsla", "pltr", "sndk", "amd", "aapl", "msft"]
+
     if "回測" in user_query or "backtest" in query:
         intent = "backtest_query"
+    elif any(ticker in query.split() for ticker in known_tickers):
+        intent = "single_stock_analysis"
+    elif(
+        "新聞" in user_query
+        or "news" in query
+        or "突破" in user_query
+        or "追高" in user_query
+        or "進場" in user_query
+    ):
+        intent = "single_stock_analsis"
     elif (
         "產業" in user_query
         or "趨勢" in user_query
