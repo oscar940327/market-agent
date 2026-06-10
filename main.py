@@ -10,6 +10,30 @@ from backtesting.metrics import calculate_backtest_metrics
 from backtesting.reports import build_backtest_report, format_backtest_report
 
 
+def run_single_stock_analysis(ticker: str, user_query: str) -> dict:
+    price_data = get_recent_price_data(ticker, period="1y")
+
+    analysis_result = analyze_moving_averages(price_data)
+    breakout_result = check_breakout(price_data)
+    volume_surge_result = check_volume_surge(price_data)
+    pullback_result = check_pullback_to_ma20(price_data)
+    news_items = get_stock_news(f"{ticker} stock", max_items=3)
+
+    analysis_data = {
+        "intent": "single_stock_analysis",
+        "query": user_query,
+        "ticker": ticker,
+        "technical_analysis": analysis_result,
+        "signals": {
+            "breakout": breakout_result,
+            "volume_surge": volume_surge_result,
+            "pullback": pullback_result,
+        },
+        "news": news_items,
+    }
+
+    return analysis_data
+
 def main():
     print("Market Agent")
     print("Project skeleton is ready.")
@@ -79,6 +103,8 @@ def main():
 
     print()
     print(f"{ticker} 近期新聞：")
+
+
     news_items = get_stock_news(f"{ticker} stock", max_items=3)
 
     for news in news_items:
@@ -88,3 +114,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
