@@ -2,7 +2,7 @@
 
 Market Agent 是一個個人股票研究 Agent 專案，目標是用自然語言協助整理市場資料、技術訊號、策略條件與歷史回測結果。
 
-這個專案目前處於早期骨架階段，尚未提供完整功能。
+這個專案目前處於早期 CLI 階段，已具備單一股票分析 workflow 和 pullback 策略回測查詢初版。
 
 ## What It Is
 
@@ -45,19 +45,31 @@ Market Agent 不是：
 ```text
 market-agent/
 ├── agent/
-│  
+│   └── rule_based_router.py
+│
 ├── skills/
-│  
+│   ├── stock_price_skill.py
+│   ├── technical_analysis_skill.py
+│   └── news_skill.py
+│
 ├── strategies/
-│  
+│   ├── breakout_strategy.py
+│   ├── pullback_strategy.py
+│   └── volume_surge_strategy.py
+│
+├── backtesting/
+│   ├── backtest_runner.py
+│   ├── metrics.py
+│   └── reports.py
+│
 ├── data/
-│  
+│   └── historical_prices/
+│
 ├── main.py
-│  
 ├── requirements.txt
-│   
 ├── TODO.md
-│   
+├── current_progress.md
+├── project_context.md
 └── README.md
 ```
 
@@ -107,30 +119,29 @@ market-agent/
 使用者提問時讀取結果
 ```
 
-目前尚未建立 `backtesting/` 目錄。
+目前已建立 `backtesting/` 目錄，並先支援 pullback 策略的簡單離線回測。
 
 ## Current Status
 
 目前進度：
 
 - 已建立基本專案骨架
-- 已規劃 `agent/`、`skills/`、`strategies/`、`data/` 目錄
-- `main.py` 尚未實作
-- `requirements.txt` 尚未定義依賴
-- 回測模組尚未建立
+- 已建立 `agent/`、`skills/`、`strategies/`、`backtesting/`、`data/` 目錄
+- `main.py` 已作為 CLI 入口
+- 已定義 `yfinance`、`pandas`、`python-dotenv` 依賴
+- 已支援單一股票分析 workflow
+- 已支援 pullback 策略回測查詢初版
+- 尚未接 LLM analyst、資料庫、Web UI 或自動通知
 
 ## Development
 
-目前尚無可執行的正式入口。
+安裝依賴後可以用 CLI 執行：
 
-預計後續會加入：
+```bash
+python main.py
+```
 
-- CLI 入口
-- 股價資料讀取模組
-- 技術指標計算模組
-- 策略規則模組
-- 回測結果讀取模組
-- Agent routing workflow
+下一步預計加入 rule-based analyst，把 `analysis_data` / `backtest_data` 整理成固定格式文字，先不接 LLM。
 
 ## Disclaimer
 

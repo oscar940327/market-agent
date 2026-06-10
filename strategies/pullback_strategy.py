@@ -8,7 +8,7 @@ def check_pullback_to_ma20(
 ) -> dict:
     data = price_data.copy()
 
-    data["MA20"] = data["Close"].rolling(window=10).mean()
+    data["MA20"] = data["Close"].rolling(window=20).mean()
 
     latest = data.iloc[-1]
 
