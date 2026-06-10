@@ -14,7 +14,7 @@ def main():
     print("Project skeleton is ready.")
     print()
 
-    ticker = input("請輸入股票代號（例如：MU）：")
+    ticker = input("請輸入股票代號（例如：MU）：").upper()
 
     price_data = get_recent_price_data(ticker, period="1y")
 
@@ -58,6 +58,7 @@ def main():
     print(formatted_report)
 
     print()
+    print(f"{ticker} 近期新聞：")
     news_items = get_stock_news(f"{ticker} stock", max_items=3)
 
     for news in news_items:
