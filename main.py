@@ -23,6 +23,17 @@ def main():
     print("Router 判斷結果：")
     print(route_result)
 
+    intent = route_result["intent"]
+
+    if intent == "single_stock_analysis":
+        print("這是單一股票分析問題，接下來會要求你輸入股票代號。")
+    elif intent == "industry_trend":
+        print("這是產業趨勢問題，目前會先用單一股票流程暫時測試。")
+    elif intent == "backtest_query":
+        print("這是回測查詢問題，接下來會顯示目前已有的 pullback 回測結果。")
+    else:
+        print("目前無法判斷問題類型，先用單一股票流程暫時測試。")
+
     ticker = input("請輸入股票代號（例如：MU）：").upper()
 
     price_data = get_recent_price_data(ticker, period="1y")
