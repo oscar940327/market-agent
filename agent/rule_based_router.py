@@ -1,3 +1,5 @@
+# 最簡易的 agent
+
 def detect_intent(user_query: str) -> dict:
     query = user_query.lower()
 
