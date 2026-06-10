@@ -1,12 +1,12 @@
 from skills.stock_price_skill import get_recent_price_data
 from skills.technical_analysis_skill import analyze_moving_averages
+from skills.news_skill import get_stock_news
 from strategies.breakout_strategy import check_breakout
 from strategies.volume_surge_strategy import check_volume_surge
 from strategies.pullback_strategy import check_pullback_to_ma20
 from backtesting.backtest_runner import run_pullback_backtest
 from backtesting.metrics import calculate_backtest_metrics
 from backtesting.reports import build_backtest_report, format_backtest_report
-
 
 
 def main():
@@ -56,6 +56,14 @@ def main():
     print()
     print(f"{ticker} Pullback 回測報告：")
     print(formatted_report)
+
+    print()
+    news_items = get_stock_news(f"{ticker} stock", max_items=3)
+
+    for news in news_items:
+        print(f"- {news['published']}")
+        print(f"  {news['title']}")
+        print(f"  {news['link']}")
 
 if __name__ == "__main__":
     main()
