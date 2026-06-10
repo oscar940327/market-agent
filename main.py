@@ -34,6 +34,32 @@ def run_single_stock_analysis(ticker: str, user_query: str) -> dict:
 
     return analysis_data
 
+def print_analysis_data(analysis_data: dict) -> None:
+    print()
+    print("Analysis Data Summary")
+    print("---------------------")
+
+    print("Ticker:", analysis_data["ticker"])
+    print("Intent:", analysis_data["intent"])
+    print("Query:", analysis_data["query"])
+
+    print()
+    print("Technical Analysis:")
+    print(analysis_data["technical_analysis"])
+
+    print()
+    print("Signals:")
+    print("Breakout:", analysis_data["signals"]["breakout"])
+    print("Volume Surge:", analysis_data["signals"]["volume_surge"])
+    print("Pullback:", analysis_data["signals"]["pullback"])
+
+    print()
+    print("Recent News:")
+    for news in analysis_data["news"]:
+        print("-", news["published"])
+        print(" ", news["title"])
+        print(" ", news["link"])
+
 def main():
     print("Market Agent")
     print("Project skeleton is ready.")
@@ -52,10 +78,7 @@ def main():
     if intent == "single_stock_analysis":
         ticker = input("請輸入股票代號（例如：MU）：").upper()
         analysis_data = run_single_stock_analysis(ticker, user_query)
-
-        print()
-        print("Analysis Data:")
-        print(analysis_data)
+        print_analysis_data(analysis_data)
 
     else:
         print()
