@@ -1,3 +1,4 @@
+from agent.rule_based_router import detect_intent
 from skills.stock_price_skill import get_recent_price_data
 from skills.technical_analysis_skill import analyze_moving_averages
 from skills.news_skill import get_stock_news
@@ -13,6 +14,14 @@ def main():
     print("Market Agent")
     print("Project skeleton is ready.")
     print()
+
+
+    user_query = input("請輸入你的問題：")
+    route_result = detect_intent(user_query)
+
+    print()
+    print("Router 判斷結果：")
+    print(route_result)
 
     ticker = input("請輸入股票代號（例如：MU）：").upper()
 
