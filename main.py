@@ -1,5 +1,10 @@
 from agent.rule_based_router import detect_intent
-from agent.analyst import format_backtest_analysis, format_single_stock_analysis
+from agent.analyst import (
+    format_backtest_analysis,
+    format_single_stock_analysis,
+    format_theme_analysis,
+)
+from data.themes import find_theme_key, get_all_theme_tickers, get_theme
 from skills.stock_price_skill import get_recent_price_data
 from skills.technical_analysis_skill import analyze_moving_averages
 from skills.news_skill import get_stock_news
@@ -62,7 +67,11 @@ def fetch_news_items(ticker: str) -> list[dict]:
         return []
 
 
-def run_single_stock_analysis(ticker: str, user_query: str) -> dict:
+def run_single_stock_analysis(
+    ticker: str,
+    user_query: str,
+    include_news: bool = True,
+) -> dict:
     price_data, fetch_error = fetch_price_data(ticker, period="1y")
 
     if fetch_error:
@@ -85,7 +94,10 @@ def run_single_stock_analysis(ticker: str, user_query: str) -> dict:
     breakout_result = check_breakout(price_data)
     volume_surge_result = check_volume_surge(price_data)
     pullback_result = check_pullback_to_ma20(price_data)
-    news_items = fetch_news_items(ticker)
+    news_items = []
+
+    if include_news:
+        news_items = fetch_news_items(ticker)
 
     analysis_data = {
         "intent": "single_stock_analysis",
@@ -102,6 +114,96 @@ def run_single_stock_analysis(ticker: str, user_query: str) -> dict:
     }
 
     return analysis_data
+
+
+def score_stock_analysis(analysis_data: dict) -> dict:
+    if analysis_data["status"] != "success":
+        return {
+            "ticker": analysis_data.get("ticker", ""),
+            "status": analysis_data["status"],
+            "score": 0,
+            "reasons": [analysis_data["message"]],
+            "analysis": analysis_data,
+        }
+
+    score = 0
+    reasons = []
+    technical = analysis_data["technical_analysis"]
+    signals = analysis_data["signals"]
+
+    if technical["short_term_trend"] == "strong":
+        score += 2
+        reasons.append("短線趨勢偏強")
+    elif technical["short_term_trend"] == "weak":
+        score -= 1
+        reasons.append("短線趨勢偏弱")
+
+    if technical["is_above_ma20"]:
+        score += 1
+        reasons.append("站上 MA20")
+    else:
+        score -= 1
+        reasons.append("低於 MA20")
+
+    if signals["breakout"]["is_breakout"]:
+        score += 2
+        reasons.append("出現突破訊號")
+
+    if signals["volume_surge"]["is_volume_surge"]:
+        score += 1.5
+        reasons.append("成交量放大")
+
+    if signals["pullback"]["is_pullback"]:
+        score += 1
+        reasons.append("接近 MA20 回測區")
+
+    if not reasons:
+        reasons.append("目前訊號偏中性")
+
+    return {
+        "ticker": analysis_data["ticker"],
+        "status": "success",
+        "score": score,
+        "reasons": reasons,
+        "analysis": analysis_data,
+    }
+
+
+def run_theme_analysis(user_query: str) -> dict:
+    theme_key = find_theme_key(user_query)
+
+    if theme_key:
+        theme = get_theme(theme_key)
+        theme_name = theme["name"]
+        tickers = theme["tickers"]
+    else:
+        theme_name = "全部支援主題"
+        tickers = get_all_theme_tickers()
+
+    results = []
+
+    for ticker in tickers:
+        analysis_data = run_single_stock_analysis(
+            ticker=ticker,
+            user_query=user_query,
+            include_news=False,
+        )
+        results.append(score_stock_analysis(analysis_data))
+
+    sorted_results = sorted(
+        results,
+        key=lambda item: item["score"],
+        reverse=True,
+    )
+
+    return {
+        "intent": "industry_trend",
+        "status": "success",
+        "query": user_query,
+        "theme_key": theme_key,
+        "theme_name": theme_name,
+        "results": sorted_results,
+    }
 
 
 def run_backtest_query(ticker: str, user_query: str) -> dict:
@@ -204,6 +306,11 @@ def main():
         backtest_data = run_backtest_query(ticker, user_query)
         print()
         print(format_backtest_analysis(backtest_data))
+
+    elif intent == "industry_trend":
+        theme_data = run_theme_analysis(user_query)
+        print()
+        print(format_theme_analysis(theme_data))
 
     else:
         print()

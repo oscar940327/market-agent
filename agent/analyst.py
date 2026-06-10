@@ -160,6 +160,106 @@ def format_backtest_analysis(backtest_data: dict) -> str:
     return "\n".join(lines)
 
 
+def format_theme_analysis(theme_data: dict) -> str:
+    if theme_data["status"] != "success":
+        lines = [
+            "主題觀察清單無法完成",
+            "",
+            f"狀態：{theme_data['status']}",
+            f"原因：{theme_data['message']}",
+        ]
+
+        supported_themes = theme_data.get("supported_themes", [])
+
+        if supported_themes:
+            lines.append("")
+            lines.append("目前支援主題：")
+            for theme_name in supported_themes:
+                lines.append(f"- {theme_name}")
+
+        return "\n".join(lines)
+
+    results = theme_data["results"]
+    successful_results = [result for result in results if result["status"] == "success"]
+    failed_results = [result for result in results if result["status"] != "success"]
+
+    lines = [
+        f"{theme_data['theme_name']} 主題觀察清單",
+        "",
+        f"原始問題：{theme_data['query']}",
+        "",
+        "值得優先觀察",
+    ]
+
+    if successful_results:
+        for index, result in enumerate(successful_results[:5], start=1):
+            analysis = result["analysis"]
+            technical = analysis["technical_analysis"]
+            signals = analysis["signals"]
+            reasons = "、".join(result["reasons"])
+
+            lines.extend(
+                [
+                    (
+                        f"{index}. {result['ticker']} | "
+                        f"分數 {result['score']:.1f} | "
+                        f"{reasons}"
+                    ),
+                    (
+                        f"   價格 {technical['current_price']} | "
+                        f"趨勢 {technical['short_term_trend']} | "
+                        f"突破 {format_bool(signals['breakout']['is_breakout'])} | "
+                        f"放量 {format_bool(signals['volume_surge']['is_volume_surge'])} | "
+                        f"MA20 回測 {format_bool(signals['pullback']['is_pullback'])}"
+                    ),
+                ]
+            )
+    else:
+        lines.append("- 目前沒有成功完成分析的標的。")
+
+    if failed_results:
+        lines.append("")
+        lines.append("未完成分析")
+
+        for result in failed_results:
+            lines.append(f"- {result['ticker']}：{result['status']}，{result['reasons'][0]}")
+
+    lines.extend(
+        [
+            "",
+            "研究結論",
+            build_theme_takeaway(successful_results),
+            "",
+            "風險提醒",
+            "- 這份清單是依照技術訊號排序，不構成投資建議。",
+            "- 主題股票池目前是固定清單，可能不完整或需要人工調整。",
+            "- 多股票掃描只適合找觀察名單，不能取代完整單股研究。",
+        ]
+    )
+
+    return "\n".join(lines)
+
+
+def build_theme_takeaway(results: list[dict]) -> str:
+    if not results:
+        return "- 目前沒有足夠資料產生主題觀察結論。"
+
+    top_result = results[0]
+
+    if top_result["score"] >= 4:
+        return (
+            f"- {top_result['ticker']} 目前在這個主題中訊號最集中，"
+            "可以優先加入觀察清單。"
+        )
+
+    if top_result["score"] >= 2:
+        return (
+            f"- {top_result['ticker']} 目前相對較強，但整體訊號仍需要搭配單股分析確認。"
+        )
+
+    return "- 目前主題內標的訊號不算明確，適合先觀察，不適合直接下結論。"
+
+
 def build_backtest_takeaway(metrics: dict) -> str:
     total_trades = metrics["total_trades"]
 

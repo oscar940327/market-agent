@@ -2,7 +2,7 @@
 
 Market Agent 是一個個人股票研究 Agent 專案，目標是用自然語言協助整理市場資料、技術訊號、策略條件與歷史回測結果。
 
-這個專案目前已具備第一版 CLI 核心：單一股票分析、三種策略回測查詢，以及 rule-based 文字報告。
+這個專案目前已具備第一版 CLI 核心：單一股票分析、三種策略回測查詢、主題股票觀察清單，以及 rule-based 文字報告。
 
 ## What It Is
 
@@ -64,6 +64,7 @@ market-agent/
 │   └── reports.py
 │
 ├── data/
+│   ├── themes.py
 │   └── historical_prices/
 │
 ├── main.py
@@ -131,6 +132,7 @@ market-agent/
 - 已定義 `yfinance`、`pandas`、`python-dotenv` 依賴
 - 已支援單一股票分析 workflow
 - 已支援 breakout、volume_surge、pullback 策略回測查詢初版
+- 已支援固定主題股票池掃描
 - 已支援 rule-based 分析報告輸出
 - 尚未接 LLM analyst、資料庫、Web UI 或自動通知
 

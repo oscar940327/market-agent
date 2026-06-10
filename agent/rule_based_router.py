@@ -28,8 +28,13 @@ def detect_intent(user_query: str) -> dict:
         or "趨勢" in user_query
         or "記憶體" in user_query
         or "半導體" in user_query
+        or "類股" in user_query
+        or "概念股" in user_query
+        or "值得觀察" in user_query
+        or "哪些股票" in user_query
         or "industry" in query
         or "trend" in query
+        or "theme" in query
     ):
         intent = "industry_trend"
     elif any(char.isupper() for char in user_query):
