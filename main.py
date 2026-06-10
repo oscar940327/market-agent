@@ -1,4 +1,5 @@
 from agent.rule_based_router import detect_intent
+from agent.analyst import format_backtest_analysis, format_single_stock_analysis
 from skills.stock_price_skill import get_recent_price_data
 from skills.technical_analysis_skill import analyze_moving_averages
 from skills.news_skill import get_stock_news
@@ -11,20 +12,84 @@ from backtesting.backtest_runner import (
     run_volume_surge_backtest,
 )
 from backtesting.metrics import calculate_backtest_metrics
-from backtesting.reports import build_backtest_report, format_backtest_report
+from backtesting.reports import build_backtest_report
+
+
+def validate_price_data(price_data, ticker: str, min_rows: int):
+    if price_data is None or price_data.empty:
+        return {
+            "ticker": ticker,
+            "status": "no_price_data",
+            "message": "沒有取得股價資料，請確認股票代號是否正確或稍後再試。",
+        }
+
+    missing_columns = [
+        column for column in ["Close", "Volume"] if column not in price_data.columns
+    ]
+
+    if missing_columns:
+        return {
+            "ticker": ticker,
+            "status": "invalid_price_data",
+            "message": f"股價資料缺少必要欄位：{', '.join(missing_columns)}。",
+        }
+
+    if len(price_data) < min_rows:
+        return {
+            "ticker": ticker,
+            "status": "not_enough_price_data",
+            "message": f"目前只有 {len(price_data)} 筆資料，至少需要 {min_rows} 筆。",
+        }
+
+    return None
+
+
+def fetch_price_data(ticker: str, period: str):
+    try:
+        return get_recent_price_data(ticker, period=period), None
+    except Exception as error:
+        return None, {
+            "ticker": ticker,
+            "status": "price_data_error",
+            "message": f"取得股價資料時發生錯誤：{error}",
+        }
+
+
+def fetch_news_items(ticker: str) -> list[dict]:
+    try:
+        return get_stock_news(f"{ticker} stock", max_items=3)
+    except Exception:
+        return []
 
 
 def run_single_stock_analysis(ticker: str, user_query: str) -> dict:
-    price_data = get_recent_price_data(ticker, period="1y")
+    price_data, fetch_error = fetch_price_data(ticker, period="1y")
+
+    if fetch_error:
+        return {
+            "intent": "single_stock_analysis",
+            "query": user_query,
+            **fetch_error,
+        }
+
+    data_error = validate_price_data(price_data, ticker=ticker, min_rows=50)
+
+    if data_error:
+        return {
+            "intent": "single_stock_analysis",
+            "query": user_query,
+            **data_error,
+        }
 
     analysis_result = analyze_moving_averages(price_data)
     breakout_result = check_breakout(price_data)
     volume_surge_result = check_volume_surge(price_data)
     pullback_result = check_pullback_to_ma20(price_data)
-    news_items = get_stock_news(f"{ticker} stock", max_items=3)
+    news_items = fetch_news_items(ticker)
 
     analysis_data = {
         "intent": "single_stock_analysis",
+        "status": "success",
         "query": user_query,
         "ticker": ticker,
         "technical_analysis": analysis_result,
@@ -66,7 +131,25 @@ def run_backtest_query(ticker: str, user_query: str) -> dict:
             "message": "請指定要回測的策略：breakout、volume_surge 或 pullback。",
         }
 
-    price_data = get_recent_price_data(ticker, period="2y")
+    price_data, fetch_error = fetch_price_data(ticker, period="2y")
+
+    if fetch_error:
+        return {
+            "intent": "backtest_query",
+            "strategy": strategy,
+            "user_query": user_query,
+            **fetch_error,
+        }
+
+    data_error = validate_price_data(price_data, ticker=ticker, min_rows=60)
+
+    if data_error:
+        return {
+            "intent": "backtest_query",
+            "strategy": strategy,
+            "user_query": user_query,
+            **data_error,
+        }
 
     if strategy == "breakout":
         backtest_results = run_breakout_backtest(price_data)
@@ -84,8 +167,6 @@ def run_backtest_query(ticker: str, user_query: str) -> dict:
         metrics=metrics,
     )
 
-    report_text = format_backtest_report(report)
-
     backtest_data = {
         "intent": "backtest_query",
         "ticker": ticker,
@@ -93,66 +174,14 @@ def run_backtest_query(ticker: str, user_query: str) -> dict:
         "user_query": user_query,
         "status": "success",
         "report": report,
-        "report_text": report_text,
     }
 
     return backtest_data
 
 
-def print_analysis_data(analysis_data: dict) -> None:
-    print()
-    print("Analysis Data Summary")
-    print("---------------------")
-
-    print("Ticker:", analysis_data["ticker"])
-    print("Intent:", analysis_data["intent"])
-    print("Query:", analysis_data["query"])
-
-    print()
-    print("Technical Analysis:")
-    print(analysis_data["technical_analysis"])
-
-    print()
-    print("Signals:")
-    print("Breakout:", analysis_data["signals"]["breakout"])
-    print("Volume Surge:", analysis_data["signals"]["volume_surge"])
-    print("Pullback:", analysis_data["signals"]["pullback"])
-
-    print()
-    print("Recent News:")
-    for news in analysis_data["news"]:
-        print("-", news["published"])
-        print(" ", news["title"])
-        print(" ", news["link"])
-
-
-def print_backtest_data(backtest_data: dict) -> None:
-    print()
-    print("Backtest Data Summary")
-    print("---------------------")
-
-    print("Intent:", backtest_data["intent"])
-    print("Ticker:", backtest_data["ticker"])
-    print("Strategy:", backtest_data["strategy"])
-    print("Query:", backtest_data["user_query"])
-    print("Status:", backtest_data["status"])
-
-    if backtest_data["status"] != "success":
-        print("Message:", backtest_data["message"])
-        return
-
-    print()
-    print(backtest_data["report_text"])
-
-    print()
-    print("Sample Trades:")
-    for trade in backtest_data["report"]["sample_trades"]:
-        print(trade)
-
-
 def main():
     print("Market Agent")
-    print("Project skeleton is ready.")
+    print("個人股票研究助理 CLI")
     print()
 
     user_query = input("請輸入你的問題：")
@@ -167,12 +196,14 @@ def main():
     if intent == "single_stock_analysis":
         ticker = input("請輸入股票代號（例如：MU）：").upper()
         analysis_data = run_single_stock_analysis(ticker, user_query)
-        print_analysis_data(analysis_data)
+        print()
+        print(format_single_stock_analysis(analysis_data))
 
     elif intent == "backtest_query":
         ticker = input("請輸入要回測的股票代號（例如：MU）：").upper()
         backtest_data = run_backtest_query(ticker, user_query)
-        print_backtest_data(backtest_data)
+        print()
+        print(format_backtest_analysis(backtest_data))
 
     else:
         print()
