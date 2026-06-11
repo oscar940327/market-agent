@@ -9,6 +9,7 @@ def test_app_registers_public_api_paths():
 
     assert "/health" in schema["paths"]
     assert "/route" in schema["paths"]
+    assert "/query" in schema["paths"]
     assert "/analyze/single" in schema["paths"]
     assert "/backtest" in schema["paths"]
     assert "/themes" in schema["paths"]
@@ -27,6 +28,104 @@ def test_route_endpoint_uses_rule_based_router():
     )
 
     assert result["intent"] == "backtest_query"
+
+
+def test_extract_ticker_from_query_uses_known_ticker_symbols():
+    assert api.extract_ticker_from_query("MU 現在適合進場嗎？") == "MU"
+    assert api.extract_ticker_from_query("AI server 相關股票有哪些？") is None
+
+
+def test_query_endpoint_dispatches_single_stock_with_ticker_from_query(monkeypatch):
+    captured = {}
+
+    def fake_run_single_stock_analysis(ticker, user_query, include_news=True):
+        captured["ticker"] = ticker
+        captured["user_query"] = user_query
+        captured["include_news"] = include_news
+        return {
+            "status": "no_price_data",
+            "ticker": ticker,
+            "message": "沒有取得股價資料",
+        }
+
+    monkeypatch.setattr(api, "run_single_stock_analysis", fake_run_single_stock_analysis)
+
+    result = api.query_market_agent(
+        api.QueryRequest(
+            user_query="MU 現在適合進場嗎？",
+            include_news=False,
+        )
+    )
+
+    assert captured == {
+        "ticker": "MU",
+        "user_query": "MU 現在適合進場嗎？",
+        "include_news": False,
+    }
+    assert result["route"]["intent"] == "single_stock_analysis"
+    assert result["data"]["ticker"] == "MU"
+    assert "MU 分析無法完成" in result["report"]
+
+
+def test_query_endpoint_uses_explicit_ticker_for_backtest(monkeypatch):
+    captured = {}
+
+    def fake_run_backtest_query(ticker, user_query):
+        captured["ticker"] = ticker
+        captured["user_query"] = user_query
+        return {
+            "status": "unknown_strategy",
+            "ticker": ticker,
+            "strategy": "unknown",
+            "user_query": user_query,
+            "message": "請指定要回測的策略",
+        }
+
+    monkeypatch.setattr(api, "run_backtest_query", fake_run_backtest_query)
+
+    result = api.query_market_agent(
+        api.QueryRequest(
+            ticker=" mu ",
+            user_query="突破策略以前表現怎麼樣？",
+        )
+    )
+
+    assert captured == {
+        "ticker": "MU",
+        "user_query": "突破策略以前表現怎麼樣？",
+    }
+    assert result["route"]["intent"] == "backtest_query"
+    assert result["data"]["strategy"] == "unknown"
+
+
+def test_query_endpoint_returns_needs_ticker_for_stock_workflow_without_ticker():
+    result = api.query_market_agent(
+        api.QueryRequest(user_query="突破可以進場嗎？")
+    )
+
+    assert result["route"]["intent"] == "single_stock_analysis"
+    assert result["data"]["status"] == "needs_ticker"
+    assert "需要提供股票代號" in result["report"]
+
+
+def test_query_endpoint_dispatches_theme_workflow(monkeypatch):
+    def fake_run_theme_analysis(user_query):
+        return {
+            "status": "success",
+            "query": user_query,
+            "theme_name": "測試主題",
+            "results": [],
+        }
+
+    monkeypatch.setattr(api, "run_theme_analysis", fake_run_theme_analysis)
+
+    result = api.query_market_agent(
+        api.QueryRequest(user_query="記憶體概念股有哪些值得觀察？")
+    )
+
+    assert result["route"]["intent"] == "industry_trend"
+    assert result["data"]["theme_name"] == "測試主題"
+    assert "測試主題 主題觀察清單" in result["report"]
 
 
 def test_single_stock_endpoint_normalizes_ticker_and_returns_report(monkeypatch):

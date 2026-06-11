@@ -158,9 +158,19 @@ uvicorn api:app --reload
 
 - `GET /health`
 - `POST /route`
+- `POST /query`
 - `POST /analyze/single`
 - `POST /backtest`
 - `POST /themes`
+
+`POST /query` 是給網站整合用的統一入口，會先判斷 intent，再呼叫對應 workflow。範例：
+
+```json
+{
+  "user_query": "MU 現在適合進場嗎？",
+  "include_news": false
+}
+```
 
 本地測試：
 
