@@ -135,6 +135,12 @@ market-agent/
 - 已支援 breakout、volume_surge、pullback 策略回測查詢初版
 - 已支援固定主題股票池掃描
 - 已支援 rule-based 分析報告輸出
+- 已支援 `yfinance + Stooq` 多資料源股價 fallback
+- 已支援穩定 API response schema：`status`、`intent`、`data`、`report`、`error`
+- 已支援新聞結構化摘要：topic、sentiment、importance
+- 已支援基本面資料摘要
+- 已支援主題 / 同業廣度摘要
+- 已支援綜合研究 profile：technical、news、fundamental、risk、setup quality
 - 尚未接 LLM analyst、資料庫或 Web UI
 - 自動通知、自動交易與下單功能不在目前產品範圍
 
@@ -168,7 +174,8 @@ uvicorn api:app --reload
 ```json
 {
   "user_query": "MU 現在適合進場嗎？",
-  "include_news": false
+  "include_news": true,
+  "include_fundamentals": true
 }
 ```
 

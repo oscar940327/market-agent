@@ -18,6 +18,43 @@ def format_single_stock_analysis(analysis_data: dict) -> str:
     volume_surge = signals["volume_surge"]
     pullback = signals["pullback"]
     news_items = analysis_data["news"]
+    news_analysis = analysis_data.get(
+        "news_analysis",
+        {
+            "summary": {
+                "total_items": 0,
+                "sentiment": "neutral",
+                "high_importance_count": 0,
+                "top_topics": {},
+            }
+        },
+    )
+    news_summary = news_analysis["summary"]
+    fundamentals = analysis_data.get(
+        "fundamentals",
+        {
+            "status": "skipped",
+            "summary": {
+                "stance": "unknown",
+                "positives": [],
+                "risks": [],
+            },
+        },
+    )
+    fundamental_summary = fundamentals["summary"]
+    research_profile = analysis_data.get(
+        "research_profile",
+        {
+            "technical_score": 0,
+            "news_score": 0,
+            "fundamental_score": 0,
+            "risk_score": 0,
+            "combined_score": 0,
+            "setup_quality": "unknown",
+            "risk_level": "unknown",
+            "research_confidence": "low",
+        },
+    )
 
     lines = [
         f"{analysis_data['ticker']} 單一股票分析",
@@ -55,6 +92,32 @@ def format_single_stock_analysis(analysis_data: dict) -> str:
             lines.append(f"  {news['link']}")
     else:
         lines.append("- 目前沒有取得新聞資料。")
+
+    lines.extend(
+        [
+            "",
+            "新聞結構化摘要",
+            f"- 新聞整體情緒：{news_summary['sentiment']}",
+            f"- 高重要性新聞數：{news_summary['high_importance_count']}",
+            f"- 主要新聞主題：{format_topic_counts(news_summary['top_topics'])}",
+            "",
+            "基本面摘要",
+            f"- 基本面狀態：{fundamentals['status']}",
+            f"- 基本面立場：{fundamental_summary['stance']}",
+            f"- 正向因素：{format_reason_list(fundamental_summary['positives'])}",
+            f"- 風險因素：{format_reason_list(fundamental_summary['risks'])}",
+            "",
+            "綜合研究評估",
+            f"- 技術分數：{research_profile['technical_score']}",
+            f"- 新聞分數：{research_profile['news_score']}",
+            f"- 基本面分數：{research_profile['fundamental_score']}",
+            f"- 風險分數：{research_profile['risk_score']}",
+            f"- 綜合分數：{research_profile['combined_score']}",
+            f"- setup quality：{research_profile['setup_quality']}",
+            f"- risk level：{research_profile['risk_level']}",
+            f"- research confidence：{research_profile['research_confidence']}",
+        ]
+    )
 
     lines.extend(
         [
@@ -107,6 +170,27 @@ def build_single_stock_takeaway(technical: dict, signals: dict) -> str:
         return f"- 目前需要優先留意：{'、'.join(risk_signals)}。"
 
     return "- 目前訊號偏中性，沒有明確突破、放量或 MA20 回測訊號。"
+
+
+def format_topic_counts(topic_counts: dict) -> str:
+    if not topic_counts:
+        return "無"
+
+    return "、".join(
+        f"{topic} {count}"
+        for topic, count in sorted(
+            topic_counts.items(),
+            key=lambda item: item[1],
+            reverse=True,
+        )
+    )
+
+
+def format_reason_list(reasons: list[str]) -> str:
+    if not reasons:
+        return "無"
+
+    return "、".join(reasons)
 
 
 def format_backtest_analysis(backtest_data: dict) -> str:
@@ -180,6 +264,16 @@ def format_theme_analysis(theme_data: dict) -> str:
         return "\n".join(lines)
 
     results = theme_data["results"]
+    sector_summary = theme_data.get(
+        "sector_summary",
+        {
+            "successful_count": 0,
+            "average_score": 0,
+            "strongest_ticker": None,
+            "positive_breadth": 0,
+            "breadth_label": "no_data",
+        },
+    )
     successful_results = [result for result in results if result["status"] == "success"]
     failed_results = [result for result in results if result["status"] != "success"]
 
@@ -187,6 +281,13 @@ def format_theme_analysis(theme_data: dict) -> str:
         f"{theme_data['theme_name']} 主題觀察清單",
         "",
         f"原始問題：{theme_data['query']}",
+        "",
+        "主題廣度摘要",
+        f"- 成功分析檔數：{sector_summary['successful_count']}",
+        f"- 平均分數：{sector_summary['average_score']}",
+        f"- 最強標的：{sector_summary['strongest_ticker']}",
+        f"- 正分比例：{format_percent(sector_summary['positive_breadth'])}",
+        f"- 廣度狀態：{sector_summary['breadth_label']}",
         "",
         "值得優先觀察",
     ]

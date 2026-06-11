@@ -1,10 +1,13 @@
 import pandas as pd
 
 from agent.rule_based_router import detect_intent
+from agent.research_profile import build_research_profile
 from backtesting.metrics import calculate_backtest_metrics
 from backtesting.reports import build_backtest_report
 from data.themes import find_theme_key, get_all_theme_tickers
-from main import score_stock_analysis, validate_price_data
+from main import build_sector_summary, score_stock_analysis, validate_price_data
+from skills.news_analysis_skill import analyze_news_items
+from skills.fundamental_skill import summarize_fundamentals
 from strategies.breakout_strategy import check_breakout
 from strategies.pullback_strategy import check_pullback_to_ma20
 from strategies.volume_surge_strategy import check_volume_surge
@@ -147,3 +150,102 @@ def test_find_theme_key_and_all_theme_tickers_are_stable():
 
     assert "NVDA" in tickers
     assert len(tickers) == len(set(tickers))
+
+
+def test_analyze_news_items_classifies_topic_sentiment_and_importance():
+    result = analyze_news_items(
+        [
+            {
+                "title": "MU beats earnings expectations and raises guidance",
+                "link": "https://example.com/positive",
+                "published": "Fri, 12 Jun 2026 00:00:00 GMT",
+            },
+            {
+                "title": "Chip demand warning pressures memory stocks",
+                "link": "https://example.com/negative",
+                "published": "Fri, 12 Jun 2026 01:00:00 GMT",
+            },
+        ]
+    )
+
+    assert result["summary"]["total_items"] == 2
+    assert result["summary"]["sentiment"] == "neutral"
+    assert result["summary"]["high_importance_count"] == 2
+    assert result["items"][0]["topic"] == "earnings"
+    assert result["items"][0]["sentiment"] == "positive"
+    assert result["items"][0]["importance"] == "high"
+    assert result["items"][1]["topic"] == "industry_demand"
+    assert result["items"][1]["sentiment"] == "negative"
+
+
+def test_summarize_fundamentals_identifies_positive_and_risk_factors():
+    result = summarize_fundamentals(
+        {
+            "revenue_growth": 0.12,
+            "earnings_growth": -0.05,
+            "gross_margins": 0.45,
+            "debt_to_equity": 170,
+            "trailing_pe": 65,
+        }
+    )
+
+    assert result["stance"] == "mixed"
+    assert "營收成長為正" in result["positives"]
+    assert "毛利率相對較高" in result["positives"]
+    assert "獲利成長為負" in result["risks"]
+    assert "負債權益比偏高" in result["risks"]
+    assert "本益比偏高" in result["risks"]
+
+
+def test_build_research_profile_combines_multiple_research_dimensions():
+    result = build_research_profile(
+        technical={
+            "short_term_trend": "strong",
+            "is_above_ma20": True,
+        },
+        signals={
+            "breakout": {"is_breakout": True},
+            "volume_surge": {"is_volume_surge": True},
+            "pullback": {"is_pullback": False},
+        },
+        news_analysis={
+            "summary": {
+                "total_items": 2,
+                "sentiment": "positive",
+            }
+        },
+        fundamentals={
+            "status": "success",
+            "summary": {
+                "positives": ["營收成長為正", "毛利率相對較高"],
+                "risks": ["本益比偏高"],
+            },
+        },
+    )
+
+    assert result["technical_score"] == 6.5
+    assert result["news_score"] == 1.0
+    assert result["fundamental_score"] == 0.75
+    assert result["risk_score"] == 0
+    assert result["setup_quality"] == "strong"
+    assert result["risk_level"] == "low"
+    assert result["research_confidence"] == "high"
+
+
+def test_build_sector_summary_measures_theme_breadth():
+    result = build_sector_summary(
+        [
+            {"ticker": "MU", "status": "success", "score": 4},
+            {"ticker": "WDC", "status": "success", "score": 2},
+            {"ticker": "STX", "status": "success", "score": -1},
+            {"ticker": "SNDK", "status": "price_data_error", "score": 0},
+        ]
+    )
+
+    assert result == {
+        "successful_count": 3,
+        "average_score": 1.67,
+        "strongest_ticker": "MU",
+        "positive_breadth": 0.6667,
+        "breadth_label": "mixed",
+    }

@@ -4,10 +4,13 @@ from agent.analyst import (
     format_single_stock_analysis,
     format_theme_analysis,
 )
+from agent.research_profile import build_research_profile
 from data.themes import find_theme_key, get_all_theme_tickers, get_theme
-from skills.stock_price_skill import get_recent_price_data
+from skills.stock_price_skill import get_recent_price_result
 from skills.technical_analysis_skill import analyze_moving_averages
 from skills.news_skill import get_stock_news
+from skills.news_analysis_skill import analyze_news_items
+from skills.fundamental_skill import get_basic_fundamentals
 from strategies.breakout_strategy import check_breakout
 from strategies.volume_surge_strategy import check_volume_surge
 from strategies.pullback_strategy import check_pullback_to_ma20
@@ -51,13 +54,26 @@ def validate_price_data(price_data, ticker: str, min_rows: int):
 
 def fetch_price_data(ticker: str, period: str):
     try:
-        return get_recent_price_data(ticker, period=period), None
+        price_result = get_recent_price_result(ticker, period=period)
     except Exception as error:
         return None, {
             "ticker": ticker,
             "status": "price_data_error",
             "message": f"取得股價資料時發生錯誤：{error}",
-        }
+            "price_source": {
+                "provider": None,
+                "attempted_providers": [],
+                "errors": [{"provider": "price_service", "message": str(error)}],
+            },
+        }, None
+
+    price_source = {
+        "provider": price_result.provider,
+        "attempted_providers": price_result.attempted_providers,
+        "errors": price_result.errors,
+    }
+
+    return price_result.data, None, price_source
 
 
 def fetch_news_items(ticker: str) -> list[dict]:
@@ -67,12 +83,30 @@ def fetch_news_items(ticker: str) -> list[dict]:
         return []
 
 
+def fetch_fundamentals(ticker: str) -> dict:
+    try:
+        return get_basic_fundamentals(ticker)
+    except Exception as error:
+        return {
+            "status": "fundamental_data_error",
+            "provider": "yfinance",
+            "message": f"取得基本面資料時發生錯誤：{error}",
+            "metrics": {},
+            "summary": {
+                "stance": "unknown",
+                "positives": [],
+                "risks": ["基本面資料暫時無法取得"],
+            },
+        }
+
+
 def run_single_stock_analysis(
     ticker: str,
     user_query: str,
     include_news: bool = True,
+    include_fundamentals: bool = True,
 ) -> dict:
-    price_data, fetch_error = fetch_price_data(ticker, period="1y")
+    price_data, fetch_error, price_source = fetch_price_data(ticker, period="1y")
 
     if fetch_error:
         return {
@@ -87,6 +121,7 @@ def run_single_stock_analysis(
         return {
             "intent": "single_stock_analysis",
             "query": user_query,
+            "price_source": price_source,
             **data_error,
         }
 
@@ -95,15 +130,42 @@ def run_single_stock_analysis(
     volume_surge_result = check_volume_surge(price_data)
     pullback_result = check_pullback_to_ma20(price_data)
     news_items = []
+    fundamentals = {
+        "status": "skipped",
+        "provider": None,
+        "metrics": {},
+        "summary": {
+            "stance": "unknown",
+            "positives": [],
+            "risks": [],
+        },
+    }
 
     if include_news:
         news_items = fetch_news_items(ticker)
+
+    news_analysis = analyze_news_items(news_items)
+
+    if include_fundamentals:
+        fundamentals = fetch_fundamentals(ticker)
+
+    research_profile = build_research_profile(
+        technical=analysis_result,
+        signals={
+            "breakout": breakout_result,
+            "volume_surge": volume_surge_result,
+            "pullback": pullback_result,
+        },
+        news_analysis=news_analysis,
+        fundamentals=fundamentals,
+    )
 
     analysis_data = {
         "intent": "single_stock_analysis",
         "status": "success",
         "query": user_query,
         "ticker": ticker,
+        "price_source": price_source,
         "technical_analysis": analysis_result,
         "signals": {
             "breakout": breakout_result,
@@ -111,6 +173,9 @@ def run_single_stock_analysis(
             "pullback": pullback_result,
         },
         "news": news_items,
+        "news_analysis": news_analysis,
+        "fundamentals": fundamentals,
+        "research_profile": research_profile,
     }
 
     return analysis_data
@@ -187,6 +252,7 @@ def run_theme_analysis(user_query: str) -> dict:
             ticker=ticker,
             user_query=user_query,
             include_news=False,
+            include_fundamentals=False,
         )
         results.append(score_stock_analysis(analysis_data))
 
@@ -195,6 +261,7 @@ def run_theme_analysis(user_query: str) -> dict:
         key=lambda item: item["score"],
         reverse=True,
     )
+    sector_summary = build_sector_summary(sorted_results)
 
     return {
         "intent": "industry_trend",
@@ -202,8 +269,47 @@ def run_theme_analysis(user_query: str) -> dict:
         "query": user_query,
         "theme_key": theme_key,
         "theme_name": theme_name,
+        "sector_summary": sector_summary,
         "results": sorted_results,
     }
+
+
+def build_sector_summary(results: list[dict]) -> dict:
+    successful_results = [result for result in results if result["status"] == "success"]
+
+    if not successful_results:
+        return {
+            "successful_count": 0,
+            "average_score": 0,
+            "strongest_ticker": None,
+            "positive_breadth": 0,
+            "breadth_label": "no_data",
+        }
+
+    positive_results = [result for result in successful_results if result["score"] > 0]
+    average_score = sum(result["score"] for result in successful_results) / len(
+        successful_results
+    )
+    positive_breadth = len(positive_results) / len(successful_results)
+    strongest_result = successful_results[0]
+
+    return {
+        "successful_count": len(successful_results),
+        "average_score": round(average_score, 2),
+        "strongest_ticker": strongest_result["ticker"],
+        "positive_breadth": round(positive_breadth, 4),
+        "breadth_label": classify_sector_breadth(positive_breadth),
+    }
+
+
+def classify_sector_breadth(positive_breadth: float) -> str:
+    if positive_breadth >= 0.7:
+        return "broad_strength"
+
+    if positive_breadth >= 0.4:
+        return "mixed"
+
+    return "weak_breadth"
 
 
 def run_backtest_query(ticker: str, user_query: str) -> dict:
@@ -233,7 +339,7 @@ def run_backtest_query(ticker: str, user_query: str) -> dict:
             "message": "請指定要回測的策略：breakout、volume_surge 或 pullback。",
         }
 
-    price_data, fetch_error = fetch_price_data(ticker, period="2y")
+    price_data, fetch_error, price_source = fetch_price_data(ticker, period="2y")
 
     if fetch_error:
         return {
@@ -250,6 +356,7 @@ def run_backtest_query(ticker: str, user_query: str) -> dict:
             "intent": "backtest_query",
             "strategy": strategy,
             "user_query": user_query,
+            "price_source": price_source,
             **data_error,
         }
 
@@ -275,6 +382,7 @@ def run_backtest_query(ticker: str, user_query: str) -> dict:
         "strategy": strategy,
         "user_query": user_query,
         "status": "success",
+        "price_source": price_source,
         "report": report,
     }
 

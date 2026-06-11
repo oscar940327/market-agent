@@ -38,10 +38,16 @@ def test_extract_ticker_from_query_uses_known_ticker_symbols():
 def test_query_endpoint_dispatches_single_stock_with_ticker_from_query(monkeypatch):
     captured = {}
 
-    def fake_run_single_stock_analysis(ticker, user_query, include_news=True):
+    def fake_run_single_stock_analysis(
+        ticker,
+        user_query,
+        include_news=True,
+        include_fundamentals=True,
+    ):
         captured["ticker"] = ticker
         captured["user_query"] = user_query
         captured["include_news"] = include_news
+        captured["include_fundamentals"] = include_fundamentals
         return {
             "status": "no_price_data",
             "ticker": ticker,
@@ -54,6 +60,7 @@ def test_query_endpoint_dispatches_single_stock_with_ticker_from_query(monkeypat
         api.QueryRequest(
             user_query="MU 現在適合進場嗎？",
             include_news=False,
+            include_fundamentals=False,
         )
     )
 
@@ -61,6 +68,13 @@ def test_query_endpoint_dispatches_single_stock_with_ticker_from_query(monkeypat
         "ticker": "MU",
         "user_query": "MU 現在適合進場嗎？",
         "include_news": False,
+        "include_fundamentals": False,
+    }
+    assert result["status"] == "no_price_data"
+    assert result["intent"] == "single_stock_analysis"
+    assert result["error"] == {
+        "status": "no_price_data",
+        "message": "沒有取得股價資料",
     }
     assert result["route"]["intent"] == "single_stock_analysis"
     assert result["data"]["ticker"] == "MU"
@@ -95,6 +109,9 @@ def test_query_endpoint_uses_explicit_ticker_for_backtest(monkeypatch):
         "user_query": "突破策略以前表現怎麼樣？",
     }
     assert result["route"]["intent"] == "backtest_query"
+    assert result["status"] == "unknown_strategy"
+    assert result["intent"] == "backtest_query"
+    assert result["error"]["status"] == "unknown_strategy"
     assert result["data"]["strategy"] == "unknown"
 
 
@@ -104,6 +121,9 @@ def test_query_endpoint_returns_needs_ticker_for_stock_workflow_without_ticker()
     )
 
     assert result["route"]["intent"] == "single_stock_analysis"
+    assert result["status"] == "needs_ticker"
+    assert result["intent"] == "single_stock_analysis"
+    assert result["error"]["status"] == "needs_ticker"
     assert result["data"]["status"] == "needs_ticker"
     assert "需要提供股票代號" in result["report"]
 
@@ -124,17 +144,57 @@ def test_query_endpoint_dispatches_theme_workflow(monkeypatch):
     )
 
     assert result["route"]["intent"] == "industry_trend"
+    assert result["status"] == "success"
+    assert result["intent"] == "industry_trend"
+    assert result["error"] is None
     assert result["data"]["theme_name"] == "測試主題"
     assert "測試主題 主題觀察清單" in result["report"]
+
+
+def test_build_api_response_has_stable_success_shape():
+    result = api.build_api_response(
+        intent="industry_trend",
+        data={"status": "success", "value": 1},
+        report="ok",
+    )
+
+    assert result == {
+        "status": "success",
+        "intent": "industry_trend",
+        "data": {"status": "success", "value": 1},
+        "report": "ok",
+        "error": None,
+    }
+
+
+def test_build_api_response_has_stable_error_shape():
+    result = api.build_api_response(
+        intent="single_stock_analysis",
+        data={"status": "needs_ticker", "message": "missing ticker"},
+        report="error report",
+    )
+
+    assert result["status"] == "needs_ticker"
+    assert result["intent"] == "single_stock_analysis"
+    assert result["error"] == {
+        "status": "needs_ticker",
+        "message": "missing ticker",
+    }
 
 
 def test_single_stock_endpoint_normalizes_ticker_and_returns_report(monkeypatch):
     captured = {}
 
-    def fake_run_single_stock_analysis(ticker, user_query, include_news=True):
+    def fake_run_single_stock_analysis(
+        ticker,
+        user_query,
+        include_news=True,
+        include_fundamentals=True,
+    ):
         captured["ticker"] = ticker
         captured["user_query"] = user_query
         captured["include_news"] = include_news
+        captured["include_fundamentals"] = include_fundamentals
         return {
             "status": "no_price_data",
             "ticker": ticker,
@@ -148,6 +208,7 @@ def test_single_stock_endpoint_normalizes_ticker_and_returns_report(monkeypatch)
             ticker=" mu ",
             user_query="MU 現在適合進場嗎？",
             include_news=False,
+            include_fundamentals=False,
         )
     )
 
@@ -155,6 +216,7 @@ def test_single_stock_endpoint_normalizes_ticker_and_returns_report(monkeypatch)
         "ticker": "MU",
         "user_query": "MU 現在適合進場嗎？",
         "include_news": False,
+        "include_fundamentals": False,
     }
     assert result["data"]["ticker"] == "MU"
     assert "MU 分析無法完成" in result["report"]
