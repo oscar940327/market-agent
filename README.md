@@ -67,6 +67,7 @@ market-agent/
 │   ├── themes.py
 │   └── historical_prices/
 │
+├── api.py
 ├── main.py
 ├── requirements.txt
 ├── current_progress.md
@@ -134,7 +135,8 @@ market-agent/
 - 已支援 breakout、volume_surge、pullback 策略回測查詢初版
 - 已支援固定主題股票池掃描
 - 已支援 rule-based 分析報告輸出
-- 尚未接 LLM analyst、資料庫、Web UI 或自動通知
+- 尚未接 LLM analyst、資料庫或 Web UI
+- 自動通知、自動交易與下單功能不在目前產品範圍
 
 ## Development
 
@@ -145,6 +147,26 @@ python main.py
 ```
 
 目前 CLI 會輸出固定格式研究摘要，先不接 LLM。
+
+也可以啟動 FastAPI backend，供未來網站或其他 client 呼叫：
+
+```bash
+uvicorn api:app --reload
+```
+
+目前 API endpoint：
+
+- `GET /health`
+- `POST /route`
+- `POST /analyze/single`
+- `POST /backtest`
+- `POST /themes`
+
+本地測試：
+
+```bash
+python -m pytest -q
+```
 
 ## Disclaimer
 
