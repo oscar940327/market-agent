@@ -2,7 +2,7 @@
 
 Market Agent 是一個個人股票研究 Agent 專案，目標是用自然語言協助整理市場資料、技術訊號、策略條件與歷史回測結果。
 
-這個專案目前已具備 V3 controlled agentic workflow：單一股票分析、三種策略回測查詢、主題股票觀察清單、多面向研究資料，以及 Manager + Expert Agents 架構。
+這個專案目前已具備 V4 controlled agentic workflow：單一股票分析、三種策略回測查詢、主題股票觀察清單、多面向研究資料、Manager + Expert Agents 架構，以及可選的 LLM Analyst。
 
 ## What It Is
 
@@ -13,7 +13,7 @@ Market Agent 預計支援這類問題：
 - `某檔股票現在是突破還是追高？`
 - `這個技術訊號以前回測表現怎麼樣？`
 
-Agent 的角色是理解問題、拆解任務，並呼叫明確的 Python 模組取得資料、計算指標、套用策略規則或讀取回測結果。LLM 目前尚未接入，現階段由 rule-based analyst 將結構化資料整理成中文研究摘要。
+Agent 的角色是理解問題、拆解任務，並呼叫明確的 Python 模組取得資料、計算指標、套用策略規則或讀取回測結果。LLM Analyst 只負責解釋結構化資料，不負責抓資料、算指標或跑回測。
 
 ## What It Is Not
 
@@ -38,7 +38,7 @@ Market Agent 不是：
 4. 整合模組輸出的結果
 5. 回覆可讀的研究摘要
 
-V3 之後，流程由 `MarketManagerAgent` 編排：
+V4 之後，流程由 `MarketManagerAgent` 編排，再交給 rule-based analyst 或 LLM Analyst 產生報告：
 
 ```text
 使用者問題
@@ -65,7 +65,9 @@ Analyst
 market-agent/
 ├── agent/
 │   ├── analyst.py
+│   ├── llm_analyst.py
 │   ├── market_manager.py
+│   ├── reporting.py
 │   ├── research_profile.py
 │   ├── rule_based_router.py
 │   └── experts/
@@ -171,6 +173,7 @@ market-agent/
 - `V1`: 建立 CLI / API core，支援單股分析、策略回測與主題掃描。
 - `V2`: 加入多資料源價格、新聞結構化、基本面摘要與綜合研究 profile。
 - `V3`: 加入 Market Manager 與 Technical / News / Fundamental / Backtest expert agents。
+- `V4`: 加入可選 LLM Analyst，將結構化 agent outputs 轉成自然語言研究摘要。
 
 ## Current Status
 
@@ -193,7 +196,9 @@ market-agent/
 - 已支援 `MarketManagerAgent` 編排單股分析與回測查詢
 - 已支援 Technical / News / Fundamental / Backtest expert agent outputs
 - 已支援 `execution_plan` 與 `agent_outputs`
-- 尚未接 LLM analyst、資料庫或 Web UI
+- 已支援 `analyst_mode=rule_based|llm`
+- 已支援 LLM Analyst fallback：未設定 LLM provider 時自動使用 rule-based analyst
+- 尚未接資料庫或 Web UI
 - 自動通知、自動交易與下單功能不在目前產品範圍
 
 ## Development
@@ -204,7 +209,24 @@ market-agent/
 python main.py
 ```
 
-目前 CLI 會輸出固定格式研究摘要，先不接 LLM。
+預設 CLI 會輸出 rule-based 研究摘要。若要使用 OpenRouter 的 LLM Analyst，可設定：
+
+```bash
+export MARKET_AGENT_ANALYST_MODE=llm
+export MARKET_AGENT_LLM_PROVIDER=openrouter
+export OPENROUTER_API_KEY=your_openrouter_api_key
+export MARKET_AGENT_LLM_MODEL=openai/gpt-4.1
+export OPENROUTER_APP_NAME=market-agent
+```
+
+也可以使用 OpenAI Responses API：
+
+```bash
+export MARKET_AGENT_ANALYST_MODE=llm
+export MARKET_AGENT_LLM_PROVIDER=openai
+export OPENAI_API_KEY=your_api_key
+export MARKET_AGENT_LLM_MODEL=gpt-4.1
+```
 
 也可以啟動 FastAPI backend，供未來網站或其他 client 呼叫：
 
@@ -227,9 +249,23 @@ uvicorn api:app --reload
 {
   "user_query": "MU 現在適合進場嗎？",
   "include_news": true,
-  "include_fundamentals": true
+  "include_fundamentals": true,
+  "analyst_mode": "rule_based"
 }
 ```
+
+使用 LLM Analyst：
+
+```json
+{
+  "user_query": "MU 現在適合進場嗎？",
+  "include_news": false,
+  "include_fundamentals": false,
+  "analyst_mode": "llm"
+}
+```
+
+如果沒有設定對應 provider 的 API key，API 會回傳 `analyst.fallback_used = true`，並使用 rule-based report。
 
 本地測試：
 
@@ -240,7 +276,7 @@ python -m pytest -q
 目前測試狀態：
 
 ```text
-38 passed
+44 passed
 ```
 
 ## Disclaimer

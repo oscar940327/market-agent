@@ -3,12 +3,8 @@ import re
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
 
-from agent.analyst import (
-    format_backtest_analysis,
-    format_error_message,
-    format_single_stock_analysis,
-    format_theme_analysis,
-)
+from agent.analyst import format_error_message
+from agent.reporting import build_report
 from agent.rule_based_router import detect_intent
 from data.themes import get_all_theme_tickers
 from main import run_backtest_query, run_single_stock_analysis, run_theme_analysis
@@ -52,6 +48,7 @@ class QueryRequest(BaseModel):
     ticker: str | None = Field(default=None, max_length=12)
     include_news: bool = True
     include_fundamentals: bool = True
+    analyst_mode: str = "rule_based"
 
 
 class SingleStockAnalysisRequest(BaseModel):
@@ -59,15 +56,18 @@ class SingleStockAnalysisRequest(BaseModel):
     user_query: str = Field(..., min_length=1)
     include_news: bool = True
     include_fundamentals: bool = True
+    analyst_mode: str = "rule_based"
 
 
 class BacktestRequest(BaseModel):
     ticker: str = Field(..., min_length=1, max_length=12)
     user_query: str = Field(..., min_length=1)
+    analyst_mode: str = "rule_based"
 
 
 class ThemeAnalysisRequest(BaseModel):
     user_query: str = Field(..., min_length=1)
+    analyst_mode: str = "rule_based"
 
 
 def normalize_ticker(ticker: str) -> str:
@@ -98,6 +98,7 @@ def build_api_response(
     intent: str,
     data: dict,
     report: str,
+    analyst: dict | None = None,
     route: dict | None = None,
 ) -> dict:
     status = data.get("status", "success")
@@ -116,6 +117,9 @@ def build_api_response(
         "report": report,
         "error": error,
     }
+
+    if analyst is not None:
+        response["analyst"] = analyst
 
     if route is not None:
         response["route"] = route
@@ -159,12 +163,18 @@ def query_market_agent(request: QueryRequest) -> dict:
             include_news=request.include_news,
             include_fundamentals=request.include_fundamentals,
         )
+        report_result = build_report(
+            kind="single_stock",
+            data=analysis_data,
+            analyst_mode=request.analyst_mode,
+        )
 
         return build_api_response(
             intent=intent,
             route=route_result,
             data=analysis_data,
-            report=format_single_stock_analysis(analysis_data),
+            report=report_result["report"],
+            analyst=report_result["analyst"],
         )
 
     if intent == "backtest_query":
@@ -183,22 +193,34 @@ def query_market_agent(request: QueryRequest) -> dict:
             ticker=normalize_ticker(ticker),
             user_query=request.user_query,
         )
+        report_result = build_report(
+            kind="backtest",
+            data=backtest_data,
+            analyst_mode=request.analyst_mode,
+        )
 
         return build_api_response(
             intent=intent,
             route=route_result,
             data=backtest_data,
-            report=format_backtest_analysis(backtest_data),
+            report=report_result["report"],
+            analyst=report_result["analyst"],
         )
 
     if intent == "industry_trend":
         theme_data = run_theme_analysis(request.user_query)
+        report_result = build_report(
+            kind="theme",
+            data=theme_data,
+            analyst_mode=request.analyst_mode,
+        )
 
         return build_api_response(
             intent=intent,
             route=route_result,
             data=theme_data,
-            report=format_theme_analysis(theme_data),
+            report=report_result["report"],
+            analyst=report_result["analyst"],
         )
 
     result = {
@@ -224,11 +246,17 @@ def analyze_single_stock(request: SingleStockAnalysisRequest) -> dict:
         include_news=request.include_news,
         include_fundamentals=request.include_fundamentals,
     )
+    report_result = build_report(
+        kind="single_stock",
+        data=analysis_data,
+        analyst_mode=request.analyst_mode,
+    )
 
     return build_api_response(
         intent="single_stock_analysis",
         data=analysis_data,
-        report=format_single_stock_analysis(analysis_data),
+        report=report_result["report"],
+        analyst=report_result["analyst"],
     )
 
 
@@ -238,20 +266,32 @@ def backtest_strategy(request: BacktestRequest) -> dict:
         ticker=normalize_ticker(request.ticker),
         user_query=request.user_query,
     )
+    report_result = build_report(
+        kind="backtest",
+        data=backtest_data,
+        analyst_mode=request.analyst_mode,
+    )
 
     return build_api_response(
         intent="backtest_query",
         data=backtest_data,
-        report=format_backtest_analysis(backtest_data),
+        report=report_result["report"],
+        analyst=report_result["analyst"],
     )
 
 
 @app.post("/themes")
 def analyze_theme(request: ThemeAnalysisRequest) -> dict:
     theme_data = run_theme_analysis(request.user_query)
+    report_result = build_report(
+        kind="theme",
+        data=theme_data,
+        analyst_mode=request.analyst_mode,
+    )
 
     return build_api_response(
         intent="industry_trend",
         data=theme_data,
-        report=format_theme_analysis(theme_data),
+        report=report_result["report"],
+        analyst=report_result["analyst"],
     )

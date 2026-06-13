@@ -1,14 +1,10 @@
 from agent.rule_based_router import detect_intent
-from agent.analyst import (
-    format_backtest_analysis,
-    format_single_stock_analysis,
-    format_theme_analysis,
-)
 from agent.market_manager import (
     MarketManagerAgent,
     fetch_price_data,
     validate_price_data,
 )
+from agent.reporting import build_report, get_default_analyst_mode
 from data.themes import find_theme_key, get_all_theme_tickers, get_theme
 
 
@@ -181,19 +177,34 @@ def main():
     if intent == "single_stock_analysis":
         ticker = input("請輸入股票代號（例如：MU）：").upper()
         analysis_data = run_single_stock_analysis(ticker, user_query)
+        report_result = build_report(
+            kind="single_stock",
+            data=analysis_data,
+            analyst_mode=get_default_analyst_mode(),
+        )
         print()
-        print(format_single_stock_analysis(analysis_data))
+        print(report_result["report"])
 
     elif intent == "backtest_query":
         ticker = input("請輸入要回測的股票代號（例如：MU）：").upper()
         backtest_data = run_backtest_query(ticker, user_query)
+        report_result = build_report(
+            kind="backtest",
+            data=backtest_data,
+            analyst_mode=get_default_analyst_mode(),
+        )
         print()
-        print(format_backtest_analysis(backtest_data))
+        print(report_result["report"])
 
     elif intent == "industry_trend":
         theme_data = run_theme_analysis(user_query)
+        report_result = build_report(
+            kind="theme",
+            data=theme_data,
+            analyst_mode=get_default_analyst_mode(),
+        )
         print()
-        print(format_theme_analysis(theme_data))
+        print(report_result["report"])
 
     else:
         print()
