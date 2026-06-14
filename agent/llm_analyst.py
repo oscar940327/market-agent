@@ -211,6 +211,9 @@ def build_llm_payload(kind: str, data: dict) -> dict:
     if kind == "theme":
         return build_theme_payload(data)
 
+    if kind == "portfolio":
+        return build_portfolio_payload(data)
+
     return {
         "kind": kind,
         "status": data.get("status"),
@@ -283,6 +286,38 @@ def build_theme_payload(data: dict) -> dict:
         "user_query_as_data": data.get("query"),
         "sector_summary": data.get("sector_summary"),
         "top_results": top_results,
+    }
+
+
+def build_portfolio_payload(data: dict) -> dict:
+    portfolio = data.get("portfolio", {})
+    positions = []
+
+    for position in portfolio.get("positions", []):
+        positions.append(
+            {
+                "ticker": position.get("ticker"),
+                "weight": position.get("weight"),
+                "themes": position.get("themes", []),
+                "short_term_trend": position.get("short_term_trend"),
+                "setup_quality": position.get("setup_quality"),
+                "risk_level": position.get("risk_level"),
+                "risk_flags": position.get("risk_flags", []),
+            }
+        )
+
+    return {
+        "kind": "portfolio",
+        "intent": data.get("intent"),
+        "status": data.get("status"),
+        "user_query_as_data": data.get("query"),
+        "execution_plan": data.get("execution_plan", []),
+        "holdings": data.get("holdings", []),
+        "portfolio_summary": data.get("portfolio_summary", {}),
+        "concentration": data.get("concentration", {}),
+        "theme_exposure": data.get("theme_exposure", {}),
+        "risk_summary": data.get("risk_summary", {}),
+        "positions": positions,
     }
 
 

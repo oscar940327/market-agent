@@ -2,7 +2,7 @@
 
 Market Agent 是一個個人股票研究 Agent 專案，目標是用自然語言協助整理市場資料、技術訊號、策略條件與歷史回測結果。
 
-這個專案目前已具備 V4 controlled agentic workflow：單一股票分析、三種策略回測查詢、主題股票觀察清單、多面向研究資料、Manager + Expert Agents 架構，以及可選的 LLM Analyst。
+這個專案目前已具備 V5 controlled agentic workflow：單一股票分析、三種策略回測查詢、主題股票觀察清單、投資組合風險研究、多面向研究資料、Manager + Expert Agents 架構，以及可選的 LLM Analyst。
 
 ## What It Is
 
@@ -10,6 +10,7 @@ Market Agent 預計支援這類問題：
 
 - `MU 現在適合進場嗎？`
 - `目前記憶體概念股趨勢如何？`
+- `我目前持有 VOO、QQQM、TSLA，有什麼需要注意？`
 - `某檔股票現在是突破還是追高？`
 - `這個技術訊號以前回測表現怎麼樣？`
 
@@ -38,7 +39,7 @@ Market Agent 不是：
 4. 整合模組輸出的結果
 5. 回覆可讀的研究摘要
 
-V4 之後，流程由 `MarketManagerAgent` 編排，再交給 rule-based analyst 或 LLM Analyst 產生報告：
+V5 之後，流程由 `MarketManagerAgent` 編排，再交給 rule-based analyst 或 LLM Analyst 產生報告：
 
 ```text
 使用者問題
@@ -49,6 +50,7 @@ Technical Agent
 News Agent
 Fundamental Agent
 Backtest Agent
+Portfolio Agent
 ↓
 Market Manager Agent
 ↓
@@ -74,7 +76,8 @@ market-agent/
 │       ├── technical_agent.py
 │       ├── news_agent.py
 │       ├── fundamental_agent.py
-│       └── backtest_agent.py
+│       ├── backtest_agent.py
+│       └── portfolio_agent.py
 │
 ├── skills/
 │   ├── stock_price_skill.py
@@ -129,6 +132,7 @@ market-agent/
 - `News Agent`：新聞取得、topic、sentiment、importance
 - `Fundamental Agent`：估值、成長、現金流、風險摘要
 - `Backtest Agent`：策略選擇、歷史勝率、平均報酬、最大虧損
+- `Portfolio Agent`：持股權重、集中度、主題曝險、portfolio-level 風險
 
 ### Skills
 
@@ -174,6 +178,7 @@ market-agent/
 - `V2`: 加入多資料源價格、新聞結構化、基本面摘要與綜合研究 profile。
 - `V3`: 加入 Market Manager 與 Technical / News / Fundamental / Backtest expert agents。
 - `V4`: 加入可選 LLM Analyst，將結構化 agent outputs 轉成自然語言研究摘要。
+- `V5`: 加入 Watchlist / Portfolio / Risk 研究模式，支援持股集中度與主題曝險分析。
 
 ## Current Status
 
@@ -198,6 +203,9 @@ market-agent/
 - 已支援 `execution_plan` 與 `agent_outputs`
 - 已支援 `analyst_mode=rule_based|llm`
 - 已支援 LLM Analyst fallback：未設定 LLM provider 時自動使用 rule-based analyst
+- 已支援 Watchlist / Portfolio / Risk 研究模式
+- 已支援 `POST /portfolio`
+- 已支援持股權重、集中度、主題曝險與 portfolio-level 風險摘要
 - 尚未接資料庫或 Web UI
 - 自動通知、自動交易與下單功能不在目前產品範圍
 
@@ -242,6 +250,7 @@ uvicorn api:app --reload
 - `POST /analyze/single`
 - `POST /backtest`
 - `POST /themes`
+- `POST /portfolio`
 
 `POST /query` 是給網站整合用的統一入口，會先判斷 intent，再呼叫對應 workflow。範例：
 
@@ -265,6 +274,22 @@ uvicorn api:app --reload
 }
 ```
 
+投資組合研究：
+
+```json
+{
+  "user_query": "我目前持有 VOO QQQM TSLA 有什麼需要注意？",
+  "holdings": [
+    {"ticker": "VOO", "market_value": 5000},
+    {"ticker": "QQQM", "market_value": 3000},
+    {"ticker": "TSLA", "market_value": 2000}
+  ],
+  "include_news": false,
+  "include_fundamentals": false,
+  "analyst_mode": "rule_based"
+}
+```
+
 如果沒有設定對應 provider 的 API key，API 會回傳 `analyst.fallback_used = true`，並使用 rule-based report。
 
 本地測試：
@@ -276,7 +301,7 @@ python -m pytest -q
 目前測試狀態：
 
 ```text
-44 passed
+52 passed
 ```
 
 ## Disclaimer

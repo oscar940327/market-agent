@@ -160,6 +160,20 @@ def run_backtest_query(ticker: str, user_query: str) -> dict:
     return market_manager.run_backtest_query(ticker=ticker, user_query=user_query)
 
 
+def run_portfolio_analysis(
+    holdings: list[dict],
+    user_query: str,
+    include_news: bool = False,
+    include_fundamentals: bool = False,
+) -> dict:
+    return market_manager.run_portfolio_analysis(
+        holdings=holdings,
+        user_query=user_query,
+        include_news=include_news,
+        include_fundamentals=include_fundamentals,
+    )
+
+
 def main():
     print("Market Agent")
     print("個人股票研究助理 CLI")
@@ -201,6 +215,22 @@ def main():
         report_result = build_report(
             kind="theme",
             data=theme_data,
+            analyst_mode=get_default_analyst_mode(),
+        )
+        print()
+        print(report_result["report"])
+
+    elif intent == "portfolio_analysis":
+        raw_tickers = input("請輸入持股代號，用逗號分隔（例如：VOO, QQQM, TSLA）：")
+        holdings = [
+            {"ticker": ticker.strip()}
+            for ticker in raw_tickers.split(",")
+            if ticker.strip()
+        ]
+        portfolio_data = run_portfolio_analysis(holdings, user_query)
+        report_result = build_report(
+            kind="portfolio",
+            data=portfolio_data,
             analyst_mode=get_default_analyst_mode(),
         )
         print()

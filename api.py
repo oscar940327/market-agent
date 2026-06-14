@@ -7,7 +7,12 @@ from agent.analyst import format_error_message
 from agent.reporting import build_report
 from agent.rule_based_router import detect_intent
 from data.themes import get_all_theme_tickers
-from main import run_backtest_query, run_single_stock_analysis, run_theme_analysis
+from main import (
+    run_backtest_query,
+    run_portfolio_analysis,
+    run_single_stock_analysis,
+    run_theme_analysis,
+)
 
 
 KNOWN_TICKERS = {
@@ -43,9 +48,17 @@ class RouteRequest(BaseModel):
     user_query: str = Field(..., min_length=1)
 
 
+class HoldingRequest(BaseModel):
+    ticker: str = Field(..., min_length=1, max_length=12)
+    market_value: float | None = None
+    quantity: float | None = None
+    cost_basis: float | None = None
+
+
 class QueryRequest(BaseModel):
     user_query: str = Field(..., min_length=1)
     ticker: str | None = Field(default=None, max_length=12)
+    holdings: list[HoldingRequest] | None = None
     include_news: bool = True
     include_fundamentals: bool = True
     analyst_mode: str = "rule_based"
@@ -70,8 +83,31 @@ class ThemeAnalysisRequest(BaseModel):
     analyst_mode: str = "rule_based"
 
 
+class PortfolioAnalysisRequest(BaseModel):
+    user_query: str = Field(
+        default="我的投資組合目前有什麼需要注意？",
+        min_length=1,
+    )
+    holdings: list[HoldingRequest] = Field(..., min_length=1)
+    include_news: bool = False
+    include_fundamentals: bool = False
+    analyst_mode: str = "rule_based"
+
+
 def normalize_ticker(ticker: str) -> str:
     return ticker.strip().upper()
+
+
+def normalize_holdings_request(holdings: list[HoldingRequest]) -> list[dict]:
+    return [
+        {
+            "ticker": normalize_ticker(holding.ticker),
+            "market_value": holding.market_value,
+            "quantity": holding.quantity,
+            "cost_basis": holding.cost_basis,
+        }
+        for holding in holdings
+    ]
 
 
 def extract_ticker_from_query(user_query: str) -> str | None:
@@ -90,6 +126,15 @@ def build_needs_ticker_result(intent: str, user_query: str) -> dict:
         "status": "needs_ticker",
         "query": user_query,
         "message": "這類問題需要提供股票代號，請在 request body 加上 ticker。",
+    }
+
+
+def build_needs_holdings_result(intent: str, user_query: str) -> dict:
+    return {
+        "intent": intent,
+        "status": "needs_holdings",
+        "query": user_query,
+        "message": "這類問題需要提供 holdings，例如 VOO、QQQM、TSLA 等持股清單。",
     }
 
 
@@ -223,6 +268,36 @@ def query_market_agent(request: QueryRequest) -> dict:
             analyst=report_result["analyst"],
         )
 
+    if intent == "portfolio_analysis":
+        if not request.holdings:
+            result = build_needs_holdings_result(intent, request.user_query)
+            return build_api_response(
+                intent=intent,
+                route=route_result,
+                data=result,
+                report=format_error_message(result),
+            )
+
+        portfolio_data = run_portfolio_analysis(
+            holdings=normalize_holdings_request(request.holdings),
+            user_query=request.user_query,
+            include_news=request.include_news,
+            include_fundamentals=request.include_fundamentals,
+        )
+        report_result = build_report(
+            kind="portfolio",
+            data=portfolio_data,
+            analyst_mode=request.analyst_mode,
+        )
+
+        return build_api_response(
+            intent=intent,
+            route=route_result,
+            data=portfolio_data,
+            report=report_result["report"],
+            analyst=report_result["analyst"],
+        )
+
     result = {
         "intent": intent,
         "status": "unsupported_intent",
@@ -292,6 +367,28 @@ def analyze_theme(request: ThemeAnalysisRequest) -> dict:
     return build_api_response(
         intent="industry_trend",
         data=theme_data,
+        report=report_result["report"],
+        analyst=report_result["analyst"],
+    )
+
+
+@app.post("/portfolio")
+def analyze_portfolio(request: PortfolioAnalysisRequest) -> dict:
+    portfolio_data = run_portfolio_analysis(
+        holdings=normalize_holdings_request(request.holdings),
+        user_query=request.user_query,
+        include_news=request.include_news,
+        include_fundamentals=request.include_fundamentals,
+    )
+    report_result = build_report(
+        kind="portfolio",
+        data=portfolio_data,
+        analyst_mode=request.analyst_mode,
+    )
+
+    return build_api_response(
+        intent="portfolio_analysis",
+        data=portfolio_data,
         report=report_result["report"],
         analyst=report_result["analyst"],
     )

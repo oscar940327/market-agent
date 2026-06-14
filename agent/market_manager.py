@@ -1,6 +1,7 @@
 from agent.experts.backtest_agent import run_backtest_agent, select_backtest_strategy
 from agent.experts.fundamental_agent import run_fundamental_agent
 from agent.experts.news_agent import run_news_agent
+from agent.experts.portfolio_agent import normalize_holdings, run_portfolio_agent
 from agent.experts.technical_agent import run_technical_agent
 from agent.research_profile import build_research_profile
 from skills.stock_price_skill import get_recent_price_result
@@ -86,6 +87,25 @@ class MarketManagerAgent:
             return ["backtest_strategy_selection"]
 
         return ["backtest_strategy_selection", "backtest"]
+
+    def build_portfolio_plan(
+        self,
+        include_news: bool = False,
+        include_fundamentals: bool = False,
+    ) -> list[str]:
+        plan = ["portfolio", "technical"]
+
+        if include_news:
+            plan.append("news")
+        else:
+            plan.append("news_skipped")
+
+        if include_fundamentals:
+            plan.append("fundamental")
+        else:
+            plan.append("fundamental_skipped")
+
+        return plan
 
     def run_single_stock_analysis(
         self,
@@ -209,4 +229,60 @@ class MarketManagerAgent:
                 "backtest": backtest_agent,
             },
             "report": backtest_agent["report"],
+        }
+
+    def run_portfolio_analysis(
+        self,
+        holdings: list[dict],
+        user_query: str,
+        include_news: bool = False,
+        include_fundamentals: bool = False,
+    ) -> dict:
+        execution_plan = self.build_portfolio_plan(
+            include_news=include_news,
+            include_fundamentals=include_fundamentals,
+        )
+        normalized_holdings = normalize_holdings(holdings)
+
+        if not normalized_holdings:
+            return {
+                "intent": "portfolio_analysis",
+                "status": "no_holdings",
+                "query": user_query,
+                "execution_plan": execution_plan,
+                "message": "請提供至少一個有效持股 ticker。",
+            }
+
+        analyses = []
+
+        for holding in normalized_holdings:
+            analyses.append(
+                self.run_single_stock_analysis(
+                    ticker=holding["ticker"],
+                    user_query=user_query,
+                    include_news=include_news,
+                    include_fundamentals=include_fundamentals,
+                )
+            )
+
+        portfolio_agent = run_portfolio_agent(
+            holdings=normalized_holdings,
+            analyses=analyses,
+        )
+
+        return {
+            "intent": "portfolio_analysis",
+            "status": "success",
+            "query": user_query,
+            "execution_plan": execution_plan,
+            "holdings": portfolio_agent["holdings"],
+            "analyses": analyses,
+            "agent_outputs": {
+                "portfolio": portfolio_agent,
+            },
+            "portfolio": portfolio_agent,
+            "portfolio_summary": portfolio_agent["summary"],
+            "risk_summary": portfolio_agent["risk_summary"],
+            "concentration": portfolio_agent["concentration"],
+            "theme_exposure": portfolio_agent["theme_exposure"],
         }

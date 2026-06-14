@@ -3,6 +3,7 @@ import os
 from agent.analyst import (
     format_backtest_analysis,
     format_error_message,
+    format_portfolio_analysis,
     format_single_stock_analysis,
     format_theme_analysis,
 )
@@ -114,6 +115,9 @@ def build_rule_based_report(kind: str, data: dict) -> str:
 
     if kind == "theme":
         return format_theme_analysis(data)
+
+    if kind == "portfolio":
+        return format_portfolio_analysis(data)
 
     return format_error_message(
         {

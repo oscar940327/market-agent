@@ -6,6 +6,16 @@ def detect_intent(user_query: str) -> dict:
     known_tickers = ["mu", "nvda", "tsla", "pltr", "sndk", "amd", "aapl", "msft"]
 
     if (
+        "投資組合" in user_query
+        or "持有" in user_query
+        or "持股" in user_query
+        or "部位" in user_query
+        or "觀察清單" in user_query
+        or "watchlist" in query
+        or "portfolio" in query
+    ):
+        intent = "portfolio_analysis"
+    elif (
         "回測" in user_query
         or "backtest" in query
         or "勝率" in user_query

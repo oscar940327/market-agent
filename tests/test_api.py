@@ -13,6 +13,7 @@ def test_app_registers_public_api_paths():
     assert "/analyze/single" in schema["paths"]
     assert "/backtest" in schema["paths"]
     assert "/themes" in schema["paths"]
+    assert "/portfolio" in schema["paths"]
 
 
 def test_health_check():
@@ -149,6 +150,99 @@ def test_query_endpoint_dispatches_theme_workflow(monkeypatch):
     assert result["error"] is None
     assert result["data"]["theme_name"] == "測試主題"
     assert "測試主題 主題觀察清單" in result["report"]
+
+
+def test_query_endpoint_returns_needs_holdings_for_portfolio_workflow():
+    result = api.query_market_agent(
+        api.QueryRequest(user_query="我目前持有 VOO QQQM 有什麼需要注意？")
+    )
+
+    assert result["route"]["intent"] == "portfolio_analysis"
+    assert result["status"] == "needs_holdings"
+    assert result["intent"] == "portfolio_analysis"
+    assert result["error"]["status"] == "needs_holdings"
+    assert "需要提供 holdings" in result["report"]
+
+
+def test_query_endpoint_dispatches_portfolio_workflow(monkeypatch):
+    captured = {}
+
+    def fake_run_portfolio_analysis(
+        holdings,
+        user_query,
+        include_news=False,
+        include_fundamentals=False,
+    ):
+        captured["holdings"] = holdings
+        captured["user_query"] = user_query
+        captured["include_news"] = include_news
+        captured["include_fundamentals"] = include_fundamentals
+        return {
+            "intent": "portfolio_analysis",
+            "status": "success",
+            "query": user_query,
+            "portfolio": {
+                "positions": [],
+            },
+            "portfolio_summary": {
+                "holding_count": 2,
+            },
+            "risk_summary": {
+                "risk_level": "low",
+                "risk_factors": [],
+            },
+            "concentration": {
+                "holding_count": 2,
+                "largest_position": "VOO",
+                "largest_weight": 0.5,
+                "top_3_weight": 1.0,
+                "position_concentration": "high",
+            },
+            "theme_exposure": {
+                "exposure": {},
+                "largest_theme": None,
+                "largest_theme_weight": 0,
+                "theme_concentration": "no_data",
+            },
+        }
+
+    monkeypatch.setattr(api, "run_portfolio_analysis", fake_run_portfolio_analysis)
+
+    result = api.query_market_agent(
+        api.QueryRequest(
+            user_query="我目前持有 VOO QQQM 有什麼需要注意？",
+            holdings=[
+                api.HoldingRequest(ticker="voo", market_value=1000),
+                api.HoldingRequest(ticker="qqqm", market_value=1000),
+            ],
+            include_news=False,
+            include_fundamentals=False,
+        )
+    )
+
+    assert captured == {
+        "holdings": [
+            {
+                "ticker": "VOO",
+                "market_value": 1000.0,
+                "quantity": None,
+                "cost_basis": None,
+            },
+            {
+                "ticker": "QQQM",
+                "market_value": 1000.0,
+                "quantity": None,
+                "cost_basis": None,
+            },
+        ],
+        "user_query": "我目前持有 VOO QQQM 有什麼需要注意？",
+        "include_news": False,
+        "include_fundamentals": False,
+    }
+    assert result["status"] == "success"
+    assert result["intent"] == "portfolio_analysis"
+    assert result["route"]["intent"] == "portfolio_analysis"
+    assert "投資組合研究摘要" in result["report"]
 
 
 def test_build_api_response_has_stable_success_shape():

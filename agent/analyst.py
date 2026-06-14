@@ -379,6 +379,111 @@ def build_backtest_takeaway(metrics: dict) -> str:
     return "- 歷史結果有一定參考價值，但訊號品質仍需要搭配其他條件判斷。"
 
 
+def format_portfolio_analysis(portfolio_data: dict) -> str:
+    if portfolio_data["status"] != "success":
+        return format_error_message(portfolio_data)
+
+    portfolio = portfolio_data["portfolio"]
+    concentration = portfolio_data["concentration"]
+    theme_exposure = portfolio_data["theme_exposure"]
+    risk_summary = portfolio_data["risk_summary"]
+    positions = portfolio["positions"]
+
+    lines = [
+        "投資組合研究摘要",
+        "",
+        f"原始問題：{portfolio_data['query']}",
+        "",
+        "持股概況",
+        f"- 持股檔數：{concentration['holding_count']}",
+        (
+            f"- 最大持股：{concentration['largest_position']} "
+            f"({format_percent(concentration['largest_weight'])})"
+        ),
+        f"- 前三大持股權重：{format_percent(concentration['top_3_weight'])}",
+        f"- 持股集中度：{concentration['position_concentration']}",
+        "",
+        "主題曝險",
+        (
+            f"- 最大主題：{theme_exposure['largest_theme']} "
+            f"({format_percent(theme_exposure['largest_theme_weight'])})"
+        ),
+        f"- 主題集中度：{theme_exposure['theme_concentration']}",
+        f"- 主題分布：{format_weight_map(theme_exposure['exposure'])}",
+        "",
+        "Portfolio Risk",
+        f"- 風險等級：{risk_summary['risk_level']}",
+        f"- 主要風險：{format_reason_list(risk_summary['risk_factors'])}",
+        "",
+        "持股檢查",
+    ]
+
+    if positions:
+        for position in positions:
+            lines.append(
+                "- "
+                f"{position['ticker']} | "
+                f"權重 {format_percent(position['weight'])} | "
+                f"趨勢 {position.get('short_term_trend', 'unknown')} | "
+                f"setup {position.get('setup_quality', 'unknown')} | "
+                f"risk {position.get('risk_level', 'unknown')}"
+            )
+            lines.append(f"  風險旗標：{format_reason_list(position['risk_flags'])}")
+    else:
+        lines.append("- 目前沒有可檢查的持股。")
+
+    lines.extend(
+        [
+            "",
+            "研究結論",
+            build_portfolio_takeaway(concentration, theme_exposure, risk_summary),
+            "",
+            "風險提醒",
+            "- 這份輸出只整理持股集中度、主題曝險與單股研究訊號，不構成投資建議。",
+            "- 權重若未提供 market_value，系統會用等權重估算。",
+            "- Portfolio 風險仍需要搭配個人現金流、投資期限與可承受回撤判斷。",
+        ]
+    )
+
+    return "\n".join(lines)
+
+
+def format_weight_map(weight_map: dict) -> str:
+    if not weight_map:
+        return "無"
+
+    return "、".join(
+        f"{name} {format_percent(weight)}"
+        for name, weight in weight_map.items()
+    )
+
+
+def build_portfolio_takeaway(
+    concentration: dict,
+    theme_exposure: dict,
+    risk_summary: dict,
+) -> str:
+    if risk_summary["risk_level"] == "high":
+        return (
+            "- 目前投資組合主要問題是集中度偏高，"
+            "應優先檢查最大持股、前三大持股與最大主題曝險。"
+        )
+
+    if risk_summary["risk_level"] == "medium":
+        return (
+            "- 目前投資組合有中等程度的集中或單股風險，"
+            "適合持續追蹤權重變化與弱勢標的。"
+        )
+
+    if (
+        concentration["position_concentration"] == "low"
+        and theme_exposure["theme_concentration"] == "low"
+    ):
+        return "- 目前持股與主題曝險相對分散，沒有明顯 portfolio-level 風險旗標。"
+
+    return "- 目前投資組合風險偏低，但仍需要定期檢查主題曝險與單股趨勢。"
+
+
 def format_error_message(result: dict) -> str:
     title = "分析無法完成"
 
