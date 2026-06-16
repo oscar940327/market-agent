@@ -1,6 +1,7 @@
 import re
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from agent.analyst import format_error_message
@@ -34,13 +35,27 @@ KNOWN_TICKERS = {
     "TSLA",
     "TSM",
     "WDC",
-    *get_all_theme_tickers(),
+    *get_all_theme_tickers(include_non_default=True),
 }
 
 app = FastAPI(
     title="Market Agent API",
     description="Personal stock research API backed by the Market Agent workflows.",
     version="0.1.0",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://127.0.0.1:8001",
+        "http://localhost:8001",
+        "http://127.0.0.1:5500",
+        "http://localhost:5500",
+        "https://oscar940327.github.io",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 

@@ -1,4 +1,5 @@
 import pytest
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError
 
 import api
@@ -21,6 +22,18 @@ def test_health_check():
         "status": "ok",
         "service": "market-agent",
     }
+
+
+def test_app_allows_personal_website_origins():
+    cors_middleware = [
+        middleware
+        for middleware in api.app.user_middleware
+        if middleware.cls is CORSMiddleware
+    ]
+
+    assert len(cors_middleware) == 1
+    assert "http://127.0.0.1:8001" in cors_middleware[0].kwargs["allow_origins"]
+    assert "https://oscar940327.github.io" in cors_middleware[0].kwargs["allow_origins"]
 
 
 def test_route_endpoint_uses_rule_based_router():

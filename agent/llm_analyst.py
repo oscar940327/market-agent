@@ -284,6 +284,7 @@ def build_theme_payload(data: dict) -> dict:
         "status": data.get("status"),
         "theme_name": data.get("theme_name"),
         "user_query_as_data": data.get("query"),
+        "scan_scope": data.get("scan_scope"),
         "sector_summary": data.get("sector_summary"),
         "top_results": top_results,
     }

@@ -4,8 +4,12 @@ from agent.rule_based_router import detect_intent
 from agent.research_profile import build_research_profile
 from backtesting.metrics import calculate_backtest_metrics
 from backtesting.reports import build_backtest_report
-from data.themes import find_theme_key, get_all_theme_tickers
-from main import build_sector_summary, score_stock_analysis, validate_price_data
+import main as main_module
+from data.themes import (
+    find_theme_key,
+    get_all_theme_tickers,
+)
+from main import build_sector_summary, run_theme_analysis, score_stock_analysis, validate_price_data
 from skills.news_analysis_skill import analyze_news_items
 from skills.fundamental_skill import summarize_fundamentals
 from strategies.breakout_strategy import check_breakout
@@ -145,11 +149,69 @@ def test_score_stock_analysis_rewards_positive_signals():
 
 def test_find_theme_key_and_all_theme_tickers_are_stable():
     assert find_theme_key("AI server 相關股票有哪些值得觀察？") == "ai_server"
+    assert find_theme_key("資安股有哪些值得觀察？") == "cybersecurity"
+    assert find_theme_key("雲端軟體股有哪些值得觀察？") == "software_cloud"
+    assert find_theme_key("能源股有哪些值得觀察？") == "energy_utilities"
+    assert find_theme_key("醫療生技股有哪些值得觀察？") == "healthcare_biotech"
 
     tickers = get_all_theme_tickers()
 
     assert "NVDA" in tickers
+    assert "ADBE" not in tickers
     assert len(tickers) == len(set(tickers))
+
+
+def test_non_default_theme_tickers_are_available_for_ticker_detection():
+    default_tickers = get_all_theme_tickers()
+    all_theme_tickers = get_all_theme_tickers(include_non_default=True)
+
+    assert "ADBE" not in default_tickers
+    assert "ADBE" in all_theme_tickers
+    assert "CRWD" in all_theme_tickers
+    assert "FANG" in all_theme_tickers
+    assert len(all_theme_tickers) == len(set(all_theme_tickers))
+
+
+def test_run_theme_analysis_scans_matched_theme(monkeypatch):
+    captured_tickers = []
+
+    def fake_run_single_stock_analysis(
+        ticker,
+        user_query,
+        include_news=True,
+        include_fundamentals=True,
+    ):
+        captured_tickers.append(ticker)
+        return {
+            "ticker": ticker,
+            "status": "success",
+            "technical_analysis": {
+                "short_term_trend": "strong",
+                "is_above_ma20": True,
+            },
+            "signals": {
+                "breakout": {"is_breakout": False},
+                "volume_surge": {"is_volume_surge": False},
+                "pullback": {"is_pullback": False},
+            },
+        }
+
+    monkeypatch.setattr(
+        main_module,
+        "run_single_stock_analysis",
+        fake_run_single_stock_analysis,
+    )
+
+    result = run_theme_analysis("資安股有哪些值得觀察？")
+
+    assert result["theme_key"] == "cybersecurity"
+    assert result["scan_scope"] == {
+        "available_ticker_count": 4,
+        "scanned_ticker_count": 4,
+        "scan_limit": None,
+        "scan_limited": False,
+    }
+    assert captured_tickers == ["CRWD", "FTNT", "PANW", "ZS"]
 
 
 def test_analyze_news_items_classifies_topic_sentiment_and_importance():

@@ -274,6 +274,15 @@ def format_theme_analysis(theme_data: dict) -> str:
             "breadth_label": "no_data",
         },
     )
+    scan_scope = theme_data.get(
+        "scan_scope",
+        {
+            "available_ticker_count": len(results),
+            "scanned_ticker_count": len(results),
+            "scan_limit": None,
+            "scan_limited": False,
+        },
+    )
     successful_results = [result for result in results if result["status"] == "success"]
     failed_results = [result for result in results if result["status"] != "success"]
 
@@ -281,6 +290,11 @@ def format_theme_analysis(theme_data: dict) -> str:
         f"{theme_data['theme_name']} 主題觀察清單",
         "",
         f"原始問題：{theme_data['query']}",
+        "",
+        "掃描範圍",
+        f"- 可用股票數：{scan_scope['available_ticker_count']}",
+        f"- 本次掃描數：{scan_scope['scanned_ticker_count']}",
+        f"- 掃描限制：{scan_scope['scan_limit'] or '無'}",
         "",
         "主題廣度摘要",
         f"- 成功分析檔數：{sector_summary['successful_count']}",

@@ -5,7 +5,12 @@ from agent.market_manager import (
     validate_price_data,
 )
 from agent.reporting import build_report, get_default_analyst_mode
-from data.themes import find_theme_key, get_all_theme_tickers, get_theme
+from data.themes import (
+    find_theme_key,
+    get_all_theme_tickers,
+    get_theme,
+    get_theme_scan_tickers,
+)
 
 
 market_manager = MarketManagerAgent()
@@ -84,10 +89,14 @@ def run_theme_analysis(user_query: str) -> dict:
     if theme_key:
         theme = get_theme(theme_key)
         theme_name = theme["name"]
-        tickers = theme["tickers"]
+        available_ticker_count = len(theme["tickers"])
+        tickers = get_theme_scan_tickers(theme)
+        scan_limit = theme.get("scan_limit")
     else:
         theme_name = "全部支援主題"
+        scan_limit = None
         tickers = get_all_theme_tickers()
+        available_ticker_count = len(tickers)
 
     results = []
 
@@ -113,6 +122,12 @@ def run_theme_analysis(user_query: str) -> dict:
         "query": user_query,
         "theme_key": theme_key,
         "theme_name": theme_name,
+        "scan_scope": {
+            "available_ticker_count": available_ticker_count,
+            "scanned_ticker_count": len(tickers),
+            "scan_limit": scan_limit,
+            "scan_limited": bool(scan_limit and available_ticker_count > len(tickers)),
+        },
         "sector_summary": sector_summary,
         "results": sorted_results,
     }
