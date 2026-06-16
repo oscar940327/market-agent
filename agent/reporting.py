@@ -11,6 +11,13 @@ from agent.llm_analyst import OpenAIResponsesClient, generate_llm_report
 from agent.llm_analyst import OpenRouterChatClient
 
 
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv()
+except ImportError:
+    pass
+
 SUPPORTED_ANALYST_MODES = {"rule_based", "llm"}
 
 
