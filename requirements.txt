@@ -2,5 +2,6 @@ python-dotenv
 yfinance 
 pandas
 fastapi
+pydantic
 uvicorn
 pytest
