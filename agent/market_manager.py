@@ -4,6 +4,8 @@ from agent.experts.news_agent import run_news_agent
 from agent.experts.portfolio_agent import normalize_holdings, run_portfolio_agent
 from agent.experts.technical_agent import run_technical_agent
 from agent.research_profile import build_research_profile
+from backtesting.evidence import REQUIRED_HISTORY_YEARS
+from backtesting.signal_evidence import build_signal_backtest_evidence
 from skills.stock_price_skill import get_recent_price_result
 
 
@@ -58,6 +60,52 @@ def fetch_price_data(ticker: str, period: str):
     }
 
     return price_result.data, None, price_source
+
+
+def build_price_data_window(price_data, required_years: int = REQUIRED_HISTORY_YEARS):
+    sorted_data = price_data.sort_index()
+    latest_date = sorted_data.index.max()
+    target_start_date = latest_date - required_years_to_offset(required_years)
+    window_data = sorted_data.loc[sorted_data.index >= target_start_date]
+
+    if window_data.empty:
+        window_data = sorted_data
+
+    data_start = window_data.index.min()
+    data_end = window_data.index.max()
+    history_years = (data_end - data_start).days / 365.25
+    has_required_history = data_start <= target_start_date + required_history_tolerance()
+
+    return window_data, {
+        "data_start_date": data_start.date().isoformat(),
+        "data_end_date": data_end.date().isoformat(),
+        "data_as_of": data_end.date().isoformat(),
+        "target_start_date": target_start_date.date().isoformat(),
+        "history_years": round(history_years, 2),
+        "required_history_years": required_years,
+        "has_required_history": bool(has_required_history),
+    }
+
+
+def required_years_to_offset(years: int):
+    import pandas as pd
+
+    return pd.DateOffset(years=years)
+
+
+def required_history_tolerance():
+    import pandas as pd
+
+    # The target date may fall on a weekend or holiday, so allow a few calendar days.
+    return pd.Timedelta(days=7)
+
+
+def has_triggered_strategy_signal(signals: dict) -> bool:
+    return bool(
+        signals.get("breakout", {}).get("is_breakout")
+        or signals.get("volume_surge", {}).get("is_volume_surge")
+        or signals.get("pullback", {}).get("is_pullback")
+    )
 
 
 class MarketManagerAgent:
@@ -140,6 +188,63 @@ class MarketManagerAgent:
             }
 
         technical_agent = run_technical_agent(price_data)
+        backtest_evidence = {
+            "status": "no_triggered_signals",
+            "ticker": ticker,
+            "signals": [],
+            "summary": {
+                "triggered_signal_count": 0,
+                "message": "目前沒有明確突破、放量或回踩訊號，因此本次不附加歷史訊號參考。",
+            },
+        }
+
+        if has_triggered_strategy_signal(technical_agent["signals"]):
+            historical_price_data, history_fetch_error, history_price_source = (
+                fetch_price_data(ticker, period="max")
+            )
+
+            if history_fetch_error:
+                backtest_evidence = {
+                    "status": history_fetch_error["status"],
+                    "ticker": ticker,
+                    "signals": [],
+                    "summary": {
+                        "triggered_signal_count": 0,
+                        "message": history_fetch_error["message"],
+                    },
+                    "price_source": history_price_source,
+                }
+            else:
+                historical_window_data, data_window = build_price_data_window(
+                    historical_price_data
+                )
+                history_data_error = validate_price_data(
+                    historical_window_data,
+                    ticker=ticker,
+                    min_rows=60,
+                )
+
+                if history_data_error:
+                    backtest_evidence = {
+                        "status": history_data_error["status"],
+                        "ticker": ticker,
+                        "signals": [],
+                        "data_window": data_window,
+                        "summary": {
+                            "triggered_signal_count": 0,
+                            "message": history_data_error["message"],
+                        },
+                        "price_source": history_price_source,
+                    }
+                else:
+                    backtest_evidence = build_signal_backtest_evidence(
+                        ticker=ticker,
+                        price_data=historical_window_data,
+                        current_signals=technical_agent["signals"],
+                        data_window=data_window,
+                    )
+                    backtest_evidence["price_source"] = history_price_source
+
         news_agent = run_news_agent(ticker, include_news=include_news)
         fundamental_agent = run_fundamental_agent(
             ticker,
@@ -151,6 +256,10 @@ class MarketManagerAgent:
             signals=technical_agent["signals"],
             news_analysis=news_agent["news_analysis"],
             fundamentals=fundamental_agent["fundamentals"],
+            price_history_rows=len(price_data),
+            include_news=include_news,
+            include_fundamentals=include_fundamentals,
+            backtest_evidence=backtest_evidence,
         )
 
         return {
@@ -164,13 +273,16 @@ class MarketManagerAgent:
                 "technical": technical_agent,
                 "news": news_agent,
                 "fundamental": fundamental_agent,
+                "backtest_evidence": backtest_evidence,
             },
             "technical_analysis": technical_agent["technical_analysis"],
             "signals": technical_agent["signals"],
+            "backtest_evidence": backtest_evidence,
             "news": news_agent["news"],
             "news_analysis": news_agent["news_analysis"],
             "fundamentals": fundamental_agent["fundamentals"],
             "research_profile": research_profile,
+            "evidence_quality": research_profile["evidence_quality"],
         }
 
     def run_backtest_query(self, ticker: str, user_query: str) -> dict:
@@ -188,7 +300,7 @@ class MarketManagerAgent:
                 "message": "請指定要回測的策略：breakout、volume_surge 或 pullback。",
             }
 
-        price_data, fetch_error, price_source = fetch_price_data(ticker, period="2y")
+        price_data, fetch_error, price_source = fetch_price_data(ticker, period="max")
 
         if fetch_error:
             return {
@@ -199,7 +311,13 @@ class MarketManagerAgent:
                 **fetch_error,
             }
 
-        data_error = validate_price_data(price_data, ticker=ticker, min_rows=60)
+        backtest_price_data, data_window = build_price_data_window(price_data)
+
+        data_error = validate_price_data(
+            backtest_price_data,
+            ticker=ticker,
+            min_rows=60,
+        )
 
         if data_error:
             return {
@@ -208,13 +326,15 @@ class MarketManagerAgent:
                 "user_query": user_query,
                 "execution_plan": execution_plan,
                 "price_source": price_source,
+                "data_window": data_window,
                 **data_error,
             }
 
         backtest_agent = run_backtest_agent(
             ticker=ticker,
             user_query=user_query,
-            price_data=price_data,
+            price_data=backtest_price_data,
+            data_window=data_window,
         )
 
         return {
@@ -224,6 +344,11 @@ class MarketManagerAgent:
             "user_query": user_query,
             "status": backtest_agent["status"],
             "price_source": price_source,
+            "data_start_date": data_window["data_start_date"],
+            "data_end_date": data_window["data_end_date"],
+            "data_as_of": data_window["data_as_of"],
+            "data_window": data_window,
+            "evidence_quality": backtest_agent["evidence_quality"],
             "execution_plan": execution_plan,
             "agent_outputs": {
                 "backtest": backtest_agent,

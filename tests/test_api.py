@@ -129,6 +129,62 @@ def test_query_endpoint_uses_explicit_ticker_for_backtest(monkeypatch):
     assert result["data"]["strategy"] == "unknown"
 
 
+def test_query_endpoint_uses_research_workflow_when_research_options_are_requested(monkeypatch):
+    captured = {}
+
+    def fake_run_single_stock_analysis(
+        ticker,
+        user_query,
+        include_news=True,
+        include_fundamentals=True,
+    ):
+        captured["ticker"] = ticker
+        captured["user_query"] = user_query
+        captured["include_news"] = include_news
+        captured["include_fundamentals"] = include_fundamentals
+        return {
+            "status": "success",
+            "ticker": ticker,
+            "technical_analysis": {},
+            "signals": {},
+            "news_analysis": {"summary": {"total_items": 0}},
+            "fundamentals": {"status": "skipped"},
+            "research_profile": {},
+        }
+
+    def fake_build_report(kind, data, analyst_mode="rule_based"):
+        return {
+            "report": f"{kind} report",
+            "analyst": {
+                "requested_mode": analyst_mode,
+                "mode_used": "rule_based",
+            },
+        }
+
+    monkeypatch.setattr(api, "run_single_stock_analysis", fake_run_single_stock_analysis)
+    monkeypatch.setattr(api, "build_report", fake_build_report)
+
+    result = api.query_market_agent(
+        api.QueryRequest(
+            user_query="MU backtest breakout strategy",
+            include_news=True,
+            include_fundamentals=True,
+            include_technicals=True,
+        )
+    )
+
+    assert captured == {
+        "ticker": "MU",
+        "user_query": "MU backtest breakout strategy",
+        "include_news": True,
+        "include_fundamentals": True,
+    }
+    assert result["intent"] == "single_stock_analysis"
+    assert result["route"]["intent"] == "single_stock_analysis"
+    assert result["route"]["original_intent"] == "backtest_query"
+    assert result["route"]["reason"] == "research_options_requested"
+
+
 def test_query_endpoint_returns_needs_ticker_for_stock_workflow_without_ticker():
     result = api.query_market_agent(
         api.QueryRequest(user_query="突破可以進場嗎？")

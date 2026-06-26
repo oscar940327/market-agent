@@ -5,11 +5,15 @@ def build_backtest_report(
     strategy_name: str,
     backtest_results: list[dict],
     metrics: dict,
+    evidence_quality: dict | None = None,
+    data_window: dict | None = None,
 ) -> dict:
     return{
         "ticker": ticker,
         "strategy_name": strategy_name,
         "metrics": metrics,
+        "evidence_quality": evidence_quality,
+        "data_window": data_window,
         "sample_trades": backtest_results[:5],
     }
 

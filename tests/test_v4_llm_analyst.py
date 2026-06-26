@@ -159,7 +159,7 @@ def test_build_report_uses_injected_llm_client():
 
 
 def test_build_report_falls_back_when_llm_is_not_configured(monkeypatch):
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    clear_llm_env(monkeypatch)
 
     result = build_report(
         kind="single_stock",
@@ -174,7 +174,7 @@ def test_build_report_falls_back_when_llm_is_not_configured(monkeypatch):
 
 
 def test_api_accepts_analyst_mode_and_returns_metadata(monkeypatch):
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    clear_llm_env(monkeypatch)
 
     def fake_run_single_stock_analysis(
         ticker,
@@ -233,3 +233,12 @@ def test_openrouter_response_text_extraction():
     )
 
     assert result == "OpenRouter analyst report"
+
+
+def clear_llm_env(monkeypatch):
+    monkeypatch.delenv("MARKET_AGENT_LLM_PROVIDER", raising=False)
+    monkeypatch.delenv("MARKET_AGENT_LLM_MODEL", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.delenv("OPENROUTER_SITE_URL", raising=False)
+    monkeypatch.delenv("OPENROUTER_APP_NAME", raising=False)

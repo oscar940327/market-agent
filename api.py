@@ -76,6 +76,7 @@ class QueryRequest(BaseModel):
     holdings: list[HoldingRequest] | None = None
     include_news: bool = True
     include_fundamentals: bool = True
+    include_technicals: bool = True
     analyst_mode: str = "rule_based"
 
 
@@ -133,6 +134,24 @@ def extract_ticker_from_query(user_query: str) -> str | None:
             return candidate
 
     return None
+
+
+def get_explicit_request_fields(request: BaseModel) -> set[str]:
+    if hasattr(request, "model_fields_set"):
+        return set(request.model_fields_set)
+
+    return set(getattr(request, "__fields_set__", set()))
+
+
+def should_use_research_workflow_for_backtest_query(request: QueryRequest) -> bool:
+    explicit_fields = get_explicit_request_fields(request)
+    return (
+        ("include_news" in explicit_fields and request.include_news)
+        or (
+            "include_fundamentals" in explicit_fields
+            and request.include_fundamentals
+        )
+    )
 
 
 def build_needs_ticker_result(intent: str, user_query: str) -> dict:
@@ -204,6 +223,18 @@ def route_query(request: RouteRequest) -> dict:
 def query_market_agent(request: QueryRequest) -> dict:
     route_result = detect_intent(request.user_query)
     intent = route_result["intent"]
+
+    if (
+        intent == "backtest_query"
+        and should_use_research_workflow_for_backtest_query(request)
+    ):
+        route_result = {
+            **route_result,
+            "intent": "single_stock_analysis",
+            "original_intent": "backtest_query",
+            "reason": "research_options_requested",
+        }
+        intent = "single_stock_analysis"
 
     if intent == "single_stock_analysis":
         ticker = request.ticker or extract_ticker_from_query(request.user_query)

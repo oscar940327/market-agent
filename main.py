@@ -52,6 +52,27 @@ def score_stock_analysis(analysis_data: dict) -> dict:
         score -= 1
         reasons.append("短線趨勢偏弱")
 
+    momentum_state = technical.get("momentum_state", "neutral")
+
+    if momentum_state == "bullish_momentum":
+        score += 1.5
+        reasons.append("RSI 與 MACD 多方動能增強")
+    elif momentum_state == "turning_positive":
+        score += 0.75
+        reasons.append("MACD 動能轉正")
+    elif momentum_state == "bullish_but_overbought":
+        score += 0.5
+        reasons.append("多方動能仍在但 RSI 偏高")
+    elif momentum_state == "bearish_momentum":
+        score -= 1.5
+        reasons.append("RSI 與 MACD 空方動能仍在")
+    elif momentum_state == "turning_negative":
+        score -= 0.75
+        reasons.append("MACD 動能轉弱")
+    elif momentum_state == "bearish_but_oversold":
+        score -= 0.5
+        reasons.append("空方動能仍在但 RSI 偏低")
+
     if technical["is_above_ma20"]:
         score += 1
         reasons.append("站上 MA20")
@@ -115,6 +136,7 @@ def run_theme_analysis(user_query: str) -> dict:
         reverse=True,
     )
     sector_summary = build_sector_summary(sorted_results)
+    evidence_quality = build_theme_evidence_quality(sorted_results)
 
     return {
         "intent": "industry_trend",
@@ -129,6 +151,7 @@ def run_theme_analysis(user_query: str) -> dict:
             "scan_limited": bool(scan_limit and available_ticker_count > len(tickers)),
         },
         "sector_summary": sector_summary,
+        "evidence_quality": evidence_quality,
         "results": sorted_results,
     }
 
@@ -158,6 +181,55 @@ def build_sector_summary(results: list[dict]) -> dict:
         "strongest_ticker": strongest_result["ticker"],
         "positive_breadth": round(positive_breadth, 4),
         "breadth_label": classify_sector_breadth(positive_breadth),
+    }
+
+
+def build_theme_evidence_quality(results: list[dict]) -> dict:
+    total_count = len(results)
+    successful_count = len(
+        [result for result in results if result["status"] == "success"]
+    )
+    coverage_ratio = successful_count / total_count if total_count else 0
+
+    if total_count == 0:
+        data_completeness = "none"
+    elif coverage_ratio >= 0.8:
+        data_completeness = "high"
+    elif coverage_ratio >= 0.5:
+        data_completeness = "medium"
+    elif coverage_ratio > 0:
+        data_completeness = "low_to_medium"
+    else:
+        data_completeness = "none"
+
+    if successful_count >= 5:
+        stock_specific = "medium"
+    elif successful_count >= 1:
+        stock_specific = "low_to_medium"
+    else:
+        stock_specific = "none"
+
+    level = "medium" if data_completeness == "high" else data_completeness
+
+    return {
+        "level": level,
+        "stock_specific": stock_specific,
+        "backtest_sample": "not_applicable",
+        "data_completeness": data_completeness,
+        "signal_clarity": "medium" if successful_count else "none",
+        "news_coverage": "skipped",
+        "social_coverage": "not_used",
+        "sentiment_confidence": "skipped",
+        "news_impact_quality": "skipped",
+        "fundamental_coverage": "skipped",
+        "peer_group": "not_used",
+        "market_wide": "not_used",
+        "scanned_ticker_count": total_count,
+        "successful_ticker_count": successful_count,
+        "reason": (
+            f"證據品質為 {level}。本次主題掃描成功分析 {successful_count}/{total_count} 檔，"
+            "新聞、基本面、同業相似案例與全市場驗證尚未納入。"
+        ),
     }
 
 

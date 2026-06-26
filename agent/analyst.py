@@ -53,7 +53,26 @@ def format_single_stock_analysis(analysis_data: dict) -> str:
             "setup_quality": "unknown",
             "risk_level": "unknown",
             "research_confidence": "low",
+            "evidence_quality": {
+                "level": "low",
+                "reason": "證據品質資料不足。",
+            },
         },
+    )
+    evidence_quality = analysis_data.get(
+        "evidence_quality",
+        research_profile.get(
+            "evidence_quality",
+            {
+                "level": "low",
+                "stock_specific": "unknown",
+                "peer_group": "not_used",
+                "market_wide": "not_used",
+                "data_completeness": "unknown",
+                "signal_clarity": "unknown",
+                "reason": "證據品質資料不足。",
+            },
+        ),
     )
 
     lines = [
@@ -68,6 +87,11 @@ def format_single_stock_analysis(analysis_data: dict) -> str:
         f"- MA50：{technical['ma50']}",
         f"- 價格是否高於 MA20：{format_bool(technical['is_above_ma20'])}",
         f"- 短線趨勢：{technical['short_term_trend']}",
+        f"- RSI14：{technical.get('rsi14', 'unknown')}",
+        f"- MACD：{technical.get('macd', 'unknown')}",
+        f"- MACD signal：{technical.get('macd_signal', 'unknown')}",
+        f"- MACD histogram：{technical.get('macd_histogram', 'unknown')}",
+        f"- 動能狀態：{technical.get('momentum_state', 'unknown')}",
         "",
         "策略訊號",
         (
@@ -116,6 +140,15 @@ def format_single_stock_analysis(analysis_data: dict) -> str:
             f"- setup quality：{research_profile['setup_quality']}",
             f"- risk level：{research_profile['risk_level']}",
             f"- research confidence：{research_profile['research_confidence']}",
+            "",
+            "證據品質",
+            f"- evidence level：{evidence_quality['level']}",
+            f"- stock specific：{evidence_quality.get('stock_specific', 'unknown')}",
+            f"- peer group：{evidence_quality.get('peer_group', 'not_used')}",
+            f"- market wide：{evidence_quality.get('market_wide', 'not_used')}",
+            f"- data completeness：{evidence_quality.get('data_completeness', 'unknown')}",
+            f"- signal clarity：{evidence_quality.get('signal_clarity', 'unknown')}",
+            f"- 說明：{evidence_quality['reason']}",
         ]
     )
 
@@ -143,6 +176,21 @@ def build_single_stock_takeaway(technical: dict, signals: dict) -> str:
         positive_signals.append("短線均線排列偏強")
     elif technical["short_term_trend"] == "weak":
         risk_signals.append("短線均線排列偏弱")
+
+    momentum_state = technical.get("momentum_state")
+
+    if momentum_state == "bullish_momentum":
+        positive_signals.append("RSI 與 MACD 顯示多方動能增強")
+    elif momentum_state == "turning_positive":
+        positive_signals.append("MACD 動能正在轉正")
+    elif momentum_state == "bullish_but_overbought":
+        risk_signals.append("RSI 偏高，短線可能過熱")
+    elif momentum_state == "bearish_momentum":
+        risk_signals.append("RSI 與 MACD 顯示空方動能仍在")
+    elif momentum_state == "turning_negative":
+        risk_signals.append("MACD 動能正在轉弱")
+    elif momentum_state == "bearish_but_oversold":
+        positive_signals.append("RSI 偏低，可能進入超跌觀察區")
 
     if signals["breakout"]["is_breakout"]:
         positive_signals.append("價格出現突破訊號")
@@ -199,6 +247,24 @@ def format_backtest_analysis(backtest_data: dict) -> str:
 
     report = backtest_data["report"]
     metrics = report["metrics"]
+    evidence_quality = report.get(
+        "evidence_quality",
+        backtest_data.get(
+            "evidence_quality",
+            {
+                "level": "unknown",
+                "sample_size": metrics["total_trades"],
+                "sample_quality": "unknown",
+                "history_years": 0,
+                "required_history_years": 15,
+                "market_cycle_coverage": "unknown",
+                "peer_group_needed": True,
+                "peer_group": "not_used",
+                "reason": "尚未產生回測證據品質。",
+            },
+        ),
+    )
+    data_window = report.get("data_window") or backtest_data.get("data_window") or {}
     sample_trades = report["sample_trades"]
 
     lines = [
@@ -207,11 +273,25 @@ def format_backtest_analysis(backtest_data: dict) -> str:
         f"原始問題：{backtest_data['user_query']}",
         f"策略：{backtest_data['strategy']}",
         "",
+        "資料範圍",
+        f"- 起始日：{data_window.get('data_start_date', 'unknown')}",
+        f"- 結束日：{data_window.get('data_end_date', 'unknown')}",
+        f"- data as of：{data_window.get('data_as_of', 'unknown')}",
+        f"- 歷史年限：約 {evidence_quality.get('history_years', 0)} 年",
+        "",
         "績效摘要",
         f"- 總交易次數：{metrics['total_trades']}",
         f"- 勝率：{format_percent(metrics['win_rate'])}",
         f"- 平均報酬：{format_percent(metrics['average_return'])}",
         f"- 最大虧損：{format_percent(metrics['max_loss'])}",
+        "",
+        "證據品質",
+        f"- 等級：{evidence_quality['level']}",
+        f"- 樣本品質：{evidence_quality.get('sample_quality', 'unknown')}",
+        f"- 市場週期覆蓋：{evidence_quality.get('market_cycle_coverage', 'unknown')}",
+        f"- 需要同類型股票補充：{format_bool(evidence_quality.get('peer_group_needed', True))}",
+        f"- peer group：{evidence_quality.get('peer_group', 'not_used')}",
+        f"- 說明：{evidence_quality['reason']}",
         "",
         "範例交易",
     ]
