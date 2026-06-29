@@ -1,4 +1,5 @@
 from agent.rule_based_router import detect_intent
+import inspect
 from agent.market_manager import (
     MarketManagerAgent,
     fetch_price_data,
@@ -21,12 +22,14 @@ def run_single_stock_analysis(
     user_query: str,
     include_news: bool = True,
     include_fundamentals: bool = True,
+    include_ml: bool = True,
 ) -> dict:
     return market_manager.run_single_stock_analysis(
         ticker=ticker,
         user_query=user_query,
         include_news=include_news,
         include_fundamentals=include_fundamentals,
+        include_ml=include_ml,
     )
 
 
@@ -123,10 +126,7 @@ def run_theme_analysis(user_query: str) -> dict:
 
     for ticker in tickers:
         analysis_data = run_single_stock_analysis(
-            ticker=ticker,
-            user_query=user_query,
-            include_news=False,
-            include_fundamentals=False,
+            **build_theme_single_stock_kwargs(ticker=ticker, user_query=user_query)
         )
         results.append(score_stock_analysis(analysis_data))
 
@@ -231,6 +231,20 @@ def build_theme_evidence_quality(results: list[dict]) -> dict:
             "新聞、基本面、同業相似案例與全市場驗證尚未納入。"
         ),
     }
+
+
+def build_theme_single_stock_kwargs(ticker: str, user_query: str) -> dict:
+    kwargs = {
+        "ticker": ticker,
+        "user_query": user_query,
+        "include_news": False,
+        "include_fundamentals": False,
+    }
+    signature = inspect.signature(run_single_stock_analysis)
+    if "include_ml" in signature.parameters:
+        kwargs["include_ml"] = False
+
+    return kwargs
 
 
 def classify_sector_breadth(positive_breadth: float) -> str:

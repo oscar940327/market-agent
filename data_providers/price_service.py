@@ -62,11 +62,85 @@ def fetch_recent_price_data(
     )
 
 
+def fetch_price_data_range(
+    ticker: str,
+    start_date: str,
+    end_date: str | None = None,
+    providers: tuple[str, ...] = ("yfinance", "stooq"),
+) -> PriceFetchResult:
+    attempted_providers = []
+    errors = []
+
+    for provider in providers:
+        attempted_providers.append(provider)
+
+        try:
+            data = fetch_range_from_provider(
+                provider,
+                ticker=ticker,
+                start_date=start_date,
+                end_date=end_date,
+            )
+        except Exception as error:
+            errors.append(
+                {
+                    "provider": provider,
+                    "message": str(error),
+                }
+            )
+            continue
+
+        if data is not None and not data.empty:
+            return PriceFetchResult(
+                data=data,
+                provider=provider,
+                attempted_providers=attempted_providers,
+                errors=errors,
+            )
+
+        errors.append(
+            {
+                "provider": provider,
+                "message": "provider returned no price data",
+            }
+        )
+
+    return PriceFetchResult(
+        data=pd.DataFrame(),
+        provider=None,
+        attempted_providers=attempted_providers,
+        errors=errors,
+    )
+
+
 def fetch_from_provider(provider: str, ticker: str, period: str) -> pd.DataFrame:
     if provider == "yfinance":
         return yfinance_provider.fetch_price_data(ticker=ticker, period=period)
 
     if provider == "stooq":
         return stooq_provider.fetch_price_data(ticker=ticker, period=period)
+
+    raise ValueError(f"Unsupported price provider: {provider}")
+
+
+def fetch_range_from_provider(
+    provider: str,
+    ticker: str,
+    start_date: str,
+    end_date: str | None = None,
+) -> pd.DataFrame:
+    if provider == "yfinance":
+        return yfinance_provider.fetch_price_data_range(
+            ticker=ticker,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+    if provider == "stooq":
+        return stooq_provider.fetch_price_data_range(
+            ticker=ticker,
+            start_date=start_date,
+            end_date=end_date,
+        )
 
     raise ValueError(f"Unsupported price provider: {provider}")

@@ -133,6 +133,7 @@ def test_market_manager_single_stock_aggregates_expert_outputs(monkeypatch):
         "news",
         "fundamental",
         "backtest_evidence",
+        "ml_research",
     }
     assert result["agent_outputs"]["technical"]["agent"] == "technical"
     assert result["agent_outputs"]["news"]["agent"] == "news"
@@ -145,6 +146,8 @@ def test_market_manager_single_stock_aggregates_expert_outputs(monkeypatch):
     assert "evidence_quality" in result
     assert result["evidence_quality"]["peer_group"] == "not_used"
     assert "backtest_evidence" in result
+    assert "ml_research" in result
+    assert result["agent_outputs"]["ml_research"] == result["ml_research"]
 
 
 def test_market_manager_single_stock_adds_backtest_evidence_for_triggered_signals(monkeypatch):

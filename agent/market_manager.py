@@ -6,6 +6,7 @@ from agent.experts.technical_agent import run_technical_agent
 from agent.research_profile import build_research_profile
 from backtesting.evidence import REQUIRED_HISTORY_YEARS
 from backtesting.signal_evidence import build_signal_backtest_evidence
+from ml_research import build_single_stock_ml_research
 from skills.stock_price_skill import get_recent_price_result
 
 
@@ -161,6 +162,7 @@ class MarketManagerAgent:
         user_query: str,
         include_news: bool = True,
         include_fundamentals: bool = True,
+        include_ml: bool = True,
     ) -> dict:
         execution_plan = self.build_single_stock_plan(
             include_news=include_news,
@@ -261,6 +263,16 @@ class MarketManagerAgent:
             include_fundamentals=include_fundamentals,
             backtest_evidence=backtest_evidence,
         )
+        ml_research = (
+            build_single_stock_ml_research(ticker=ticker)
+            if include_ml
+            else {
+                "status": "skipped",
+                "usage_policy": "reference_only",
+                "reason": "ml_disabled_for_internal_workflow",
+                "summary": "ML reference was skipped for this internal workflow.",
+            }
+        )
 
         return {
             "intent": "single_stock_analysis",
@@ -274,6 +286,7 @@ class MarketManagerAgent:
                 "news": news_agent,
                 "fundamental": fundamental_agent,
                 "backtest_evidence": backtest_evidence,
+                "ml_research": ml_research,
             },
             "technical_analysis": technical_agent["technical_analysis"],
             "signals": technical_agent["signals"],
@@ -283,6 +296,7 @@ class MarketManagerAgent:
             "fundamentals": fundamental_agent["fundamentals"],
             "research_profile": research_profile,
             "evidence_quality": research_profile["evidence_quality"],
+            "ml_research": ml_research,
         }
 
     def run_backtest_query(self, ticker: str, user_query: str) -> dict:

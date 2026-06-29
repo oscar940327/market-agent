@@ -30,6 +30,9 @@ def format_single_stock_analysis(analysis_data: dict) -> str:
         },
     )
     news_summary = news_analysis["summary"]
+    news_events_summary = analysis_data.get("agent_outputs", {}).get("news", {}).get(
+        "news_events_summary"
+    )
     fundamentals = analysis_data.get(
         "fundamentals",
         {
@@ -74,6 +77,9 @@ def format_single_stock_analysis(analysis_data: dict) -> str:
             },
         ),
     )
+    ml_research = analysis_data.get("ml_research") or analysis_data.get(
+        "agent_outputs", {}
+    ).get("ml_research")
 
     lines = [
         f"{analysis_data['ticker']} 單一股票分析",
@@ -121,15 +127,16 @@ def format_single_stock_analysis(analysis_data: dict) -> str:
         [
             "",
             "新聞結構化摘要",
-            f"- 新聞整體情緒：{news_summary['sentiment']}",
-            f"- 高重要性新聞數：{news_summary['high_importance_count']}",
-            f"- 主要新聞主題：{format_topic_counts(news_summary['top_topics'])}",
+            *format_news_summary_lines(news_summary, news_events_summary),
             "",
             "基本面摘要",
             f"- 基本面狀態：{fundamentals['status']}",
             f"- 基本面立場：{fundamental_summary['stance']}",
             f"- 正向因素：{format_reason_list(fundamental_summary['positives'])}",
             f"- 風險因素：{format_reason_list(fundamental_summary['risks'])}",
+            "",
+            "ML Reference",
+            *format_ml_reference_lines(ml_research),
             "",
             "綜合研究評估",
             f"- 技術分數：{research_profile['technical_score']}",
@@ -162,10 +169,233 @@ def format_single_stock_analysis(analysis_data: dict) -> str:
             "- 這份輸出只整理資料與策略訊號，不構成投資建議。",
             "- 新聞、價格資料與回測結果都可能延遲或不完整。",
             "- 進出場仍需要搭配個人風險承受度、部位大小與停損規劃。",
+            *format_ml_risk_note_lines(ml_research),
         ]
     )
 
     return "\n".join(lines)
+
+
+def format_ml_reference_lines(ml_research: dict | None) -> list[str]:
+    if not ml_research:
+        return [
+            "- ML reference is currently unavailable. Reason: missing ml_research output.",
+        ]
+
+    status = ml_research.get("status")
+    if status != "success":
+        reason = ml_research.get("reason") or status or "unknown"
+        message = ml_research.get("message")
+        line = f"- ML reference is currently unavailable. Reason: {reason}."
+        if message:
+            line += f" Detail: {message}"
+        return [line]
+
+    targets = ml_research.get("targets", {})
+    lines = [
+        format_ml_target_line(
+            label="5-day upside probability",
+            target=targets.get("up_5d"),
+        ),
+        format_ml_target_line(
+            label="10-day upside probability",
+            target=targets.get("up_10d"),
+        ),
+        format_ml_target_line(
+            label="20-day upside probability",
+            target=targets.get("up_20d"),
+        ),
+        format_ml_target_line(
+            label="20-day large-drop risk",
+            target=targets.get("large_drop_20d"),
+        ),
+        f"- {format_ml_quality_sentence(targets)}",
+        *format_return_reference_lines(ml_research.get("return_reference")),
+        *format_return_model_lines(ml_research.get("return_model")),
+    ]
+
+    risk_note = ml_research.get("risk_note")
+    if risk_note:
+        lines.append(f"- {risk_note}")
+
+    return lines
+
+
+def format_ml_target_line(*, label: str, target: dict | None) -> str:
+    if not target:
+        return f"- {label}: unavailable"
+
+    probability_percent = target.get("probability_percent")
+    signal_label = target.get("signal_label", "unknown")
+    if probability_percent is None:
+        return f"- {label}: unavailable ({signal_label})"
+
+    return f"- {label}: {probability_percent:.1f}% ({signal_label})"
+
+
+def format_ml_quality_sentence(targets: dict) -> str:
+    upside_qualities = [
+        (targets.get(target) or {}).get("signal_quality", "unknown")
+        for target in ["up_5d", "up_10d", "up_20d"]
+    ]
+    large_drop_quality = (targets.get("large_drop_20d") or {}).get(
+        "signal_quality",
+        "unknown",
+    )
+    upside_quality = summarize_quality_group(upside_qualities)
+    return (
+        "Model quality: upside direction signals are "
+        f"{upside_quality}, while large-drop risk signal quality is "
+        f"{large_drop_quality}. These numbers are reference-only."
+    )
+
+
+def summarize_quality_group(qualities: list[str]) -> str:
+    values = {
+        "unknown": 0,
+        "low": 1,
+        "low_to_medium": 2,
+        "medium": 3,
+        "high": 4,
+    }
+    scores = [values.get(quality, 0) for quality in qualities]
+    if not scores:
+        return "unknown"
+
+    average = sum(scores) / len(scores)
+    if average >= 3.5:
+        return "high"
+    if average >= 2.5:
+        return "medium"
+    if average >= 1.5:
+        return "low_to_medium"
+    if average > 0:
+        return "low"
+    return "unknown"
+
+
+def format_ml_risk_note_lines(ml_research: dict | None) -> list[str]:
+    if not ml_research or ml_research.get("status") != "success":
+        return []
+
+    risk_note = ml_research.get("risk_note")
+    if not risk_note:
+        return []
+
+    return [f"- {risk_note}"]
+
+
+def format_return_reference_lines(return_reference: dict | None) -> list[str]:
+    if not return_reference:
+        return []
+
+    method = return_reference.get("method", "unknown")
+    sample_size = return_reference.get("sample_size")
+    evidence_quality = return_reference.get("evidence_quality", "unknown")
+    lines = [
+        (
+            "- Return reference: "
+            f"{method}, sample size {sample_size}, evidence quality {evidence_quality}."
+        )
+    ]
+
+    for horizon in ["5d", "10d", "20d"]:
+        expected_range = return_reference.get(f"expected_return_range_{horizon}")
+        upside_range = return_reference.get(f"upside_return_range_{horizon}")
+        average_return = return_reference.get(f"historical_average_return_{horizon}")
+        if expected_range:
+            lines.append(
+                "- "
+                f"{horizon} expected return range: "
+                f"{format_return_value(expected_range.get('low'))} ~ "
+                f"{format_return_value(expected_range.get('high'))}; "
+                f"historical average {format_return_value(average_return)}."
+            )
+        if upside_range:
+            lines.append(
+                "- "
+                f"{horizon} upside scenario range: "
+                f"{format_return_value(upside_range.get('low'))} ~ "
+                f"{format_return_value(upside_range.get('high'))}."
+            )
+
+    max_drop_range = return_reference.get("max_drop_range_20d")
+    if max_drop_range:
+        lines.append(
+            "- "
+            "20d max-drop range: "
+            f"{format_return_value(max_drop_range.get('low'))} ~ "
+            f"{format_return_value(max_drop_range.get('high'))}."
+        )
+
+    note = return_reference.get("note")
+    if note:
+        lines.append(f"- {note}")
+
+    return lines
+
+
+def format_return_value(value) -> str:
+    if value is None:
+        return "n/a"
+    return f"{value * 100:.1f}%"
+
+
+def format_return_model_lines(return_model: dict | None) -> list[str]:
+    if not return_model:
+        return []
+
+    if return_model.get("status") != "success":
+        reason = return_model.get("reason", "unknown")
+        return [
+            f"- Return model is currently unavailable. Reason: {reason}. Historical range remains the primary reference.",
+        ]
+
+    targets = return_model.get("targets", {})
+    lines = [
+        "- Return model: experimental reference only. Historical range remains the primary reference.",
+        format_return_model_target_line(
+            label="Predicted 5d return",
+            target=targets.get("forward_return_5d"),
+        ),
+        format_return_model_target_line(
+            label="Predicted 10d return",
+            target=targets.get("forward_return_10d"),
+        ),
+        format_return_model_target_line(
+            label="Predicted 20d return",
+            target=targets.get("forward_return_20d"),
+        ),
+        format_return_model_target_line(
+            label="Predicted 20d max drop",
+            target=targets.get("max_drop_20d"),
+        ),
+    ]
+    summary = return_model.get("summary")
+    if summary:
+        lines.append(f"- {summary}")
+    return lines
+
+
+def format_return_model_target_line(*, label: str, target: dict | None) -> str:
+    if not target:
+        return f"- {label}: unavailable"
+
+    predicted_percent = target.get("predicted_percent")
+    predicted_range = target.get("predicted_range") or {}
+    model_quality = target.get("model_quality", "unknown")
+    return (
+        f"- {label}: {format_percent_value(predicted_percent)} "
+        f"(range {format_percent_value(predicted_range.get('low_percent'))} ~ "
+        f"{format_percent_value(predicted_range.get('high_percent'))}, "
+        f"quality {model_quality})"
+    )
+
+
+def format_percent_value(value) -> str:
+    if value is None:
+        return "n/a"
+    return f"{value:.1f}%"
 
 
 def build_single_stock_takeaway(technical: dict, signals: dict) -> str:
@@ -232,6 +462,91 @@ def format_topic_counts(topic_counts: dict) -> str:
             reverse=True,
         )
     )
+
+
+def format_news_summary_lines(
+    news_summary: dict,
+    news_events_summary: dict | None = None,
+) -> list[str]:
+    if news_events_summary and news_events_summary.get("status") == "success":
+        return [
+            (
+                f"- 近 {news_events_summary['lookback_days']} 天新聞數："
+                f"{news_events_summary['total_events']}"
+            ),
+            f"- 新聞整體情緒：{format_sentiment(news_events_summary['overall_sentiment'])}",
+            (
+                f"- 主要新聞主題："
+                f"{news_events_summary.get('dominant_topic_label') or '一般新聞'}"
+            ),
+            f"- 高重要性新聞數：{news_events_summary['high_importance_count']}",
+            format_news_impact_takeaway(news_events_summary),
+            *format_representative_news(news_events_summary),
+        ]
+
+    if news_events_summary and news_events_summary.get("status") == "no_recent_news":
+        return [
+            f"- 近 {news_events_summary['lookback_days']} 天沒有近期新聞資料。",
+            "- 新聞面暫時不調整整體判斷，仍以技術面、估值與風險控管為主。",
+        ]
+
+    return [
+        f"- 新聞整體情緒：{format_sentiment(news_summary.get('sentiment', 'unknown'))}",
+        f"- 高重要性新聞數：{news_summary.get('high_importance_count', 0)}",
+        f"- 主要新聞主題：{format_topic_counts(news_summary.get('top_topics', {}))}",
+    ]
+
+
+def format_representative_news(news_events_summary: dict) -> list[str]:
+    events = news_events_summary.get("representative_events", [])
+
+    if not events:
+        return []
+
+    lines = ["- 代表性新聞："]
+    for event in events[:3]:
+        published = (event.get("published_at") or "")[:10]
+        title = event.get("title") or "未命名新聞"
+        source = event.get("source") or "unknown"
+        lines.append(f"  - {published} | {source} | {title}")
+
+    return lines
+
+
+def format_news_impact_takeaway(news_events_summary: dict) -> str:
+    sentiment = news_events_summary.get("overall_sentiment", "unknown")
+    topic_label = news_events_summary.get("dominant_topic_label") or "一般新聞"
+    high_importance_count = news_events_summary.get("high_importance_count", 0)
+
+    if sentiment == "positive":
+        prefix = "新聞面偏利多"
+    elif sentiment == "negative":
+        prefix = "新聞面偏利空"
+    elif sentiment == "neutral":
+        prefix = "新聞面大致中立"
+    else:
+        prefix = "新聞面方向不明"
+
+    if high_importance_count > 0:
+        return (
+            f"- 影響解讀：{prefix}，主要屬於「{topic_label}」，"
+            "但仍需搭配技術面與估值，不會單獨改變結論。"
+        )
+
+    return (
+        f"- 影響解讀：{prefix}，主要屬於「{topic_label}」，"
+        "目前較適合作為觀察依據，不應單獨當成進出場理由。"
+    )
+
+
+def format_sentiment(sentiment: str) -> str:
+    labels = {
+        "positive": "偏利多",
+        "negative": "偏利空",
+        "neutral": "中立",
+        "unknown": "未知",
+    }
+    return labels.get(sentiment, sentiment)
 
 
 def format_reason_list(reasons: list[str]) -> str:

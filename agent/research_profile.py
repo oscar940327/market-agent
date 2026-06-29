@@ -365,6 +365,9 @@ def classify_news_impact_quality(news_analysis: dict, news_coverage: str) -> str
     high_importance_count = int(summary.get("high_importance_count", 0))
     top_topics = summary.get("top_topics", {})
     meaningful_topics = {
+        "earnings_guidance",
+        "risk_event",
+        "product_demand",
         "earnings",
         "guidance",
         "industry_demand",

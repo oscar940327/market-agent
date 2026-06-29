@@ -20,3 +20,7 @@ Thumbs.db
 
 schedule/
 done/
+
+data/market
+data/ml/
+.pytest_tmp/
