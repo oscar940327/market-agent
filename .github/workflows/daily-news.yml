@@ -1,0 +1,50 @@
+name: Daily News Pipeline
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Runs after the daily prices job window, when post-market news is usually denser.
+    - cron: "30 23 * * 1-5"
+
+jobs:
+  daily-news:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      PYTHONUNBUFFERED: "1"
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+      MARKET_AGENT_LLM_PROVIDER: openrouter
+      MARKET_AGENT_LLM_MODEL: openai/gpt-4.1
+      NEWS_LLM_PROVIDER: openrouter
+      NEWS_LLM_MODEL: openai/gpt-5.4-mini
+      NEWS_LLM_ESCALATION_MODEL: openai/gpt-5.5
+      NEWS_LLM_ESCALATION_ENABLED: "false"
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      OPENROUTER_APP_NAME: market-agent
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run daily news pipeline
+        run: python scripts/run_daily_pipeline.py --only news
+
+      - name: Upload pipeline logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-news-logs
+          path: data/pipeline_runs/*.json
+          if-no-files-found: ignore

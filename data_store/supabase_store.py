@@ -26,7 +26,7 @@ def upsert_tickers(
 
     for chunk in chunk_records(records, chunk_size):
         endpoint = f"{base_url}/rest/v1/tickers?on_conflict=ticker,universe"
-        payload = json.dumps(chunk).encode("utf-8")
+        payload = json.dumps(chunk, allow_nan=False).encode("utf-8")
         request = Request(
             endpoint,
             data=payload,
@@ -111,7 +111,7 @@ def upsert_daily_prices(
 
     for chunk in chunk_records(records, chunk_size):
         endpoint = f"{base_url}/rest/v1/daily_prices?on_conflict=ticker,date,provider"
-        payload = json.dumps(chunk).encode("utf-8")
+        payload = json.dumps(chunk, allow_nan=False).encode("utf-8")
         request = Request(
             endpoint,
             data=payload,
@@ -260,7 +260,7 @@ def upsert_technical_features(
             f"{base_url}/rest/v1/technical_features?"
             "on_conflict=ticker,date,price_provider,feature_version"
         )
-        payload = json.dumps(chunk).encode("utf-8")
+        payload = json.dumps(chunk, allow_nan=False).encode("utf-8")
         request = Request(
             endpoint,
             data=payload,
@@ -314,7 +314,7 @@ def upsert_market_regimes(
 
     for chunk in chunk_records(records, chunk_size):
         endpoint = f"{base_url}/rest/v1/market_regimes?on_conflict=date,benchmark,rule_version"
-        payload = json.dumps(chunk).encode("utf-8")
+        payload = json.dumps(chunk, allow_nan=False).encode("utf-8")
         request = Request(
             endpoint,
             data=payload,
@@ -329,6 +329,63 @@ def upsert_market_regimes(
 
         try:
             with open_url(request, timeout=60) as response:
+                response.read()
+        except HTTPError as exc:
+            body = exc.read().decode("utf-8", errors="replace")
+            return {
+                "status": "error",
+                "upserted_count": total_count,
+                "message": f"Supabase upsert failed with HTTP {exc.code}: {body}",
+            }
+        except Exception as exc:
+            return {
+                "status": "error",
+                "upserted_count": total_count,
+                "message": f"Supabase upsert failed: {exc}",
+            }
+
+        total_count += len(chunk)
+
+    return {"status": "success", "upserted_count": total_count}
+
+
+def upsert_news_event_summaries(
+    records: list[dict],
+    *,
+    supabase_url: str | None = None,
+    supabase_key: str | None = None,
+    open_url=urlopen,
+    chunk_size: int = 100,
+) -> dict:
+    if not records:
+        return {"status": "skipped", "upserted_count": 0, "message": "No records."}
+
+    base_url, api_key = resolve_supabase_credentials(
+        supabase_url=supabase_url,
+        supabase_key=supabase_key,
+    )
+    total_count = 0
+
+    for chunk in chunk_records(records, chunk_size):
+        endpoint = (
+            f"{base_url}/rest/v1/news_event_summaries?"
+            "on_conflict=ticker,summary_date,window_days,provider"
+        )
+        payload = json.dumps(chunk, allow_nan=False).encode("utf-8")
+        request = Request(
+            endpoint,
+            data=payload,
+            method="POST",
+            headers={
+                "apikey": api_key,
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+                "Prefer": "resolution=merge-duplicates,return=minimal",
+            },
+        )
+
+        try:
+            with open_url(request, timeout=30) as response:
                 response.read()
         except HTTPError as exc:
             body = exc.read().decode("utf-8", errors="replace")
@@ -456,7 +513,7 @@ def upsert_research_outcomes(
             f"{base_url}/rest/v1/research_outcomes?"
             "on_conflict=research_log_id,horizon_trading_days"
         )
-        payload = json.dumps(chunk).encode("utf-8")
+        payload = json.dumps(chunk, allow_nan=False).encode("utf-8")
         request = Request(
             endpoint,
             data=payload,

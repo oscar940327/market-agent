@@ -23,4 +23,6 @@ done/
 
 data/market
 data/ml/
+data/pipeline_runs/
+.pytest_cache/
 .pytest_tmp/

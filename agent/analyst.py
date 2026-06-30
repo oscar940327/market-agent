@@ -80,6 +80,7 @@ def format_single_stock_analysis(analysis_data: dict) -> str:
     ml_research = analysis_data.get("ml_research") or analysis_data.get(
         "agent_outputs", {}
     ).get("ml_research")
+    data_freshness = analysis_data.get("data_freshness")
 
     lines = [
         f"{analysis_data['ticker']} 單一股票分析",
@@ -166,6 +167,7 @@ def format_single_stock_analysis(analysis_data: dict) -> str:
             build_single_stock_takeaway(technical, signals),
             "",
             "風險提醒",
+            *format_data_freshness_warning_lines(data_freshness),
             "- 這份輸出只整理資料與策略訊號，不構成投資建議。",
             "- 新聞、價格資料與回測結果都可能延遲或不完整。",
             "- 進出場仍需要搭配個人風險承受度、部位大小與停損規劃。",
@@ -174,6 +176,23 @@ def format_single_stock_analysis(analysis_data: dict) -> str:
     )
 
     return "\n".join(lines)
+
+
+def format_data_freshness_warning_lines(data_freshness: dict | None) -> list[str]:
+    if not data_freshness:
+        return []
+
+    warnings = data_freshness.get("warnings", [])
+    if not warnings:
+        return []
+
+    lines = ["- 資料新鮮度提醒："]
+    for warning in warnings:
+        status = warning.get("status", "unknown")
+        message = warning.get("message") or warning.get("reason") or "資料狀態需要確認。"
+        lines.append(f"  - {status}: {message}")
+
+    return lines
 
 
 def format_ml_reference_lines(ml_research: dict | None) -> list[str]:

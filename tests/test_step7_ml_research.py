@@ -174,3 +174,23 @@ def test_single_stock_report_displays_unavailable_ml_reference():
     assert "ML Reference" in report
     assert "ML reference is currently unavailable" in report
     assert "missing_ml_artifacts" in report
+
+
+def test_single_stock_report_displays_data_freshness_warnings():
+    data = make_single_stock_report_data(news_events_summary=None)
+    data["data_freshness"] = {
+        "overall": "warning",
+        "warnings": [
+            {
+                "source": "ml_training_data",
+                "status": "warning",
+                "reason": "ml_training_data_getting_old",
+                "message": "ML training dataset 已超過 7 天未更新。",
+            }
+        ],
+    }
+
+    report = format_single_stock_analysis(data)
+
+    assert "資料新鮮度提醒" in report
+    assert "ML training dataset 已超過 7 天未更新" in report

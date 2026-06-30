@@ -1,0 +1,45 @@
+name: Daily Prices Pipeline
+
+on:
+  workflow_dispatch:
+  schedule:
+    # About 2 hours after the regular US market close during daylight saving time.
+    # GitHub cron is UTC and does not adjust for US daylight saving time.
+    - cron: "15 22 * * 1-5"
+
+jobs:
+  daily-prices:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      PYTHONUNBUFFERED: "1"
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run daily prices pipeline
+        run: python scripts/run_daily_pipeline.py --only prices
+
+      - name: Upload pipeline logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-prices-logs
+          path: |
+            data/pipeline_runs/*.json
+            data/market/prices/*.csv
+          if-no-files-found: ignore

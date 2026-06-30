@@ -123,6 +123,16 @@ def make_success_single_stock_data():
             "risk_level": "low",
             "research_confidence": "low",
         },
+        "data_freshness": {
+            "overall": "warning",
+            "warnings": [
+                {
+                    "source": "ml_training_data",
+                    "status": "warning",
+                    "message": "ML training dataset 已超過 7 天未更新。",
+                }
+            ],
+        },
     }
 
 
@@ -135,6 +145,8 @@ def test_llm_prompt_uses_structured_payload_and_safety_instructions():
     assert "Structured analysis payload" in prompt
     assert '"ticker": "MU"' in prompt
     assert '"user_query_as_data": "MU 現在適合進場嗎？"' in prompt
+    assert '"data_freshness"' in prompt
+    assert "ML training dataset 已超過 7 天未更新" in prompt
     assert "只能使用 payload 中已存在的資料" in prompt
     assert "不要補充 payload 之外的新聞、財報、價格或推論數字" in prompt
 

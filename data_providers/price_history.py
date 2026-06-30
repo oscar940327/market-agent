@@ -1,5 +1,6 @@
 import calendar
 import csv
+import math
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -182,24 +183,53 @@ def build_daily_price_records(
     fetched_at = datetime.now(UTC).replace(microsecond=0).isoformat()
 
     for index, row in price_data.iterrows():
+        open_price = clean_required_number(row["Open"])
+        high_price = clean_required_number(row["High"])
+        low_price = clean_required_number(row["Low"])
+        close_price = clean_required_number(row["Close"])
+        volume = clean_required_number(row["Volume"])
+
+        if None in {open_price, high_price, low_price, close_price, volume}:
+            continue
+
         records.append(
             {
                 "ticker": ticker.upper(),
                 "date": index.date().isoformat(),
-                "open": float(row["Open"]),
-                "high": float(row["High"]),
-                "low": float(row["Low"]),
-                "close": float(row["Close"]),
-                "adj_close": (
-                    float(row["Adj Close"]) if "Adj Close" in row and pd.notna(row["Adj Close"]) else None
-                ),
-                "volume": float(row["Volume"]),
+                "open": open_price,
+                "high": high_price,
+                "low": low_price,
+                "close": close_price,
+                "adj_close": clean_optional_number(row.get("Adj Close")),
+                "volume": volume,
                 "provider": provider,
                 "fetched_at": fetched_at,
             }
         )
 
     return records
+
+
+def clean_required_number(value) -> float | None:
+    if pd.isna(value):
+        return None
+
+    number = float(value)
+    if not math.isfinite(number):
+        return None
+
+    return number
+
+
+def clean_optional_number(value) -> float | None:
+    if value is None or pd.isna(value):
+        return None
+
+    number = float(value)
+    if not math.isfinite(number):
+        return None
+
+    return number
 
 
 def classify_price_history_status(

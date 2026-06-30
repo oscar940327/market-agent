@@ -24,6 +24,7 @@ LLM_ANALYST_SYSTEM_PROMPT = """
 輸出格式：
 - 使用繁體中文。
 - 用短段落與條列。
+- 如果 payload 的 data_freshness.warnings 有 warning / stale / missing，請在風險提醒中自然提到；如果沒有 warnings，不要主動新增資料新鮮度段落。
 - 最後一定要保留「不構成投資建議」的風險提醒。
 """.strip()
 
@@ -241,6 +242,7 @@ def build_single_stock_payload(data: dict) -> dict:
         .get("news_events_summary"),
         "fundamental_summary": fundamentals.get("summary", {}),
         "ml_research": data.get("ml_research"),
+        "data_freshness": data.get("data_freshness"),
         "research_profile": data.get("research_profile"),
         "agent_summaries": {
             name: output.get("summary", {})

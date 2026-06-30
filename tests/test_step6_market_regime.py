@@ -1,5 +1,5 @@
 import json
-from datetime import date
+from datetime import UTC, date, datetime
 
 import pandas as pd
 
@@ -49,15 +49,19 @@ def test_build_market_regime_records_outputs_schema_shape():
 def test_freshness_report_marks_dependencies():
     report = build_freshness_report(
         today=date(2026, 6, 27),
+        now=datetime(2026, 6, 27, tzinfo=UTC),
         daily_prices_latest_date=date(2026, 6, 26),
         technical_features_latest_date=date(2026, 6, 26),
         market_regimes_latest_date=date(2026, 6, 25),
+        news_latest_at=datetime(2026, 6, 26, tzinfo=UTC),
+        ml_training_generated_at=datetime(2026, 6, 24, tzinfo=UTC),
+        pipeline_last_run_at=datetime(2026, 6, 26, 12, tzinfo=UTC),
     )
 
     assert report["daily_prices"]["status"] == "fresh"
     assert report["technical_features"]["status"] == "fresh"
-    assert report["market_regimes"]["status"] == "stale"
-    assert report["overall"] == "stale"
+    assert report["market_regimes"]["status"] == "warning"
+    assert report["overall"] == "warning"
 
 
 def test_fetch_latest_date_returns_latest_row_value():

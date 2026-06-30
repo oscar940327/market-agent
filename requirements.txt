@@ -6,3 +6,5 @@ pydantic
 uvicorn
 pytest
 scikit-learn
+xgboost
+lightgbm

@@ -6,7 +6,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from data_store.supabase_store import insert_news_events  # noqa: E402
+from data_store.supabase_store import fetch_active_tickers, insert_news_events  # noqa: E402
 from news_events import fetch_and_build_news_events  # noqa: E402
 
 
@@ -18,7 +18,12 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Fetch free news sources and write normalized news_events.",
     )
-    parser.add_argument("--tickers", required=True, help="Comma-separated tickers.")
+    parser.add_argument(
+        "--tickers",
+        help="Comma-separated tickers. Omit to use active universe tickers.",
+    )
+    parser.add_argument("--universe", default="QQQ100")
+    parser.add_argument("--limit", type=int)
     parser.add_argument("--max-items", type=int, default=5)
     parser.add_argument(
         "--providers",
@@ -31,7 +36,13 @@ def main() -> int:
     providers = tuple(provider.strip() for provider in args.providers.split(",") if provider.strip())
     all_rows = []
 
-    for ticker in parse_tickers(args.tickers):
+    tickers = parse_tickers(args.tickers) if args.tickers else fetch_active_tickers(
+        universe=args.universe
+    )
+    if args.limit is not None:
+        tickers = tickers[: args.limit]
+
+    for ticker in tickers:
         rows = fetch_and_build_news_events(
             ticker=ticker,
             max_items_per_provider=args.max_items,

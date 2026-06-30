@@ -1,0 +1,42 @@
+name: Monthly Universe Update
+
+on:
+  workflow_dispatch:
+  schedule:
+    # First day of every month.
+    - cron: "0 6 1 * *"
+
+jobs:
+  monthly-universe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      PYTHONUNBUFFERED: "1"
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Update QQQ100 universe
+        run: python scripts/ingest_qqq_universe.py
+
+      - name: Upload universe reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: monthly-universe-reports
+          path: data/market/universe/*.csv
+          if-no-files-found: ignore

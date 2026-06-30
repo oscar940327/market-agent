@@ -6,6 +6,7 @@ from agent.experts.technical_agent import run_technical_agent
 from agent.research_profile import build_research_profile
 from backtesting.evidence import REQUIRED_HISTORY_YEARS
 from backtesting.signal_evidence import build_signal_backtest_evidence
+from data_freshness import build_current_data_freshness
 from ml_research import build_single_stock_ml_research
 from skills.stock_price_skill import get_recent_price_result
 
@@ -273,6 +274,7 @@ class MarketManagerAgent:
                 "summary": "ML reference was skipped for this internal workflow.",
             }
         )
+        data_freshness = build_current_data_freshness(ticker=ticker)
 
         return {
             "intent": "single_stock_analysis",
@@ -297,6 +299,7 @@ class MarketManagerAgent:
             "research_profile": research_profile,
             "evidence_quality": research_profile["evidence_quality"],
             "ml_research": ml_research,
+            "data_freshness": data_freshness,
         }
 
     def run_backtest_query(self, ticker: str, user_query: str) -> dict:

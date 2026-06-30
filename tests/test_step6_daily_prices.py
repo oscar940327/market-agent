@@ -115,6 +115,20 @@ def test_build_daily_price_records_matches_supabase_schema():
     assert records[0]["provider"] == "yfinance"
 
 
+def test_build_daily_price_records_skips_invalid_json_numbers():
+    price_data = make_price_frame(periods=2)
+    price_data.iloc[0, price_data.columns.get_loc("Open")] = float("nan")
+
+    records = build_daily_price_records(
+        ticker="mu",
+        provider="yfinance",
+        price_data=price_data,
+    )
+
+    assert len(records) == 1
+    assert records[0]["date"] == "2011-04-28"
+
+
 def test_write_price_ingest_report_writes_missing_rows(tmp_path):
     plan = build_price_ingest_plan(data_end_date=date(2026, 6, 27))
     full_result = build_price_ingest_result(
