@@ -7,6 +7,13 @@ from agent.research_profile import build_research_profile
 from backtesting.evidence import REQUIRED_HISTORY_YEARS
 from backtesting.signal_evidence import build_signal_backtest_evidence
 from data_freshness import build_current_data_freshness
+from daily_ml_predictions import (
+    build_runtime_fallback_source,
+    build_unavailable_source,
+    convert_saved_prediction_to_ml_research,
+    is_saved_prediction_usable,
+)
+from data_store import fetch_latest_ml_prediction
 from ml_research import build_single_stock_ml_research
 from skills.stock_price_skill import get_recent_price_result
 
@@ -108,6 +115,54 @@ def has_triggered_strategy_signal(signals: dict) -> bool:
         or signals.get("volume_surge", {}).get("is_volume_surge")
         or signals.get("pullback", {}).get("is_pullback")
     )
+
+
+def build_ml_research_for_single_stock(ticker: str, include_ml: bool = True) -> tuple[dict, dict | None]:
+    if not include_ml:
+        return (
+            {
+                "status": "skipped",
+                "usage_policy": "reference_only",
+                "reason": "ml_disabled_for_internal_workflow",
+                "summary": "ML reference was skipped for this internal workflow.",
+                "source": {"type": "skipped", "reason": "include_ml_false"},
+            },
+            None,
+        )
+
+    saved_prediction = safe_fetch_latest_ml_prediction(ticker=ticker)
+    if is_saved_prediction_usable(saved_prediction):
+        return convert_saved_prediction_to_ml_research(saved_prediction), saved_prediction
+
+    fallback_reason = build_saved_prediction_fallback_reason(saved_prediction)
+    runtime_ml_research = build_single_stock_ml_research(ticker=ticker)
+    if runtime_ml_research.get("status") == "success":
+        runtime_ml_research["source"] = build_runtime_fallback_source(
+            reason=fallback_reason,
+            saved_prediction=saved_prediction,
+        )
+    else:
+        runtime_ml_research["source"] = build_unavailable_source(
+            reason=fallback_reason,
+            saved_prediction=saved_prediction,
+        )
+    return runtime_ml_research, saved_prediction
+
+
+def safe_fetch_latest_ml_prediction(ticker: str) -> dict | None:
+    try:
+        return fetch_latest_ml_prediction(ticker=ticker)
+    except Exception:
+        return None
+
+
+def build_saved_prediction_fallback_reason(saved_prediction: dict | None) -> str:
+    if not saved_prediction:
+        return "no_saved_daily_prediction"
+
+    status = saved_prediction.get("prediction_status", "unknown")
+    freshness = saved_prediction.get("prediction_freshness", "unknown")
+    return f"saved_prediction_not_usable:{status}/{freshness}"
 
 
 class MarketManagerAgent:
@@ -264,15 +319,9 @@ class MarketManagerAgent:
             include_fundamentals=include_fundamentals,
             backtest_evidence=backtest_evidence,
         )
-        ml_research = (
-            build_single_stock_ml_research(ticker=ticker)
-            if include_ml
-            else {
-                "status": "skipped",
-                "usage_policy": "reference_only",
-                "reason": "ml_disabled_for_internal_workflow",
-                "summary": "ML reference was skipped for this internal workflow.",
-            }
+        ml_research, ml_prediction = build_ml_research_for_single_stock(
+            ticker=ticker,
+            include_ml=include_ml,
         )
         data_freshness = build_current_data_freshness(ticker=ticker)
 
@@ -299,6 +348,7 @@ class MarketManagerAgent:
             "research_profile": research_profile,
             "evidence_quality": research_profile["evidence_quality"],
             "ml_research": ml_research,
+            "ml_prediction": ml_prediction,
             "data_freshness": data_freshness,
         }
 

@@ -22,7 +22,17 @@ schedule/
 done/
 
 data/market
-data/ml/
+data/ml/*
+!data/ml/models/
+!data/ml/models/*.pkl
+!data/ml/return_models/
+!data/ml/return_models/*.pkl
+!data/ml/model_reports/
+!data/ml/model_reports/*.json
+!data/ml/model_reports/*.md
+!data/ml/return_model_reports/
+!data/ml/return_model_reports/*.json
+!data/ml/return_model_reports/*.md
 data/pipeline_runs/
 .pytest_cache/
 .pytest_tmp/

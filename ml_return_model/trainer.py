@@ -12,9 +12,10 @@ from sklearn.metrics import mean_absolute_error, root_mean_squared_error
 
 from ml_baseline.trainer import build_raw_feature_frame
 from ml_dataset import FEATURE_COLUMNS
+from ml_versions import RETURN_MODEL_VERSION as CURRENT_RETURN_MODEL_VERSION
 
 
-RETURN_MODEL_VERSION = "return_baseline_v1"
+RETURN_MODEL_VERSION = CURRENT_RETURN_MODEL_VERSION
 RETURN_MODEL_TARGETS = [
     "forward_return_5d",
     "forward_return_10d",

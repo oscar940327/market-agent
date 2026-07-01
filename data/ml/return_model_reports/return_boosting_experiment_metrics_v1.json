@@ -1,0 +1,1592 @@
+{
+  "experiment_version": "return_boosting_experiment_v1",
+  "status": "success",
+  "usage_policy": "comparison_only",
+  "targets": {
+    "forward_return_5d": {
+      "status": "success",
+      "reason": null,
+      "row_counts": {
+        "train": 194492,
+        "validation": 48050,
+        "test": 84845
+      },
+      "training_row_count_used": 120000,
+      "models": {
+        "xgboost": {
+          "point_model": {
+            "metrics": {
+              "train": {
+                "mae": 0.029674193545869462,
+                "rmse": 0.04450522237783374,
+                "directional_accuracy": 0.5871295477448943,
+                "downside_underestimation_rate": 0.9918286403765515,
+                "rows": 194492
+              },
+              "validation": {
+                "mae": 0.04207555416688139,
+                "rmse": 0.060011721162499414,
+                "directional_accuracy": 0.5242663891779397,
+                "downside_underestimation_rate": 0.986106890114184,
+                "rows": 48050
+              },
+              "test": {
+                "mae": 0.03744230112968174,
+                "rmse": 0.05592306225189943,
+                "directional_accuracy": 0.5264305498261536,
+                "downside_underestimation_rate": 0.9908745840266223,
+                "rows": 84845
+              }
+            },
+            "training_seconds": 2.833,
+            "feature_importance": [
+              {
+                "feature": "regime_changed",
+                "importance": 0.15324679017066956,
+                "absolute_importance": 0.15324679017066956
+              },
+              {
+                "feature": "market_regime__bull",
+                "importance": 0.11404074728488922,
+                "absolute_importance": 0.11404074728488922
+              },
+              {
+                "feature": "qqq_return_60d",
+                "importance": 0.06602220982313156,
+                "absolute_importance": 0.06602220982313156
+              },
+              {
+                "feature": "qqq_return_20d",
+                "importance": 0.05160319805145264,
+                "absolute_importance": 0.05160319805145264
+              },
+              {
+                "feature": "is_pullback",
+                "importance": 0.05158434435725212,
+                "absolute_importance": 0.05158434435725212
+              },
+              {
+                "feature": "market_regime__sideways",
+                "importance": 0.05018879473209381,
+                "absolute_importance": 0.05018879473209381
+              },
+              {
+                "feature": "volatility_20d",
+                "importance": 0.04823382571339607,
+                "absolute_importance": 0.04823382571339607
+              },
+              {
+                "feature": "market_regime__bear",
+                "importance": 0.04193104803562164,
+                "absolute_importance": 0.04193104803562164
+              },
+              {
+                "feature": "ma20_vs_ma50",
+                "importance": 0.03960480913519859,
+                "absolute_importance": 0.03960480913519859
+              },
+              {
+                "feature": "price_vs_ma200",
+                "importance": 0.03515498712658882,
+                "absolute_importance": 0.03515498712658882
+              },
+              {
+                "feature": "ma5_vs_ma20",
+                "importance": 0.03204740956425667,
+                "absolute_importance": 0.03204740956425667
+              },
+              {
+                "feature": "return_20d",
+                "importance": 0.030602894723415375,
+                "absolute_importance": 0.030602894723415375
+              },
+              {
+                "feature": "return_5d",
+                "importance": 0.029347242787480354,
+                "absolute_importance": 0.029347242787480354
+              },
+              {
+                "feature": "price_vs_ma5",
+                "importance": 0.02757362835109234,
+                "absolute_importance": 0.02757362835109234
+              },
+              {
+                "feature": "price_vs_ma10",
+                "importance": 0.027376793324947357,
+                "absolute_importance": 0.027376793324947357
+              },
+              {
+                "feature": "volume_ratio_20d",
+                "importance": 0.025757670402526855,
+                "absolute_importance": 0.025757670402526855
+              },
+              {
+                "feature": "ma50_vs_ma200",
+                "importance": 0.024657845497131348,
+                "absolute_importance": 0.024657845497131348
+              },
+              {
+                "feature": "price_vs_ma50",
+                "importance": 0.023497017100453377,
+                "absolute_importance": 0.023497017100453377
+              },
+              {
+                "feature": "macd_histogram",
+                "importance": 0.023361125960946083,
+                "absolute_importance": 0.023361125960946083
+              },
+              {
+                "feature": "qqq_above_ma200",
+                "importance": 0.02267097495496273,
+                "absolute_importance": 0.02267097495496273
+              },
+              {
+                "feature": "price_vs_ma20",
+                "importance": 0.02167072705924511,
+                "absolute_importance": 0.02167072705924511
+              },
+              {
+                "feature": "return_10d",
+                "importance": 0.020627638325095177,
+                "absolute_importance": 0.020627638325095177
+              },
+              {
+                "feature": "macd",
+                "importance": 0.020473461598157883,
+                "absolute_importance": 0.020473461598157883
+              },
+              {
+                "feature": "rsi_14",
+                "importance": 0.01872476190328598,
+                "absolute_importance": 0.01872476190328598
+              },
+              {
+                "feature": "is_breakout",
+                "importance": 0.0,
+                "absolute_importance": 0.0
+              },
+              {
+                "feature": "is_volume_surge",
+                "importance": 0.0,
+                "absolute_importance": 0.0
+              },
+              {
+                "feature": "market_regime__unknown",
+                "importance": 0.0,
+                "absolute_importance": 0.0
+              },
+              {
+                "feature": "news_count_30d",
+                "importance": 0.0,
+                "absolute_importance": 0.0
+              },
+              {
+                "feature": "news_sentiment_score_30d",
+                "importance": 0.0,
+                "absolute_importance": 0.0
+              },
+              {
+                "feature": "high_importance_news_count_30d",
+                "importance": 0.0,
+                "absolute_importance": 0.0
+              }
+            ]
+          }
+        },
+        "lightgbm": {
+          "point_model": {
+            "metrics": {
+              "train": {
+                "mae": 0.029353470228882923,
+                "rmse": 0.04405744157652646,
+                "directional_accuracy": 0.5979217654196574,
+                "downside_underestimation_rate": 0.9862496565400743,
+                "rows": 194492
+              },
+              "validation": {
+                "mae": 0.04239561414231832,
+                "rmse": 0.06039284789671308,
+                "directional_accuracy": 0.5240582726326743,
+                "downside_underestimation_rate": 0.9762080493205401,
+                "rows": 48050
+              },
+              "test": {
+                "mae": 0.03782823190750059,
+                "rmse": 0.05645105870940174,
+                "directional_accuracy": 0.5237550827980435,
+                "downside_underestimation_rate": 0.9858049084858569,
+                "rows": 84845
+              }
+            },
+            "training_seconds": 2.655,
+            "feature_importance": [
+              {
+                "feature": "qqq_return_60d",
+                "importance": 773.0,
+                "absolute_importance": 773.0
+              },
+              {
+                "feature": "qqq_return_20d",
+                "importance": 712.0,
+                "absolute_importance": 712.0
+              },
+              {
+                "feature": "ma50_vs_ma200",
+                "importance": 277.0,
+                "absolute_importance": 277.0
+              },
+              {
+                "feature": "volatility_20d",
+                "importance": 252.0,
+                "absolute_importance": 252.0
+              },
+              {
+                "feature": "ma20_vs_ma50",
+                "importance": 194.0,
+                "absolute_importance": 194.0
+              },
+              {
+                "feature": "volume_ratio_20d",
+                "importance": 145.0,
+                "absolute_importance": 145.0
+              },
+              {
+                "feature": "return_5d",
+                "importance": 141.0,
+                "absolute_importance": 141.0
+              },
+              {
+                "feature": "price_vs_ma200",
+                "importance": 140.0,
+                "absolute_importance": 140.0
+              },
+              {
+                "feature": "price_vs_ma5",
+                "importance": 138.0,
+                "absolute_importance": 138.0
+              },
+              {
+                "feature": "macd_histogram",
+                "importance": 133.0,
+                "absolute_importance": 133.0
+              },
+              {
+                "feature": "macd",
+                "importance": 128.0,
+                "absolute_importance": 128.0
+              },
+              {
+                "feature": "return_10d",
+                "importance": 124.0,
+                "absolute_importance": 124.0
+              },
+              {
+                "feature": "ma5_vs_ma20",
+                "importance": 119.0,
+                "absolute_importance": 119.0
+              },
+              {
+                "feature": "rsi_14",
+                "importance": 94.0,
+                "absolute_importance": 94.0
+              },
+              {
+                "feature": "return_20d",
+                "importance": 93.0,
+                "absolute_importance": 93.0
+              },
+              {
+                "feature": "price_vs_ma50",
+                "importance": 89.0,
+                "absolute_importance": 89.0
+              },
+              {
+                "feature": "price_vs_ma10",
+                "importance": 80.0,
+                "absolute_importance": 80.0
+              },
+              {
+                "feature": "price_vs_ma20",
+                "importance": 54.0,
+                "absolute_importance": 54.0
+              },
+              {
+                "feature": "market_regime__sideways",
+                "importance": 34.0,
+                "absolute_importance": 34.0
+              },
+              {
+                "feature": "market_regime__bull",
+                "importance": 22.0,
+                "absolute_importance": 22.0
+              },
+              {
+                "feature": "regime_changed",
+                "importance": 22.0,
+                "absolute_importance": 22.0
+              },
+              {
+                "feature": "market_regime__bear",
+                "importance": 18.0,
+                "absolute_importance": 18.0
+              },
+              {
+                "feature": "qqq_above_ma200",
+                "importance": 12.0,
+                "absolute_importance": 12.0
+              },
+              {
+                "feature": "is_pullback",
+                "importance": 4.0,
+                "absolute_importance": 4.0
+              },
+              {
+                "feature": "is_breakout",
+                "importance": 0.0,
+                "absolute_importance": 0.0
+              },
+              {
+                "feature": "is_volume_surge",
+                "importance": 0.0,
+                "absolute_importance": 0.0
+              },
+              {
+                "feature": "market_regime__unknown",
+                "importance": 0.0,
+                "absolute_importance": 0.0
+              },
+              {
+                "feature": "news_count_30d",
+                "importance": 0.0,
+                "absolute_importance": 0.0
+              },
+              {
+                "feature": "news_sentiment_score_30d",
+                "importance": 0.0,
+                "absolute_importance": 0.0
+              },
+              {
+                "feature": "high_importance_news_count_30d",
+                "importance": 0.0,
+                "absolute_importance": 0.0
+              }
+            ]
+          },
+          "range_model": {
+            "metrics": {
+              "train": {
+                "coverage": 0.49990745120621927,
+                "average_interval_width": 0.04396963456432028,
+                "downside_underestimation_rate": 0.5751370853094723,
+                "rows": 194492
+              },
+              "validation": {
+                "coverage": 0.41281997918834545,
+                "average_interval_width": 0.052085107360111696,
+                "downside_underestimation_rate": 0.7019927929492468,
+                "rows": 48050
+              },
+              "test": {
+                "coverage": 0.4458954564205316,
+                "average_interval_width": 0.04900156394318196,
+                "downside_underestimation_rate": 0.6268718801996672,
+                "rows": 84845
+              }
+            },
+            "training_seconds": 6.604
+          }
+        }
+      }
+    },
+    "forward_return_10d": {
+      "status": "success",
+      "reason": null,
+      "row_counts": {
+        "train": 194492,
+        "validation": 48050,
+        "test": 84845
+      },
+      "training_row_count_used": 120000,
+      "models": {
+        "xgboost": {
+          "point_model": {
+            "metrics": {
+              "train": {
+                "mae": 0.04233887108906548,
+                "rmse": 0.06195780588096687,
+                "directional_accuracy": 0.6042048001974374,
+                "downside_underestimation_rate": 0.9911074577791062,
+                "rows": 194492
+              },
+              "validation": {
+                "mae": 0.06034592599172946,
+                "rmse": 0.08491323426302834,
+                "directional_accuracy": 0.5327575442247658,
+                "downside_underestimation_rate": 0.9910226385636222,
+                "rows": 48050
+              },
+              "test": {
+                "mae": 0.05426607735471968,
+                "rmse": 0.08040703811321782,
+                "directional_accuracy": 0.5407389946372797,
+                "downside_underestimation_rate": 0.9773193678206871,
+                "rows": 84845
+              }
+            },
+            "training_seconds": 2.704,
+            "feature_importance": [
+              {
+                "feature": "market_regime__bull",
+                "importance": 0.15248480439186096,
+                "absolute_importance": 0.15248480439186096
+              },
+              {
+                "feature": "qqq_return_60d",
+                "importance": 0.07311790436506271,
+                "absolute_importance": 0.07311790436506271
+              },
+              {
+                "feature": "qqq_return_20d",
+                "importance": 0.06720083206892014,
+                "absolute_importance": 0.06720083206892014
+              },
+              {
+                "feature": "volatility_20d",
+                "importance": 0.06584994494915009,
+                "absolute_importance": 0.06584994494915009
+              },
+              {
+                "feature": "regime_changed",
+                "importance": 0.062128596007823944,
+                "absolute_importance": 0.062128596007823944
+              },
+              {
+                "feature": "return_10d",
+                "importance": 0.05966348946094513,
+                "absolute_importance": 0.05966348946094513
+              },
+              {
+                "feature": "market_regime__sideways",
+                "importance": 0.05958344787359238,
+                "absolute_importance": 0.05958344787359238
+              },
+              {
+                "feature": "ma5_vs_ma20",
+                "importance": 0.03216805309057236,
+                "absolute_importance": 0.03216805309057236
+              },
+              {
+                "feature": "price_vs_ma10",
+                "importance": 0.03175080567598343,
+                "absolute_importance": 0.03175080567598343
+              },
+              {
+                "feature": "price_vs_ma50",
+                "importance": 0.03161940351128578,
+                "absolute_importance": 0.03161940351128578
+              },
+              {
+                "feature": "rsi_14",
+                "importance": 0.030858933925628662,
+                "absolute_importance": 0.030858933925628662
+              },
+              {
+                "feature": "ma20_vs_ma50",
+                "importance": 0.030462129041552544,
+                "absolute_importance": 0.030462129041552544
+              },
+              {
+                "feature": "price_vs_ma20",
+                "importance": 0.03002825379371643,
+                "absolute_importance": 0.03002825379371643
+              },
+              {
+                "feature": "ma50_vs_ma200",
+                "importance": 0.02968309260904789,
+                "absolute_importance": 0.02968309260904789
+              },
+              {
+                "feature": "price_vs_ma200",
+                "importance": 0.028789689764380455,
+                "absolute_importance": 0.028789689764380455
+              },
+              {
+                "feature": "macd",
+                "importance": 0.028408562764525414,
+                "absolute_importance": 0.028408562764525414
+              },
+              {
+                "feature": "return_20d",
+                "importance": 0.02799232117831707,
+                "absolute_importance": 0.02799232117831707
+              },
+              {
+                "feature": "macd_histogram",
+                "importance": 0.027111800387501717,
+                "absolute_importance": 0.027111800387501717
+              },
+              {
+                "feature": "qqq_above_ma200",
+                "importance": 0.026226835325360298,
+                "absolute_importance": 0.026226835325360298
+              },
+              {
+                "feature": "price_vs_ma5",
+                "importance": 0.025386862456798553,
+                "absolute_importance": 0.025386862456798553
+              },
+              {
+                "feature": "return_5d",
+                "importance": 0.02347363904118538,
+                "absolute_importance": 0.02347363904118538
+              },
+              {
+                "feature": "market_regime__bear",
+                "importance": 0.022595448419451714,
+                "absolute_importance": 0.022595448419451714
+              },
+              {
+                "feature": "volume_ratio_20d",
+                "importance": 0.017835013568401337,
+                "absolute_importance": 0.017835013568401337
+              },
+              {
+                "feature": "is_breakout",
+                "importance": 0.01558010932058096,
+                "absolute_importance": 0.01558010932058096
+              },
+              {
+                "feature": "is_volume_surge",
+                "importance": 0.0,
+                "absolute_importance": 0.0
+              },
+              {
+                "feature": "is_pullback",
+                "importance": 0.0,
+                "absolute_importance": 0.0
+              },
+              {
+                "feature": "market_regime__unknown",
+                "importance": 0.0,
+                "absolute_importance": 0.0
+              },
+              {
+                "feature": "news_count_30d",
+                "importance": 0.0,
+                "absolute_importance": 0.0
+              },
+              {
+                "feature": "news_sentiment_score_30d",
+                "importance": 0.0,
+                "absolute_importance": 0.0
+              },
+              {
+                "feature": "high_importance_news_count_30d",
+                "importance": 0.0,
+                "absolute_importance": 0.0
+              }
+            ]
+          }
+        },
+        "lightgbm": {
+          "point_model": {
+            "metrics": {
+              "train": {
+                "mae": 0.04178078532991331,
+                "rmse": 0.061113618772445186,
+                "directional_accuracy": 0.6128324044176624,
+                "downside_underestimation_rate": 0.9872839137149405,
+                "rows": 194492
+              },
+              "validation": {
+                "mae": 0.06035007938791298,
+                "rmse": 0.08432485247094516,
+                "directional_accuracy": 0.5317377731529657,
+                "downside_underestimation_rate": 0.9861219533350681,
+                "rows": 48050
+              },
+              "test": {
+                "mae": 0.05468086000030685,
+                "rmse": 0.08075703935585318,
+                "directional_accuracy": 0.53168719429548,
+                "downside_underestimation_rate": 0.9732949548252978,
+                "rows": 84845
+              }
+            },
+            "training_seconds": 2.637,
+            "feature_importance": [
+              {
+                "feature": "qqq_return_60d",
+                "importance": 722.0,
+                "absolute_importance": 722.0
+              },
+              {
+                "feature": "qqq_return_20d",
+                "importance": 638.0,
+                "absolute_importance": 638.0
+              },
+              {
+                "feature": "ma50_vs_ma200",
+                "importance": 373.0,
+                "absolute_importance": 373.0
+              },
+              {
+                "feature": "volatility_20d",
+                "importance": 294.0,
+                "absolute_importance": 294.0
+              },
+              {
+                "feature": "ma20_vs_ma50",
+                "importance": 202.0,
+                "absolute_importance": 202.0
+              },
+              {
+                "feature": "macd",
+                "importance": 192.0,
+                "absolute_importance": 192.0
+              },
+              {
+                "feature": "price_vs_ma200",
+                "importance": 190.0,
+                "absolute_importance": 190.0
+              },
+              {
+                "feature": "macd_histogram",
+                "importance": 171.0,
+                "absolute_importance": 171.0
+              },
+              {
+                "feature": "price_vs_ma50",
+                "importance": 139.0,
+                "absolute_importance": 139.0
+              },
+              {
+                "feature": "ma5_vs_ma20",
+                "importance": 122.0,
+                "absolute_importance": 122.0
+              },
+              {
+                "feature": "return_10d",
+                "importance": 113.0,
+                "absolute_importance": 113.0
+              },
+              {
+                "feature": "return_20d",
+                "importance": 110.0,
+                "absolute_importance": 110.0
+              },
+              {
+                "feature": "volume_ratio_20d",
+                "importance": 108.0,
+                "absolute_importance": 108.0
+              },
+              {
+                "feature": "rsi_14",
+                "importance": 104.0,
+                "absolute_importance": 104.0
+              },
+              {
+                "feature": "price_vs_ma5",
+                "importance": 94.0,
+                "absolute_importance": 94.0
+              },
+              {
+                "feature": "return_5d",
+                "importance": 91.0,
+                "absolute_importance": 91.0
+              },
+              {
+                "feature": "price_vs_ma10",
+                "importance": 89.0,
+                "absolute_importance": 89.0
+              },
+              {
+                "feature": "price_vs_ma20",
+                "importance": 64.0,
+                "absolute_importance": 64.0
+              },
+              {
+                "feature": "market_regime__bull",
+                "importance": 44.0,
+                "absolute_importance": 44.0
+              },
+              {
+                "feature": "regime_changed",
+                "importance": 33.0,
+                "absolute_importance": 33.0
+              },
+              {
+                "feature": "market_regime__sideways",
+                "importance": 32.0,
+                "absolute_importance": 32.0
+              },
+              {
+                "feature": "market_regime__bear",
+                "importance": 7.0,
+                "absolute_importance": 7.0
+              },
+              {
+                "feature": "qqq_above_ma200",
+                "importance": 5.0,
+                "absolute_importance": 5.0
+              },
+              {
+                "feature": "is_pullback",
+                "importance": 4.0,
+                "absolute_importance": 4.0
+              },
+              {
+                "feature": "is_breakout",
+                "importance": 3.0,
+                "absolute_importance": 3.0
+              },
+              {
+                "feature": "is_volume_surge",
+                "importance": 0.0,
+                "absolute_importance": 0.0
+              },
+              {
+                "feature": "market_regime__unknown",
+                "importance": 0.0,
+                "absolute_importance": 0.0
+              },
+              {
+                "feature": "news_count_30d",
+                "importance": 0.0,
+                "absolute_importance": 0.0
+              },
+              {
+                "feature": "news_sentiment_score_30d",
+                "importance": 0.0,
+                "absolute_importance": 0.0
+              },
+              {
+                "feature": "high_importance_news_count_30d",
+                "importance": 0.0,
+                "absolute_importance": 0.0
+              }
+            ]
+          },
+          "range_model": {
+            "metrics": {
+              "train": {
+                "coverage": 0.4988688480760134,
+                "average_interval_width": 0.06360986906489077,
+                "downside_underestimation_rate": 0.5982040551985254,
+                "rows": 194492
+              },
+              "validation": {
+                "coverage": 0.39793964620187305,
+                "average_interval_width": 0.07249435989325277,
+                "downside_underestimation_rate": 0.7429959233237922,
+                "rows": 48050
+              },
+              "test": {
+                "coverage": 0.4388237374035005,
+                "average_interval_width": 0.07048186658694602,
+                "downside_underestimation_rate": 0.6361504224301058,
+                "rows": 84845
+              }
+            },
+            "training_seconds": 6.239
+          }
+        }
+      }
+    },
+    "forward_return_20d": {
+      "status": "success",
+      "reason": null,
+      "row_counts": {
+        "train": 194492,
+        "validation": 48050,
+        "test": 84845
+      },
+      "training_row_count_used": 120000,
+      "models": {
+        "xgboost": {
+          "point_model": {
+            "metrics": {
+              "train": {
+                "mae": 0.06071194456116216,
+                "rmse": 0.08723891783033766,
+                "directional_accuracy": 0.6233881085083192,
+                "downside_underestimation_rate": 0.9927470775770457,
+                "rows": 194492
+              },
+              "validation": {
+                "mae": 0.0879126656912947,
+                "rmse": 0.12049547598337418,
+                "directional_accuracy": 0.5283454734651405,
+                "downside_underestimation_rate": 0.9943203820833871,
+                "rows": 48050
+              },
+              "test": {
+                "mae": 0.0792362178638386,
+                "rmse": 0.11802170077042945,
+                "directional_accuracy": 0.5442748541457952,
+                "downside_underestimation_rate": 0.9816980872437044,
+                "rows": 84845
+              }
+            },
+            "training_seconds": 2.72,
+            "feature_importance": [
+              {
+                "feature": "market_regime__bull",
+                "importance": 0.19293631613254547,
+                "absolute_importance": 0.19293631613254547
+              },
+              {
+                "feature": "qqq_return_60d",
+                "importance": 0.08724357932806015,
+                "absolute_importance": 0.08724357932806015
+              },
+              {
+                "feature": "volatility_20d",
+                "importance": 0.06591078639030457,
+                "absolute_importance": 0.06591078639030457
+              },
+              {
+                "feature": "return_20d",
+                "importance": 0.050529845058918,
+                "absolute_importance": 0.050529845058918
+              },
+              {
+                "feature": "qqq_return_20d",
+                "importance": 0.045576516538858414,
+                "absolute_importance": 0.045576516538858414
+              },
+              {
+                "feature": "return_10d",
+                "importance": 0.04004249349236488,
+                "absolute_importance": 0.04004249349236488
+              },
+              {
+                "feature": "ma20_vs_ma50",
+                "importance": 0.037600547075271606,
+                "absolute_importance": 0.037600547075271606
+              },
+              {
+                "feature": "regime_changed",
+                "importance": 0.035510387271642685,
+                "absolute_importance": 0.035510387271642685
+              },
+              {
+                "feature": "market_regime__sideways",
+                "importance": 0.03496011719107628,
+                "absolute_importance": 0.03496011719107628
+              },
+              {
+                "feature": "price_vs_ma200",
+                "importance": 0.034613266587257385,
+                "absolute_importance": 0.034613266587257385
+              },
+              {
+                "feature": "price_vs_ma20",
+                "importance": 0.03342479094862938,
+                "absolute_importance": 0.03342479094862938
+              },
+              {
+                "feature": "ma50_vs_ma200",
+                "importance": 0.0327429361641407,
+                "absolute_importance": 0.0327429361641407
+              },
+              {
+                "feature": "price_vs_ma50",
+                "importance": 0.03228532522916794,
+                "absolute_importance": 0.03228532522916794
+              },
+              {
+                "feature": "macd",
+                "importance": 0.03222433477640152,
+                "absolute_importance": 0.03222433477640152
+              },
+              {
+                "feature": "price_vs_ma10",
+                "importance": 0.03208251670002937,
+                "absolute_importance": 0.03208251670002937
+              },
+              {
+                "feature": "market_regime__bear",
+                "importance": 0.02826307900249958,
+                "absolute_importance": 0.02826307900249958
+              },
+              {
+                "feature": "macd_histogram",
+                "importance": 0.025640716776251793,
+                "absolute_importance": 0.025640716776251793
+              },
+              {
+                "feature": "volume_ratio_20d",
+                "importance": 0.022918667644262314,
+                "absolute_importance": 0.022918667644262314
+              },
+              {
+                "feature": "rsi_14",
+                "importance": 0.022399116307497025,
+                "absolute_importance": 0.022399116307497025
+              },
+              {
+                "feature": "ma5_vs_ma20",
+                "importance": 0.021680163219571114,
+                "absolute_importance": 0.021680163219571114
+              },
+              {
+                "feature": "return_5d",
+                "importance": 0.020860984921455383,
+                "absolute_importance": 0.020860984921455383
+              },
+              {
+                "feature": "qqq_above_ma200",
+                "importance": 0.01942821592092514,
+                "absolute_importance": 0.01942821592092514
+              },
+              {
+                "feature": "price_vs_ma5",
+                "importance": 0.01885632798075676,
+                "absolute_importance": 0.01885632798075676
+              },
+              {
+                "feature": "is_volume_surge",
+                "importance": 0.016431771218776703,
+                "absolute_importance": 0.016431771218776703
+              },
+              {
+                "feature": "is_pullback",
+                "importance": 0.015837254002690315,
+                "absolute_importance": 0.015837254002690315
+              },
+              {
+                "feature": "is_breakout",
+                "importance": 0.0,
+                "absolute_importance": 0.0
+              },
+              {
+                "feature": "market_regime__unknown",
+                "importance": 0.0,
+                "absolute_importance": 0.0
+              },
+              {
+                "feature": "news_count_30d",
+                "importance": 0.0,
+                "absolute_importance": 0.0
+              },
+              {
+                "feature": "news_sentiment_score_30d",
+                "importance": 0.0,
+                "absolute_importance": 0.0
+              },
+              {
+                "feature": "high_importance_news_count_30d",
+                "importance": 0.0,
+                "absolute_importance": 0.0
+              }
+            ]
+          }
+        },
+        "lightgbm": {
+          "point_model": {
+            "metrics": {
+              "train": {
+                "mae": 0.059794961268692506,
+                "rmse": 0.08586921870951307,
+                "directional_accuracy": 0.632247084712996,
+                "downside_underestimation_rate": 0.9886025504782147,
+                "rows": 194492
+              },
+              "validation": {
+                "mae": 0.0882682307186556,
+                "rmse": 0.12052937306533887,
+                "directional_accuracy": 0.5224349635796046,
+                "downside_underestimation_rate": 0.9898025041951724,
+                "rows": 48050
+              },
+              "test": {
+                "mae": 0.07948532962345961,
+                "rmse": 0.11831218249927362,
+                "directional_accuracy": 0.5457952737344569,
+                "downside_underestimation_rate": 0.973551671941654,
+                "rows": 84845
+              }
+            },
+            "training_seconds": 2.575,
+            "feature_importance": [
+              {
+                "feature": "qqq_return_60d",
+                "importance": 661.0,
+                "absolute_importance": 661.0
+              },
+              {
+                "feature": "qqq_return_20d",
+                "importance": 526.0,
+                "absolute_importance": 526.0
+              },
+              {
+                "feature": "ma50_vs_ma200",
+                "importance": 470.0,
+                "absolute_importance": 470.0
+              },
+              {
+                "feature": "volatility_20d",
+                "importance": 397.0,
+                "absolute_importance": 397.0
+              },
+              {
+                "feature": "macd",
+                "importance": 318.0,
+                "absolute_importance": 318.0
+              },
+              {
+                "feature": "price_vs_ma200",
+                "importance": 274.0,
+                "absolute_importance": 274.0
+              },
+              {
+                "feature": "ma20_vs_ma50",
+                "importance": 207.0,
+                "absolute_importance": 207.0
+              },
+              {
+                "feature": "macd_histogram",
+                "importance": 162.0,
+                "absolute_importance": 162.0
+              },
+              {
+                "feature": "return_20d",
+                "importance": 154.0,
+                "absolute_importance": 154.0
+              },
+              {
+                "feature": "volume_ratio_20d",
+                "importance": 130.0,
+                "absolute_importance": 130.0
+              },
+              {
+                "feature": "price_vs_ma50",
+                "importance": 125.0,
+                "absolute_importance": 125.0
+              },
+              {
+                "feature": "ma5_vs_ma20",
+                "importance": 121.0,
+                "absolute_importance": 121.0
+              },
+              {
+                "feature": "rsi_14",
+                "importance": 108.0,
+                "absolute_importance": 108.0
+              },
+              {
+                "feature": "return_10d",
+                "importance": 85.0,
+                "absolute_importance": 85.0
+              },
+              {
+                "feature": "return_5d",
+                "importance": 76.0,
+                "absolute_importance": 76.0
+              },
+              {
+                "feature": "price_vs_ma5",
+                "importance": 67.0,
+                "absolute_importance": 67.0
+              },
+              {
+                "feature": "price_vs_ma10",
+                "importance": 58.0,
+                "absolute_importance": 58.0
+              },
+              {
+                "feature": "price_vs_ma20",
+                "importance": 52.0,
+                "absolute_importance": 52.0
+              },
+              {
+                "feature": "market_regime__bull",
+                "importance": 30.0,
+                "absolute_importance": 30.0
+              },
+              {
+                "feature": "market_regime__sideways",
+                "importance": 22.0,
+                "absolute_importance": 22.0
+              },
+              {
+                "feature": "market_regime__bear",
+                "importance": 19.0,
+                "absolute_importance": 19.0
+              },
+              {
+                "feature": "regime_changed",
+                "importance": 19.0,
+                "absolute_importance": 19.0
+              },
+              {
+                "feature": "qqq_above_ma200",
+                "importance": 15.0,
+                "absolute_importance": 15.0
+              },
+              {
+                "feature": "is_pullback",
+                "importance": 2.0,
+                "absolute_importance": 2.0
+              },
+              {
+                "feature": "is_breakout",
+                "importance": 0.0,
+                "absolute_importance": 0.0
+              },
+              {
+                "feature": "is_volume_surge",
+                "importance": 0.0,
+                "absolute_importance": 0.0
+              },
+              {
+                "feature": "market_regime__unknown",
+                "importance": 0.0,
+                "absolute_importance": 0.0
+              },
+              {
+                "feature": "news_count_30d",
+                "importance": 0.0,
+                "absolute_importance": 0.0
+              },
+              {
+                "feature": "news_sentiment_score_30d",
+                "importance": 0.0,
+                "absolute_importance": 0.0
+              },
+              {
+                "feature": "high_importance_news_count_30d",
+                "importance": 0.0,
+                "absolute_importance": 0.0
+              }
+            ]
+          },
+          "range_model": {
+            "metrics": {
+              "train": {
+                "coverage": 0.5011208687246776,
+                "average_interval_width": 0.09246584518458176,
+                "downside_underestimation_rate": 0.629317215727949,
+                "rows": 194492
+              },
+              "validation": {
+                "coverage": 0.37238293444328824,
+                "average_interval_width": 0.10142736064148378,
+                "downside_underestimation_rate": 0.7829697517318532,
+                "rows": 48050
+              },
+              "test": {
+                "coverage": 0.4435382167481879,
+                "average_interval_width": 0.10415566060942998,
+                "downside_underestimation_rate": 0.645328195954314,
+                "rows": 84845
+              }
+            },
+            "training_seconds": 6.221
+          }
+        }
+      }
+    },
+    "max_drop_20d": {
+      "status": "success",
+      "reason": null,
+      "row_counts": {
+        "train": 194492,
+        "validation": 48050,
+        "test": 84845
+      },
+      "training_row_count_used": 120000,
+      "models": {
+        "xgboost": {
+          "point_model": {
+            "metrics": {
+              "train": {
+                "mae": 0.03681468424823329,
+                "rmse": 0.05231026524394264,
+                "directional_accuracy": null,
+                "downside_underestimation_rate": 0.39304444398741334,
+                "rows": 194492
+              },
+              "validation": {
+                "mae": 0.052206982533808684,
+                "rmse": 0.0747623493720641,
+                "directional_accuracy": null,
+                "downside_underestimation_rate": 0.5260978147762747,
+                "rows": 48050
+              },
+              "test": {
+                "mae": 0.04427658053877427,
+                "rmse": 0.06131262540344146,
+                "directional_accuracy": null,
+                "downside_underestimation_rate": 0.4197183098591549,
+                "rows": 84845
+              }
+            },
+            "training_seconds": 2.733,
+            "feature_importance": [
+              {
+                "feature": "volatility_20d",
+                "importance": 0.11119575053453445,
+                "absolute_importance": 0.11119575053453445
+              },
+              {
+                "feature": "market_regime__bull",
+                "importance": 0.09584526717662811,
+                "absolute_importance": 0.09584526717662811
+              },
+              {
+                "feature": "return_10d",
+                "importance": 0.09214158356189728,
+                "absolute_importance": 0.09214158356189728
+              },
+              {
+                "feature": "qqq_return_60d",
+                "importance": 0.07332421094179153,
+                "absolute_importance": 0.07332421094179153
+              },
+              {
+                "feature": "qqq_return_20d",
+                "importance": 0.05718395486474037,
+                "absolute_importance": 0.05718395486474037
+              },
+              {
+                "feature": "price_vs_ma10",
+                "importance": 0.048244040459394455,
+                "absolute_importance": 0.048244040459394455
+              },
+              {
+                "feature": "ma5_vs_ma20",
+                "importance": 0.04627430438995361,
+                "absolute_importance": 0.04627430438995361
+              },
+              {
+                "feature": "ma50_vs_ma200",
+                "importance": 0.04234323278069496,
+                "absolute_importance": 0.04234323278069496
+              },
+              {
+                "feature": "price_vs_ma200",
+                "importance": 0.039634257555007935,
+                "absolute_importance": 0.039634257555007935
+              },
+              {
+                "feature": "market_regime__sideways",
+                "importance": 0.039498940110206604,
+                "absolute_importance": 0.039498940110206604
+              },
+              {
+                "feature": "price_vs_ma20",
+                "importance": 0.037588320672512054,
+                "absolute_importance": 0.037588320672512054
+              },
+              {
+                "feature": "market_regime__bear",
+                "importance": 0.033613771200180054,
+                "absolute_importance": 0.033613771200180054
+              },
+              {
+                "feature": "qqq_above_ma200",
+                "importance": 0.033403147011995316,
+                "absolute_importance": 0.033403147011995316
+              },
+              {
+                "feature": "volume_ratio_20d",
+                "importance": 0.028175873681902885,
+                "absolute_importance": 0.028175873681902885
+              },
+              {
+                "feature": "price_vs_ma5",
+                "importance": 0.026736102998256683,
+                "absolute_importance": 0.026736102998256683
+              },
+              {
+                "feature": "macd_histogram",
+                "importance": 0.026545610278844833,
+                "absolute_importance": 0.026545610278844833
+              },
+              {
+                "feature": "price_vs_ma50",
+                "importance": 0.026139289140701294,
+                "absolute_importance": 0.026139289140701294
+              },
+              {
+                "feature": "ma20_vs_ma50",
+                "importance": 0.026013527065515518,
+                "absolute_importance": 0.026013527065515518
+              },
+              {
+                "feature": "regime_changed",
+                "importance": 0.023822933435440063,
+                "absolute_importance": 0.023822933435440063
+              },
+              {
+                "feature": "macd",
+                "importance": 0.022117028012871742,
+                "absolute_importance": 0.022117028012871742
+              },
+              {
+                "feature": "return_20d",
+                "importance": 0.02118220552802086,
+                "absolute_importance": 0.02118220552802086
+              },
+              {
+                "feature": "return_5d",
+                "importance": 0.02104460448026657,
+                "absolute_importance": 0.02104460448026657
+              },
+              {
+                "feature": "rsi_14",
+                "importance": 0.013245528563857079,
+                "absolute_importance": 0.013245528563857079
+              },
+              {
+                "feature": "is_volume_surge",
+                "importance": 0.00756829883903265,
+                "absolute_importance": 0.00756829883903265
+              },
+              {
+                "feature": "is_pullback",
+                "importance": 0.007118173409253359,
+                "absolute_importance": 0.007118173409253359
+              },
+              {
+                "feature": "is_breakout",
+                "importance": 0.0,
+                "absolute_importance": 0.0
+              },
+              {
+                "feature": "market_regime__unknown",
+                "importance": 0.0,
+                "absolute_importance": 0.0
+              },
+              {
+                "feature": "news_count_30d",
+                "importance": 0.0,
+                "absolute_importance": 0.0
+              },
+              {
+                "feature": "news_sentiment_score_30d",
+                "importance": 0.0,
+                "absolute_importance": 0.0
+              },
+              {
+                "feature": "high_importance_news_count_30d",
+                "importance": 0.0,
+                "absolute_importance": 0.0
+              }
+            ]
+          }
+        },
+        "lightgbm": {
+          "point_model": {
+            "metrics": {
+              "train": {
+                "mae": 0.03610557820300065,
+                "rmse": 0.05115463087928866,
+                "directional_accuracy": null,
+                "downside_underestimation_rate": 0.3952501902391872,
+                "rows": 194492
+              },
+              "validation": {
+                "mae": 0.05221377478334321,
+                "rmse": 0.07505562375445446,
+                "directional_accuracy": null,
+                "downside_underestimation_rate": 0.5303850156087409,
+                "rows": 48050
+              },
+              "test": {
+                "mae": 0.044330329369669574,
+                "rmse": 0.061644699349107046,
+                "directional_accuracy": null,
+                "downside_underestimation_rate": 0.4276739937533149,
+                "rows": 84845
+              }
+            },
+            "training_seconds": 2.764,
+            "feature_importance": [
+              {
+                "feature": "qqq_return_60d",
+                "importance": 931.0,
+                "absolute_importance": 931.0
+              },
+              {
+                "feature": "qqq_return_20d",
+                "importance": 763.0,
+                "absolute_importance": 763.0
+              },
+              {
+                "feature": "ma50_vs_ma200",
+                "importance": 400.0,
+                "absolute_importance": 400.0
+              },
+              {
+                "feature": "volatility_20d",
+                "importance": 372.0,
+                "absolute_importance": 372.0
+              },
+              {
+                "feature": "price_vs_ma200",
+                "importance": 201.0,
+                "absolute_importance": 201.0
+              },
+              {
+                "feature": "ma20_vs_ma50",
+                "importance": 187.0,
+                "absolute_importance": 187.0
+              },
+              {
+                "feature": "macd",
+                "importance": 174.0,
+                "absolute_importance": 174.0
+              },
+              {
+                "feature": "volume_ratio_20d",
+                "importance": 147.0,
+                "absolute_importance": 147.0
+              },
+              {
+                "feature": "macd_histogram",
+                "importance": 144.0,
+                "absolute_importance": 144.0
+              },
+              {
+                "feature": "return_20d",
+                "importance": 125.0,
+                "absolute_importance": 125.0
+              },
+              {
+                "feature": "rsi_14",
+                "importance": 124.0,
+                "absolute_importance": 124.0
+              },
+              {
+                "feature": "price_vs_ma5",
+                "importance": 94.0,
+                "absolute_importance": 94.0
+              },
+              {
+                "feature": "return_5d",
+                "importance": 89.0,
+                "absolute_importance": 89.0
+              },
+              {
+                "feature": "ma5_vs_ma20",
+                "importance": 83.0,
+                "absolute_importance": 83.0
+              },
+              {
+                "feature": "price_vs_ma10",
+                "importance": 80.0,
+                "absolute_importance": 80.0
+              },
+              {
+                "feature": "return_10d",
+                "importance": 69.0,
+                "absolute_importance": 69.0
+              },
+              {
+                "feature": "market_regime__bull",
+                "importance": 65.0,
+                "absolute_importance": 65.0
+              },
+              {
+                "feature": "price_vs_ma50",
+                "importance": 61.0,
+                "absolute_importance": 61.0
+              },
+              {
+                "feature": "price_vs_ma20",
+                "importance": 60.0,
+                "absolute_importance": 60.0
+              },
+              {
+                "feature": "market_regime__sideways",
+                "importance": 39.0,
+                "absolute_importance": 39.0
+              },
+              {
+                "feature": "regime_changed",
+                "importance": 37.0,
+                "absolute_importance": 37.0
+              },
+              {
+                "feature": "qqq_above_ma200",
+                "importance": 10.0,
+                "absolute_importance": 10.0
+              },
+              {
+                "feature": "market_regime__bear",
+                "importance": 7.0,
+                "absolute_importance": 7.0
+              },
+              {
+                "feature": "is_breakout",
+                "importance": 0.0,
+                "absolute_importance": 0.0
+              },
+              {
+                "feature": "is_volume_surge",
+                "importance": 0.0,
+                "absolute_importance": 0.0
+              },
+              {
+                "feature": "is_pullback",
+                "importance": 0.0,
+                "absolute_importance": 0.0
+              },
+              {
+                "feature": "market_regime__unknown",
+                "importance": 0.0,
+                "absolute_importance": 0.0
+              },
+              {
+                "feature": "news_count_30d",
+                "importance": 0.0,
+                "absolute_importance": 0.0
+              },
+              {
+                "feature": "news_sentiment_score_30d",
+                "importance": 0.0,
+                "absolute_importance": 0.0
+              },
+              {
+                "feature": "high_importance_news_count_30d",
+                "importance": 0.0,
+                "absolute_importance": 0.0
+              }
+            ]
+          },
+          "range_model": {
+            "metrics": {
+              "train": {
+                "coverage": 0.5005141599654485,
+                "average_interval_width": 0.05559196055469803,
+                "downside_underestimation_rate": 0.249331592044917,
+                "rows": 194492
+              },
+              "validation": {
+                "coverage": 0.41485952133194587,
+                "average_interval_width": 0.06382669030964293,
+                "downside_underestimation_rate": 0.3883038501560874,
+                "rows": 48050
+              },
+              "test": {
+                "coverage": 0.46753491661264657,
+                "average_interval_width": 0.06252867084718931,
+                "downside_underestimation_rate": 0.28477812481584064,
+                "rows": 84845
+              }
+            },
+            "training_seconds": 6.045
+          }
+        }
+      }
+    }
+  },
+  "available_models": [
+    "lightgbm",
+    "xgboost"
+  ],
+  "skipped_models": {}
+}

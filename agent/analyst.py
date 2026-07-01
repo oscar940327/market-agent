@@ -205,13 +205,15 @@ def format_ml_reference_lines(ml_research: dict | None) -> list[str]:
     if status != "success":
         reason = ml_research.get("reason") or status or "unknown"
         message = ml_research.get("message")
+        source_line = format_ml_source_line(ml_research.get("source"))
         line = f"- ML reference is currently unavailable. Reason: {reason}."
         if message:
             line += f" Detail: {message}"
-        return [line]
+        return [source_line, line] if source_line else [line]
 
     targets = ml_research.get("targets", {})
     lines = [
+        *format_optional_ml_source_line(ml_research.get("source")),
         format_ml_target_line(
             label="5-day upside probability",
             target=targets.get("up_5d"),
@@ -238,6 +240,40 @@ def format_ml_reference_lines(ml_research: dict | None) -> list[str]:
         lines.append(f"- {risk_note}")
 
     return lines
+
+
+def format_optional_ml_source_line(source: dict | None) -> list[str]:
+    line = format_ml_source_line(source)
+    return [line] if line else []
+
+
+def format_ml_source_line(source: dict | None) -> str | None:
+    if not source:
+        return None
+
+    source_type = source.get("type", "unknown")
+    if source_type == "saved_daily_prediction":
+        data_as_of = source.get("data_as_of", "unknown")
+        freshness = source.get("prediction_freshness", "unknown")
+        model_version = source.get("model_version", "unknown")
+        return (
+            "- ML source: saved daily prediction "
+            f"(data as of {data_as_of}, freshness {freshness}, model {model_version})."
+        )
+
+    if source_type == "runtime_fallback":
+        reason = source.get("reason", "unknown")
+        return f"- ML source: runtime fallback. Reason: {reason}."
+
+    if source_type == "unavailable":
+        reason = source.get("reason", "unknown")
+        return f"- ML source: unavailable. Reason: {reason}."
+
+    if source_type == "skipped":
+        reason = source.get("reason", "unknown")
+        return f"- ML source: skipped. Reason: {reason}."
+
+    return f"- ML source: {source_type}."
 
 
 def format_ml_target_line(*, label: str, target: dict | None) -> str:

@@ -242,6 +242,7 @@ def build_single_stock_payload(data: dict) -> dict:
         .get("news_events_summary"),
         "fundamental_summary": fundamentals.get("summary", {}),
         "ml_research": data.get("ml_research"),
+        "ml_prediction": data.get("ml_prediction"),
         "data_freshness": data.get("data_freshness"),
         "research_profile": data.get("research_profile"),
         "agent_summaries": {

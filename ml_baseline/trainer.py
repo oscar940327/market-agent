@@ -13,9 +13,10 @@ from sklearn.metrics import (
 )
 
 from ml_dataset import FEATURE_COLUMNS
+from ml_versions import CLASSIFICATION_MODEL_VERSION
 
 
-MODEL_VERSION = "baseline_v1"
+MODEL_VERSION = CLASSIFICATION_MODEL_VERSION
 BASELINE_TARGETS = ["up_5d", "up_10d", "up_20d", "large_drop_20d"]
 CATEGORICAL_FEATURES = {
     "market_regime": ["bull", "bear", "sideways", "unknown"],

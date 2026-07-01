@@ -5,9 +5,7 @@ from collections import Counter
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
-
-FEATURE_VERSION = "ml_features_v1"
-LABEL_VERSION = "ml_labels_v1"
+from ml_versions import FEATURE_VERSION, LABEL_VERSION
 
 SPLIT_RANGES = {
     "train": (date(2011, 1, 1), date(2020, 12, 31)),

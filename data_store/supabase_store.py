@@ -92,6 +92,172 @@ def fetch_active_tickers(
     return [row["ticker"] for row in rows]
 
 
+def fetch_active_ticker_metadata(
+    *,
+    universe: str = "QQQ100",
+    supabase_url: str | None = None,
+    supabase_key: str | None = None,
+    open_url=urlopen,
+) -> list[dict]:
+    base_url, api_key = resolve_supabase_credentials(
+        supabase_url=supabase_url,
+        supabase_key=supabase_key,
+    )
+    endpoint = (
+        f"{base_url}/rest/v1/tickers?"
+        "select=ticker,name,industry,themes,market_cap_bucket,volatility_bucket,universe"
+        f"&universe=eq.{universe}&is_active=eq.true&order=ticker.asc"
+    )
+    request = Request(
+        endpoint,
+        method="GET",
+        headers={
+            "apikey": api_key,
+            "Authorization": f"Bearer {api_key}",
+            "Accept": "application/json",
+        },
+    )
+
+    with open_url(request, timeout=30) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+def insert_ml_model_run(
+    row: dict,
+    *,
+    supabase_url: str | None = None,
+    supabase_key: str | None = None,
+    open_url=urlopen,
+) -> dict:
+    base_url, api_key = resolve_supabase_credentials(
+        supabase_url=supabase_url,
+        supabase_key=supabase_key,
+    )
+    endpoint = f"{base_url}/rest/v1/ml_model_runs"
+    payload = json.dumps(row, allow_nan=False).encode("utf-8")
+    request = Request(
+        endpoint,
+        data=payload,
+        method="POST",
+        headers={
+            "apikey": api_key,
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "Prefer": "return=representation",
+        },
+    )
+
+    try:
+        with open_url(request, timeout=30) as response:
+            rows = json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace")
+        return {
+            "status": "error",
+            "message": f"Supabase insert failed with HTTP {exc.code}: {body}",
+        }
+    except Exception as exc:
+        return {"status": "error", "message": f"Supabase insert failed: {exc}"}
+
+    return {"status": "success", "row": rows[0] if rows else None}
+
+
+def upsert_ml_predictions(
+    records: list[dict],
+    *,
+    supabase_url: str | None = None,
+    supabase_key: str | None = None,
+    open_url=urlopen,
+    chunk_size: int = 100,
+) -> dict:
+    if not records:
+        return {"status": "skipped", "upserted_count": 0, "message": "No records."}
+
+    base_url, api_key = resolve_supabase_credentials(
+        supabase_url=supabase_url,
+        supabase_key=supabase_key,
+    )
+    total_count = 0
+
+    for chunk in chunk_records(records, chunk_size):
+        endpoint = (
+            f"{base_url}/rest/v1/ml_predictions?"
+            "on_conflict=ticker,prediction_date,model_version,feature_version,universe"
+        )
+        payload = json.dumps(chunk, allow_nan=False).encode("utf-8")
+        request = Request(
+            endpoint,
+            data=payload,
+            method="POST",
+            headers={
+                "apikey": api_key,
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+                "Prefer": "resolution=merge-duplicates,return=minimal",
+            },
+        )
+
+        try:
+            with open_url(request, timeout=30) as response:
+                response.read()
+        except HTTPError as exc:
+            body = exc.read().decode("utf-8", errors="replace")
+            return {
+                "status": "error",
+                "upserted_count": total_count,
+                "message": f"Supabase upsert failed with HTTP {exc.code}: {body}",
+            }
+        except Exception as exc:
+            return {
+                "status": "error",
+                "upserted_count": total_count,
+                "message": f"Supabase upsert failed: {exc}",
+            }
+
+        total_count += len(chunk)
+
+    return {"status": "success", "upserted_count": total_count}
+
+
+def fetch_latest_ml_prediction(
+    *,
+    ticker: str,
+    universe: str = "QQQ100",
+    supabase_url: str | None = None,
+    supabase_key: str | None = None,
+    open_url=urlopen,
+) -> dict | None:
+    base_url, api_key = resolve_supabase_credentials(
+        supabase_url=supabase_url,
+        supabase_key=supabase_key,
+    )
+    endpoint = (
+        f"{base_url}/rest/v1/ml_predictions?"
+        "select=*"
+        f"&ticker=eq.{ticker.upper()}"
+        f"&universe=eq.{universe}"
+        "&order=data_as_of.desc,created_at.desc"
+        "&limit=1"
+    )
+    request = Request(
+        endpoint,
+        method="GET",
+        headers={
+            "apikey": api_key,
+            "Authorization": f"Bearer {api_key}",
+            "Accept": "application/json",
+        },
+    )
+
+    with open_url(request, timeout=30) as response:
+        rows = json.loads(response.read().decode("utf-8"))
+
+    if not rows:
+        return None
+
+    return rows[0]
+
+
 def upsert_daily_prices(
     records: list[dict],
     *,
