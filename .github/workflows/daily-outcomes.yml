@@ -14,6 +14,11 @@ jobs:
       PYTHONUNBUFFERED: "1"
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+      ALERT_EMAIL_ENABLED: ${{ secrets.ALERT_EMAIL_ENABLED }}
+      ALERT_EMAIL_PROVIDER: gmail
+      ALERT_EMAIL_FROM: ${{ secrets.ALERT_EMAIL_FROM }}
+      ALERT_EMAIL_TO: ${{ secrets.ALERT_EMAIL_TO }}
+      GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
 
     steps:
       - name: Checkout
@@ -32,3 +37,37 @@ jobs:
 
       - name: Update matured research outcomes
         run: python scripts/compute_research_outcomes.py --limit 100
+
+      - name: Update matured ML prediction outcomes
+        run: python scripts/compute_ml_prediction_outcomes.py --limit 500
+
+      - name: Build ML monitoring metrics
+        run: python scripts/build_ml_monitoring_metrics.py --days 90
+
+      - name: Build ML calibration report
+        run: python scripts/build_ml_calibration_report.py --days 90
+
+      - name: Build ML drift report
+        run: python scripts/build_ml_drift_report.py --recent-days 30 --baseline-days 365
+
+      - name: Build ML model upgrade review
+        run: python scripts/build_ml_model_upgrade_review.py --send-alert
+
+      - name: Build ML health report
+        run: python scripts/build_ml_health_report.py --send-alert
+
+      - name: Send failure alert
+        if: failure()
+        run: >
+          python scripts/send_pipeline_alert.py
+          --pipeline daily-outcomes
+          --status failed
+          --message "Daily research outcomes GitHub Actions workflow failed."
+
+      - name: Upload monitoring reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-ml-monitoring-reports
+          path: data/ml/monitoring/*
+          if-no-files-found: ignore

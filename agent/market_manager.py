@@ -3,6 +3,7 @@ from agent.experts.fundamental_agent import run_fundamental_agent
 from agent.experts.news_agent import run_news_agent
 from agent.experts.portfolio_agent import normalize_holdings, run_portfolio_agent
 from agent.experts.technical_agent import run_technical_agent
+from agent.exit_signal import build_exit_signal
 from agent.research_profile import build_research_profile
 from backtesting.evidence import REQUIRED_HISTORY_YEARS
 from backtesting.signal_evidence import build_signal_backtest_evidence
@@ -323,6 +324,11 @@ class MarketManagerAgent:
             ticker=ticker,
             include_ml=include_ml,
         )
+        exit_signal = build_exit_signal(
+            technical=technical_agent["technical_analysis"],
+            signals=technical_agent["signals"],
+            ml_research=ml_research,
+        )
         data_freshness = build_current_data_freshness(ticker=ticker)
 
         return {
@@ -338,6 +344,15 @@ class MarketManagerAgent:
                 "fundamental": fundamental_agent,
                 "backtest_evidence": backtest_evidence,
                 "ml_research": ml_research,
+                "exit_signal": {
+                    "agent": "exit_signal",
+                    "status": exit_signal["status"],
+                    "summary": {
+                        "exit_signal": exit_signal["exit_signal"],
+                        "weakening_signal_20d": exit_signal["weakening_signal_20d"],
+                        "email_alert_eligible": exit_signal["email_alert_eligible"],
+                    },
+                },
             },
             "technical_analysis": technical_agent["technical_analysis"],
             "signals": technical_agent["signals"],
@@ -349,6 +364,7 @@ class MarketManagerAgent:
             "evidence_quality": research_profile["evidence_quality"],
             "ml_research": ml_research,
             "ml_prediction": ml_prediction,
+            "exit_signal": exit_signal,
             "data_freshness": data_freshness,
         }
 

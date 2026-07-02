@@ -12,6 +12,7 @@ LLM_ANALYST_SYSTEM_PROMPT = """
 - 只根據使用者提供的 structured analysis payload 寫中文研究摘要。
 - 解釋技術面、新聞面、基本面、回測或主題廣度是否互相支持。
 - 明確指出風險、資料限制與研究信心。
+- 如果 payload 有 exit_signal，請加入「持有風險 / 出場觀察」段落；它只能是觀察訊號，不是買賣指令。
 
 嚴格限制：
 - 不可以自行抓資料。
@@ -243,6 +244,7 @@ def build_single_stock_payload(data: dict) -> dict:
         "fundamental_summary": fundamentals.get("summary", {}),
         "ml_research": data.get("ml_research"),
         "ml_prediction": data.get("ml_prediction"),
+        "exit_signal": data.get("exit_signal"),
         "data_freshness": data.get("data_freshness"),
         "research_profile": data.get("research_profile"),
         "agent_summaries": {

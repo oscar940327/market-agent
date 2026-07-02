@@ -9,6 +9,10 @@ from pathlib import Path
 from typing import Callable
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from alerts import send_pipeline_alert_if_needed  # noqa: E402
 
 
 @dataclass(frozen=True)
@@ -45,6 +49,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument(
+        "--no-alert",
+        action="store_true",
+        help="Do not send email alerts even when ALERT_EMAIL_ENABLED=true.",
+    )
+    parser.add_argument(
         "--log-dir",
         default=str(PROJECT_ROOT / "data" / "pipeline_runs"),
     )
@@ -75,6 +84,18 @@ def build_pipeline_steps(args: argparse.Namespace) -> list[PipelineStep]:
             PipelineStep(
                 name="research_outcomes",
                 command=script_command("compute_research_outcomes.py", "--limit", "100"),
+                core=False,
+                retryable=True,
+            )
+        )
+        steps.append(
+            PipelineStep(
+                name="ml_prediction_outcomes",
+                command=script_command(
+                    "compute_ml_prediction_outcomes.py",
+                    "--limit",
+                    "100",
+                ),
                 core=False,
                 retryable=True,
             )
@@ -207,12 +228,17 @@ def run_pipeline(
             "skip_news": args.skip_news,
             "skip_llm_news": args.skip_llm_news,
             "dry_run": args.dry_run,
+            "no_alert": args.no_alert,
         },
         "warnings": warnings,
         "errors": errors,
         "steps": results,
     }
     write_pipeline_log(log, log_paths)
+    if not args.no_alert:
+        alert_result = send_pipeline_alert_if_needed(log)
+        log["alert"] = summarize_alert_result(alert_result)
+        write_pipeline_log(log, log_paths)
     return log
 
 
@@ -345,6 +371,16 @@ def write_pipeline_log(log: dict, paths: dict[str, Path]) -> None:
         json.dumps(log, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
+
+
+def summarize_alert_result(result: dict) -> dict:
+    return {
+        "status": result.get("status"),
+        "reason": result.get("reason"),
+        "error": result.get("error"),
+        "subject": result.get("subject"),
+        "recipients": result.get("recipients", []),
+    }
 
 
 def sanitize_command(command: list[str]) -> list[str]:

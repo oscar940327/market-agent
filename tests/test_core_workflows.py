@@ -1,6 +1,7 @@
 import pandas as pd
 
 from agent.rule_based_router import detect_intent
+from agent.exit_signal import build_exit_signal
 from agent.research_profile import build_research_profile
 from backtesting.metrics import calculate_backtest_metrics
 from backtesting.evidence import build_backtest_evidence_quality
@@ -119,6 +120,79 @@ def test_technical_analysis_includes_rsi_macd_and_momentum_state():
     assert "macd_signal" in result
     assert "macd_histogram" in result
     assert result["momentum_state"] == "bullish_but_overbought"
+
+
+def test_exit_signal_detects_reduce_when_price_breaks_ma20_with_weak_momentum():
+    result = build_exit_signal(
+        technical={
+            "current_price": 95,
+            "ma20": 100,
+            "ma50": 90,
+            "short_term_trend": "weak",
+            "rsi14": 42,
+            "macd_histogram": -1.2,
+            "momentum_state": "bearish_momentum",
+        },
+        signals={},
+        ml_research={
+            "status": "success",
+            "source": {"type": "saved_daily_prediction"},
+            "targets": {
+                "large_drop_20d": {
+                    "probability": 0.72,
+                    "label": "high large-drop risk",
+                }
+            },
+        },
+    )
+
+    assert result["status"] == "success"
+    assert result["exit_signal"] == "reduce"
+    assert result["weakening_signal_20d"] == "high"
+    assert result["email_alert_eligible"] is True
+    assert "below_ma20" in result["risk_flags"]
+    assert result["ml_reference_used"] is True
+
+
+def test_exit_signal_watches_ma20_break_without_macd_weakening():
+    result = build_exit_signal(
+        technical={
+            "current_price": 95,
+            "ma20": 100,
+            "ma50": 90,
+            "short_term_trend": "weak",
+            "rsi14": 48,
+            "macd_histogram": 0.5,
+            "momentum_state": "turning_positive",
+        },
+        signals={},
+        ml_research={"status": "unavailable"},
+    )
+
+    assert result["exit_signal"] == "watch"
+    assert result["email_alert_eligible"] is False
+    assert "below_ma20" in result["risk_flags"]
+    assert "below_ma20_with_negative_macd" not in result["risk_flags"]
+
+
+def test_exit_signal_stays_hold_when_trend_and_momentum_are_stable():
+    result = build_exit_signal(
+        technical={
+            "current_price": 110,
+            "ma20": 100,
+            "ma50": 90,
+            "short_term_trend": "strong",
+            "rsi14": 58,
+            "macd_histogram": 1.2,
+            "momentum_state": "bullish_momentum",
+        },
+        signals={},
+        ml_research={"status": "unavailable"},
+    )
+
+    assert result["exit_signal"] == "hold"
+    assert result["weakening_signal_20d"] == "low"
+    assert result["email_alert_eligible"] is False
 
 
 def test_calculate_backtest_metrics_handles_wins_losses_and_average():

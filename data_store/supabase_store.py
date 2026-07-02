@@ -1,5 +1,6 @@
 import json
 import os
+from datetime import UTC, datetime, timedelta
 from urllib.error import HTTPError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
@@ -256,6 +257,151 @@ def fetch_latest_ml_prediction(
         return None
 
     return rows[0]
+
+
+def fetch_ml_predictions_for_outcomes(
+    *,
+    universe: str = "QQQ100",
+    supabase_url: str | None = None,
+    supabase_key: str | None = None,
+    open_url=urlopen,
+    limit: int = 100,
+) -> list[dict]:
+    base_url, api_key = resolve_supabase_credentials(
+        supabase_url=supabase_url,
+        supabase_key=supabase_key,
+    )
+    endpoint = (
+        f"{base_url}/rest/v1/ml_predictions?"
+        "select=id,ticker,prediction_date,data_as_of,price_provider,model_version,"
+        "feature_version,prediction_status,prediction_freshness,up_probability_5d,"
+        "up_probability_10d,up_probability_20d,large_drop_risk_20d,"
+        "predicted_return_5d,predicted_return_10d,predicted_return_20d,"
+        "feature_snapshot"
+        f"&universe=eq.{universe}"
+        "&prediction_status=eq.ready"
+        "&order=prediction_date.asc,created_at.asc"
+        f"&limit={limit}"
+    )
+    request = Request(
+        endpoint,
+        method="GET",
+        headers={
+            "apikey": api_key,
+            "Authorization": f"Bearer {api_key}",
+            "Accept": "application/json",
+        },
+    )
+
+    with open_url(request, timeout=30) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+def upsert_ml_prediction_outcomes(
+    records: list[dict],
+    *,
+    supabase_url: str | None = None,
+    supabase_key: str | None = None,
+    open_url=urlopen,
+    chunk_size: int = 100,
+) -> dict:
+    if not records:
+        return {"status": "skipped", "upserted_count": 0, "message": "No records."}
+
+    base_url, api_key = resolve_supabase_credentials(
+        supabase_url=supabase_url,
+        supabase_key=supabase_key,
+    )
+    total_count = 0
+
+    for chunk in chunk_records(records, chunk_size):
+        endpoint = (
+            f"{base_url}/rest/v1/ml_prediction_outcomes?"
+            "on_conflict=ml_prediction_id,horizon_trading_days"
+        )
+        payload = json.dumps(chunk, allow_nan=False).encode("utf-8")
+        request = Request(
+            endpoint,
+            data=payload,
+            method="POST",
+            headers={
+                "apikey": api_key,
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+                "Prefer": "resolution=merge-duplicates,return=minimal",
+            },
+        )
+
+        try:
+            with open_url(request, timeout=30) as response:
+                response.read()
+        except HTTPError as exc:
+            body = exc.read().decode("utf-8", errors="replace")
+            return {
+                "status": "error",
+                "upserted_count": total_count,
+                "message": f"Supabase upsert failed with HTTP {exc.code}: {body}",
+            }
+        except Exception as exc:
+            return {
+                "status": "error",
+                "upserted_count": total_count,
+                "message": f"Supabase upsert failed: {exc}",
+            }
+
+        total_count += len(chunk)
+
+    return {"status": "success", "upserted_count": total_count}
+
+
+def fetch_ml_prediction_outcomes_for_metrics(
+    *,
+    universe: str = "QQQ100",
+    model_version: str | None = None,
+    days: int = 90,
+    supabase_url: str | None = None,
+    supabase_key: str | None = None,
+    open_url=urlopen,
+    limit: int = 10000,
+) -> list[dict]:
+    base_url, api_key = resolve_supabase_credentials(
+        supabase_url=supabase_url,
+        supabase_key=supabase_key,
+    )
+    select = (
+        "id,ml_prediction_id,ticker,prediction_date,horizon_trading_days,target_date,"
+        "actual_date,actual_return_pct,actual_up,actual_max_drop_pct,"
+        "actual_max_runup_pct,predicted_up_probability,predicted_return,"
+        "predicted_large_drop_risk,up_prediction_correct,"
+        "large_drop_prediction_correct,return_error,outcome_status,price_provider,"
+        "computed_at,ml_predictions!inner(model_version,feature_version,universe,"
+        "prediction_status,prediction_freshness,predicted_max_drop_20d)"
+    )
+    query = {
+        "select": select,
+        "outcome_status": "eq.computed",
+        "ml_predictions.universe": f"eq.{universe}",
+        "order": "prediction_date.desc",
+        "limit": str(limit),
+    }
+    if model_version:
+        query["ml_predictions.model_version"] = f"eq.{model_version}"
+    if days > 0:
+        query["prediction_date"] = f"gte.{build_relative_date_filter(days)}"
+
+    endpoint = f"{base_url}/rest/v1/ml_prediction_outcomes?{urlencode(query)}"
+    request = Request(
+        endpoint,
+        method="GET",
+        headers={
+            "apikey": api_key,
+            "Authorization": f"Bearer {api_key}",
+            "Accept": "application/json",
+        },
+    )
+
+    with open_url(request, timeout=60) as response:
+        return json.loads(response.read().decode("utf-8"))
 
 
 def upsert_daily_prices(
@@ -1028,6 +1174,10 @@ def build_optional_ticker_filter(ticker: str | None) -> str:
         return ""
 
     return f"&ticker=eq.{ticker.upper()}"
+
+
+def build_relative_date_filter(days: int) -> str:
+    return (datetime.now(UTC).date() - timedelta(days=days)).isoformat()
 
 
 def fetch_latest_date(

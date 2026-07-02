@@ -22,6 +22,11 @@ jobs:
       NEWS_LLM_ESCALATION_ENABLED: "false"
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
       OPENROUTER_APP_NAME: market-agent
+      ALERT_EMAIL_ENABLED: ${{ secrets.ALERT_EMAIL_ENABLED }}
+      ALERT_EMAIL_PROVIDER: gmail
+      ALERT_EMAIL_FROM: ${{ secrets.ALERT_EMAIL_FROM }}
+      ALERT_EMAIL_TO: ${{ secrets.ALERT_EMAIL_TO }}
+      GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
 
     steps:
       - name: Checkout
@@ -40,6 +45,15 @@ jobs:
 
       - name: Run daily news pipeline
         run: python scripts/run_daily_pipeline.py --only news
+
+      - name: Send failure alert
+        if: failure()
+        run: >
+          python scripts/send_pipeline_alert.py
+          --pipeline daily-news
+          --status failed
+          --message "Daily news GitHub Actions workflow failed before a pipeline alert could be sent."
+          --skip-if-log-exists data/pipeline_runs/latest_daily_pipeline.json
 
       - name: Upload pipeline logs
         if: always()

@@ -123,6 +123,15 @@ def make_success_single_stock_data():
             "risk_level": "low",
             "research_confidence": "low",
         },
+        "exit_signal": {
+            "status": "success",
+            "exit_signal": "watch",
+            "weakening_signal_20d": "low_to_medium",
+            "email_alert_eligible": False,
+            "reason": "目前出現需要觀察的轉弱跡象，但尚未形成明確減碼或出場訊號。",
+            "reasons": ["MACD histogram 為負，短線動能正在轉弱。"],
+            "action_note": "若已持有，先觀察 MA20 是否守住，以及 MACD / RSI 是否繼續轉弱。",
+        },
         "data_freshness": {
             "overall": "warning",
             "warnings": [
@@ -146,6 +155,8 @@ def test_llm_prompt_uses_structured_payload_and_safety_instructions():
     assert '"ticker": "MU"' in prompt
     assert '"user_query_as_data": "MU 現在適合進場嗎？"' in prompt
     assert '"data_freshness"' in prompt
+    assert '"exit_signal"' in prompt
+    assert '"weakening_signal_20d": "low_to_medium"' in prompt
     assert "ML training dataset 已超過 7 天未更新" in prompt
     assert "只能使用 payload 中已存在的資料" in prompt
     assert "不要補充 payload 之外的新聞、財報、價格或推論數字" in prompt

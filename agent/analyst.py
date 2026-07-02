@@ -80,6 +80,7 @@ def format_single_stock_analysis(analysis_data: dict) -> str:
     ml_research = analysis_data.get("ml_research") or analysis_data.get(
         "agent_outputs", {}
     ).get("ml_research")
+    exit_signal = analysis_data.get("exit_signal")
     data_freshness = analysis_data.get("data_freshness")
 
     lines = [
@@ -139,6 +140,9 @@ def format_single_stock_analysis(analysis_data: dict) -> str:
             "ML Reference",
             *format_ml_reference_lines(ml_research),
             "",
+            "持有風險 / 出場觀察",
+            *format_exit_signal_lines(exit_signal),
+            "",
             "綜合研究評估",
             f"- 技術分數：{research_profile['technical_score']}",
             f"- 新聞分數：{research_profile['news_score']}",
@@ -171,11 +175,50 @@ def format_single_stock_analysis(analysis_data: dict) -> str:
             "- 這份輸出只整理資料與策略訊號，不構成投資建議。",
             "- 新聞、價格資料與回測結果都可能延遲或不完整。",
             "- 進出場仍需要搭配個人風險承受度、部位大小與停損規劃。",
+            *format_exit_signal_risk_note_lines(exit_signal),
             *format_ml_risk_note_lines(ml_research),
         ]
     )
 
     return "\n".join(lines)
+
+
+def format_exit_signal_lines(exit_signal: dict | None) -> list[str]:
+    if not exit_signal:
+        return ["- 目前沒有 exit / weakening signal 資料。"]
+
+    if exit_signal.get("status") != "success":
+        return [
+            f"- 狀態：{exit_signal.get('status', 'unknown')}",
+            f"- 說明：{exit_signal.get('reason', '出場觀察資料不足。')}",
+        ]
+
+    lines = [
+        f"- exit signal：{exit_signal.get('exit_signal', 'unknown')}",
+        f"- 20 日轉弱風險：{exit_signal.get('weakening_signal_20d', 'unknown')}",
+        f"- 說明：{exit_signal.get('reason', '')}",
+        f"- 觀察動作：{exit_signal.get('action_note', '')}",
+    ]
+    reasons = exit_signal.get("reasons") or []
+    if reasons:
+        lines.append("- 觸發原因：")
+        lines.extend(f"  - {reason}" for reason in reasons)
+    return lines
+
+
+def format_exit_signal_risk_note_lines(exit_signal: dict | None) -> list[str]:
+    if not exit_signal or exit_signal.get("status") != "success":
+        return []
+
+    if exit_signal.get("exit_signal") in {"reduce", "exit"}:
+        return [
+            (
+                "- 出場觀察提醒：目前出現較明顯轉弱訊號，"
+                "若已持有，應重新檢查停損、部位大小與原本的出場計畫。"
+            )
+        ]
+
+    return []
 
 
 def format_data_freshness_warning_lines(data_freshness: dict | None) -> list[str]:
