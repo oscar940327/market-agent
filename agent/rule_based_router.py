@@ -31,9 +31,66 @@ def query_contains_ticker(user_query: str) -> bool:
     return any(candidate in KNOWN_TICKERS for candidate in candidates)
 
 
+def count_known_tickers(user_query: str) -> int:
+    candidates = re.findall(r"\b[A-Z]{1,5}\b", user_query.upper())
+    return len({candidate for candidate in candidates if candidate in KNOWN_TICKERS})
+
+
+def count_ticker_like_symbols(user_query: str) -> int:
+    candidates = re.findall(r"\b[A-Z]{1,5}\b", user_query.upper())
+    return len(set(candidates))
+
+
+def query_contains_any(user_query: str, query: str, terms: tuple[str, ...]) -> bool:
+    return any(term in user_query or term in query for term in terms)
+
+
+SINGLE_STOCK_HOLDING_TERMS = (
+    "持有",
+    "已經持有",
+    "減碼",
+    "出場",
+    "停損",
+    "要不要賣",
+    "要不要減",
+    "要不要出",
+    "already hold",
+    "holding",
+    "reduce",
+    "exit",
+    "sell",
+)
+
+STRATEGY_TERMS = (
+    "突破",
+    "放量",
+    "拉回",
+    "breakout",
+    "volume surge",
+    "pullback",
+)
+
+HISTORICAL_BACKTEST_TERMS = (
+    "以前表現",
+    "歷史表現",
+    "過去表現",
+    "以前",
+    "歷史",
+    "回測",
+    "勝率",
+    "表現怎麼樣",
+    "backtest",
+    "historical",
+    "performance",
+    "win rate",
+)
+
+
 def detect_intent(user_query: str) -> dict:
     query = user_query.lower()
     has_ticker = query_contains_ticker(user_query)
+    known_ticker_count = count_known_tickers(user_query)
+    ticker_like_count = count_ticker_like_symbols(user_query)
 
     portfolio_terms = (
         "投資組合",
@@ -80,8 +137,26 @@ def detect_intent(user_query: str) -> dict:
         "適合",
     )
 
-    if any(term in user_query or term in query for term in portfolio_terms):
+    if ticker_like_count >= 2 and query_contains_any(
+        user_query,
+        query,
+        SINGLE_STOCK_HOLDING_TERMS,
+    ):
         intent = "portfolio_analysis"
+    elif known_ticker_count == 1 and query_contains_any(
+        user_query,
+        query,
+        SINGLE_STOCK_HOLDING_TERMS,
+    ):
+        intent = "single_stock_analysis"
+    elif any(term in user_query or term in query for term in portfolio_terms):
+        intent = "portfolio_analysis"
+    elif query_contains_any(user_query, query, STRATEGY_TERMS) and query_contains_any(
+        user_query,
+        query,
+        HISTORICAL_BACKTEST_TERMS,
+    ):
+        intent = "backtest_query"
     elif any(term in user_query or term in query for term in backtest_terms):
         intent = "backtest_query"
     elif has_ticker:

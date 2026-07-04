@@ -217,11 +217,11 @@ def build_theme_evidence_quality(results: list[dict]) -> dict:
         "backtest_sample": "not_applicable",
         "data_completeness": data_completeness,
         "signal_clarity": "medium" if successful_count else "none",
-        "news_coverage": "skipped",
+        "news_coverage": data_completeness,
         "social_coverage": "not_used",
-        "sentiment_confidence": "skipped",
-        "news_impact_quality": "skipped",
-        "fundamental_coverage": "skipped",
+        "sentiment_confidence": "medium" if successful_count else "none",
+        "news_impact_quality": data_completeness,
+        "fundamental_coverage": data_completeness,
         "peer_group": "not_used",
         "market_wide": "not_used",
         "scanned_ticker_count": total_count,
@@ -237,8 +237,8 @@ def build_theme_single_stock_kwargs(ticker: str, user_query: str) -> dict:
     kwargs = {
         "ticker": ticker,
         "user_query": user_query,
-        "include_news": False,
-        "include_fundamentals": False,
+        "include_news": True,
+        "include_fundamentals": True,
     }
     signature = inspect.signature(run_single_stock_analysis)
     if "include_ml" in signature.parameters:

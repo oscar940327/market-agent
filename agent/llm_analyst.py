@@ -230,12 +230,13 @@ def build_llm_payload(kind: str, data: dict) -> dict:
 def build_single_stock_payload(data: dict) -> dict:
     context = build_single_stock_report_context(data)
 
-    return {
+    payload = {
         "kind": "single_stock",
         "intent": context["intent"],
         "status": context["status"],
         "ticker": context["ticker"],
         "user_query_as_data": context["query"],
+        "question_type": context["question_type"],
         "execution_plan": context["execution_plan"],
         "price_source": context["price_source"],
         "technical_analysis": context["technical_analysis"],
@@ -246,11 +247,14 @@ def build_single_stock_payload(data: dict) -> dict:
         "ml_research": context["ml_research"],
         "ml_prediction": context["ml_prediction"],
         "ml_reference_trust": context["ml_reference_trust"],
-        "exit_signal": context["exit_signal"],
         "data_freshness": context["data_freshness"],
         "research_profile": context["research_profile"],
         "agent_summaries": context["agent_summaries"],
     }
+    if context["question_type"] == "holding_exit":
+        payload["exit_signal"] = context["exit_signal"]
+
+    return payload
 
 
 def build_backtest_payload(data: dict) -> dict:
@@ -275,14 +279,39 @@ def build_backtest_payload(data: dict) -> dict:
 
 def build_theme_payload(data: dict) -> dict:
     top_results = []
+    successful_results = [
+        result
+        for result in data.get("results", [])
+        if result.get("status") == "success"
+    ]
 
     for result in data.get("results", [])[:5]:
+        analysis = result.get("analysis", {})
+        news_summary = (analysis.get("news_analysis") or {}).get("summary", {})
+        fundamentals = analysis.get("fundamentals") or {}
+        fundamental_summary = fundamentals.get("summary", {})
+        research_profile = analysis.get("research_profile") or {}
         top_results.append(
             {
                 "ticker": result.get("ticker"),
                 "status": result.get("status"),
                 "score": result.get("score"),
                 "reasons": result.get("reasons", []),
+                "technical_analysis": analysis.get("technical_analysis", {}),
+                "signals": analysis.get("signals", {}),
+                "news_summary": news_summary,
+                "fundamental_status": fundamentals.get("status"),
+                "fundamental_summary": fundamental_summary,
+                "research_profile": {
+                    "technical_score": research_profile.get("technical_score"),
+                    "news_score": research_profile.get("news_score"),
+                    "fundamental_score": research_profile.get("fundamental_score"),
+                    "risk_score": research_profile.get("risk_score"),
+                    "combined_score": research_profile.get("combined_score"),
+                    "setup_quality": research_profile.get("setup_quality"),
+                    "risk_level": research_profile.get("risk_level"),
+                    "research_confidence": research_profile.get("research_confidence"),
+                },
             }
         )
 
@@ -294,7 +323,63 @@ def build_theme_payload(data: dict) -> dict:
         "user_query_as_data": data.get("query"),
         "scan_scope": data.get("scan_scope"),
         "sector_summary": data.get("sector_summary"),
+        "theme_news_summary": summarize_theme_news(successful_results),
+        "theme_fundamental_summary": summarize_theme_fundamentals(successful_results),
+        "evidence_quality": data.get("evidence_quality", {}),
         "top_results": top_results,
+    }
+
+
+def summarize_theme_news(results: list[dict]) -> dict:
+    total_items = 0
+    high_importance_count = 0
+    sentiment_counts = {}
+    topic_counts = {}
+
+    for result in results:
+        summary = (
+            (result.get("analysis", {}).get("news_analysis") or {}).get("summary", {})
+        )
+        total_items += int(summary.get("total_items") or 0)
+        high_importance_count += int(summary.get("high_importance_count") or 0)
+        sentiment = summary.get("sentiment") or "unknown"
+        sentiment_counts[sentiment] = sentiment_counts.get(sentiment, 0) + 1
+        for topic, count in (summary.get("top_topics") or {}).items():
+            topic_counts[topic] = topic_counts.get(topic, 0) + int(count or 0)
+
+    return {
+        "included": True,
+        "total_items": total_items,
+        "high_importance_count": high_importance_count,
+        "sentiment_counts": sentiment_counts,
+        "top_topics": dict(
+            sorted(topic_counts.items(), key=lambda item: item[1], reverse=True)[:5]
+        ),
+    }
+
+
+def summarize_theme_fundamentals(results: list[dict]) -> dict:
+    status_counts = {}
+    stance_counts = {}
+    positive_count = 0
+    risk_count = 0
+
+    for result in results:
+        fundamentals = result.get("analysis", {}).get("fundamentals") or {}
+        summary = fundamentals.get("summary") or {}
+        status = fundamentals.get("status") or "unknown"
+        stance = summary.get("stance") or "unknown"
+        status_counts[status] = status_counts.get(status, 0) + 1
+        stance_counts[stance] = stance_counts.get(stance, 0) + 1
+        positive_count += len(summary.get("positives") or [])
+        risk_count += len(summary.get("risks") or [])
+
+    return {
+        "included": True,
+        "status_counts": status_counts,
+        "stance_counts": stance_counts,
+        "positive_factor_count": positive_count,
+        "risk_factor_count": risk_count,
     }
 
 

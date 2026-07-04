@@ -9,6 +9,7 @@ from agent.analyst import (
 )
 from agent.llm_analyst import OpenAIResponsesClient, generate_llm_report
 from agent.llm_analyst import OpenRouterChatClient
+from agent.report_context import build_single_stock_report_context
 
 
 try:
@@ -97,6 +98,12 @@ def build_report(
             ),
         }
 
+    llm_report = apply_required_report_sections(
+        kind=kind,
+        data=data,
+        report=llm_report,
+    )
+
     return {
         "report": llm_report,
         "analyst": build_analyst_metadata(
@@ -108,6 +115,72 @@ def build_report(
             message="使用 LLM analyst 解釋 structured analysis data。",
         ),
     }
+
+
+def apply_required_report_sections(*, kind: str, data: dict, report: str) -> str:
+    if kind != "single_stock" or data.get("status") != "success":
+        return report
+
+    context = build_single_stock_report_context(data)
+    if context.get("question_type") != "holding_exit":
+        return report
+
+    if not context.get("exit_signal"):
+        return report
+
+    if "持有風險 / 出場觀察" in report:
+        return report
+
+    section = format_required_exit_signal_section(context.get("exit_signal"))
+    return insert_section_before_summary(report, section)
+
+
+def format_required_exit_signal_section(exit_signal: dict | None) -> str:
+    lines = ["持有風險 / 出場觀察"]
+
+    if not exit_signal:
+        lines.append("目前沒有 exit signal 資料，因此無法完整判斷是否需要減碼。")
+        return "\n".join(lines)
+
+    if exit_signal.get("status") != "success":
+        reason = exit_signal.get("reason") or "出場觀察資料不足。"
+        lines.append(f"狀態：{exit_signal.get('status', 'unknown')}。{reason}")
+        return "\n".join(lines)
+
+    signal = exit_signal.get("exit_signal", "unknown")
+    weakening = exit_signal.get("weakening_signal_20d", "unknown")
+    reason = exit_signal.get("reason") or ""
+    action_note = exit_signal.get("action_note") or ""
+    reasons = exit_signal.get("reasons") or []
+
+    lines.extend(
+        [
+            f"目前 exit signal 為「{signal}」。",
+            f"20 日轉弱風險為「{weakening}」。",
+        ]
+    )
+    if reason:
+        lines.append(f"判斷原因：{reason}")
+    if reasons:
+        lines.append("主要觀察點：")
+        lines.extend(f"- {item}" for item in reasons)
+    if action_note:
+        lines.append(f"如果已持有：{action_note}")
+
+    lines.append("這是持有風險觀察，不是直接買賣指令。")
+    return "\n".join(lines)
+
+
+def insert_section_before_summary(report: str, section: str) -> str:
+    marker = "\n綜合評估"
+    if marker in report:
+        return report.replace(marker, f"\n{section}\n{marker}", 1)
+
+    marker = "\n風險提醒"
+    if marker in report:
+        return report.replace(marker, f"\n{section}\n{marker}", 1)
+
+    return f"{report.rstrip()}\n\n{section}"
 
 
 def build_rule_based_report(kind: str, data: dict) -> str:

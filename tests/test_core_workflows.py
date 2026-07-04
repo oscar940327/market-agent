@@ -40,6 +40,20 @@ def test_detect_intent_routes_backtest_before_single_stock():
     assert result["intent"] == "backtest_query"
 
 
+def test_detect_intent_routes_plain_chinese_strategy_history_to_backtest():
+    result = detect_intent("MU 突破策略以前表現怎麼樣")
+
+    assert result["intent"] == "backtest_query"
+    assert result["has_ticker"] is True
+
+
+def test_detect_intent_routes_single_ticker_holding_question_to_stock_analysis():
+    result = detect_intent("MU 如果我已經持有，現在要不要減碼")
+
+    assert result["intent"] == "single_stock_analysis"
+    assert result["has_ticker"] is True
+
+
 def test_detect_intent_routes_supported_theme_query():
     result = detect_intent("記憶體概念股有哪些值得觀察？")
 
@@ -417,14 +431,23 @@ def test_non_default_theme_tickers_are_available_for_ticker_detection():
 
 def test_run_theme_analysis_scans_matched_theme(monkeypatch):
     captured_tickers = []
+    captured_options = []
 
     def fake_run_single_stock_analysis(
         ticker,
         user_query,
         include_news=True,
         include_fundamentals=True,
+        include_ml=True,
     ):
         captured_tickers.append(ticker)
+        captured_options.append(
+            {
+                "include_news": include_news,
+                "include_fundamentals": include_fundamentals,
+                "include_ml": include_ml,
+            }
+        )
         return {
             "ticker": ticker,
             "status": "success",
@@ -456,6 +479,9 @@ def test_run_theme_analysis_scans_matched_theme(monkeypatch):
         "scan_limited": False,
     }
     assert captured_tickers == ["CRWD", "FTNT", "PANW", "ZS"]
+    assert all(option["include_news"] is True for option in captured_options)
+    assert all(option["include_fundamentals"] is True for option in captured_options)
+    assert all(option["include_ml"] is False for option in captured_options)
 
 
 def test_analyze_news_items_classifies_topic_sentiment_and_importance():
@@ -621,6 +647,7 @@ def test_run_theme_analysis_includes_evidence_quality(monkeypatch):
         user_query,
         include_news=True,
         include_fundamentals=True,
+        include_ml=True,
     ):
         return {
             "ticker": ticker,
@@ -647,8 +674,8 @@ def test_run_theme_analysis_includes_evidence_quality(monkeypatch):
 
     assert result["evidence_quality"]["level"] == "medium"
     assert result["evidence_quality"]["backtest_sample"] == "not_applicable"
-    assert result["evidence_quality"]["news_coverage"] == "skipped"
+    assert result["evidence_quality"]["news_coverage"] == "high"
     assert result["evidence_quality"]["social_coverage"] == "not_used"
-    assert result["evidence_quality"]["fundamental_coverage"] == "skipped"
+    assert result["evidence_quality"]["fundamental_coverage"] == "high"
     assert result["evidence_quality"]["peer_group"] == "not_used"
     assert result["evidence_quality"]["market_wide"] == "not_used"

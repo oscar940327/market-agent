@@ -1,4 +1,16 @@
 from agent.ml_reference_trust import build_ml_reference_trust
+from agent.rule_based_router import SINGLE_STOCK_HOLDING_TERMS, query_contains_any
+
+
+def classify_single_stock_question_type(query: str | None) -> str:
+    if not query:
+        return "entry_or_research"
+
+    lowered = query.lower()
+    if query_contains_any(query, lowered, SINGLE_STOCK_HOLDING_TERMS):
+        return "holding_exit"
+
+    return "entry_or_research"
 
 
 def build_single_stock_report_context(data: dict) -> dict:
@@ -27,6 +39,7 @@ def build_single_stock_report_context(data: dict) -> dict:
         "status": data.get("status"),
         "ticker": data.get("ticker"),
         "query": data.get("query"),
+        "question_type": classify_single_stock_question_type(data.get("query")),
         "execution_plan": data.get("execution_plan", []),
         "price_source": data.get("price_source"),
         "technical_analysis": data.get("technical_analysis"),

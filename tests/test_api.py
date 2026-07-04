@@ -129,27 +129,26 @@ def test_query_endpoint_uses_explicit_ticker_for_backtest(monkeypatch):
     assert result["data"]["strategy"] == "unknown"
 
 
-def test_query_endpoint_uses_research_workflow_when_research_options_are_requested(monkeypatch):
+def test_query_endpoint_keeps_historical_strategy_question_as_backtest(monkeypatch):
     captured = {}
 
-    def fake_run_single_stock_analysis(
-        ticker,
-        user_query,
-        include_news=True,
-        include_fundamentals=True,
-    ):
+    def fake_run_backtest_query(ticker, user_query):
         captured["ticker"] = ticker
         captured["user_query"] = user_query
-        captured["include_news"] = include_news
-        captured["include_fundamentals"] = include_fundamentals
         return {
             "status": "success",
             "ticker": ticker,
-            "technical_analysis": {},
-            "signals": {},
-            "news_analysis": {"summary": {"total_items": 0}},
-            "fundamentals": {"status": "skipped"},
-            "research_profile": {},
+            "strategy": "breakout",
+            "user_query": user_query,
+            "report": {
+                "metrics": {
+                    "total_trades": 10,
+                    "win_rate": 0.6,
+                    "average_return": 0.03,
+                    "max_loss": -0.08,
+                },
+                "sample_trades": [],
+            },
         }
 
     def fake_build_report(kind, data, analyst_mode="rule_based"):
@@ -161,12 +160,12 @@ def test_query_endpoint_uses_research_workflow_when_research_options_are_request
             },
         }
 
-    monkeypatch.setattr(api, "run_single_stock_analysis", fake_run_single_stock_analysis)
+    monkeypatch.setattr(api, "run_backtest_query", fake_run_backtest_query)
     monkeypatch.setattr(api, "build_report", fake_build_report)
 
     result = api.query_market_agent(
         api.QueryRequest(
-            user_query="MU backtest breakout strategy",
+            user_query="MU 突破策略以前表現怎麼樣",
             include_news=True,
             include_fundamentals=True,
             include_technicals=True,
@@ -175,14 +174,11 @@ def test_query_endpoint_uses_research_workflow_when_research_options_are_request
 
     assert captured == {
         "ticker": "MU",
-        "user_query": "MU backtest breakout strategy",
-        "include_news": True,
-        "include_fundamentals": True,
+        "user_query": "MU 突破策略以前表現怎麼樣",
     }
-    assert result["intent"] == "single_stock_analysis"
-    assert result["route"]["intent"] == "single_stock_analysis"
-    assert result["route"]["original_intent"] == "backtest_query"
-    assert result["route"]["reason"] == "research_options_requested"
+    assert result["intent"] == "backtest_query"
+    assert result["route"]["intent"] == "backtest_query"
+    assert result["data"]["strategy"] == "breakout"
 
 
 def test_query_endpoint_returns_needs_ticker_for_stock_workflow_without_ticker():
@@ -231,6 +227,99 @@ def test_query_endpoint_returns_needs_holdings_for_portfolio_workflow():
     assert result["intent"] == "portfolio_analysis"
     assert result["error"]["status"] == "needs_holdings"
     assert "需要提供 holdings" in result["report"]
+
+
+def test_query_endpoint_routes_single_ticker_holding_question_to_stock_analysis(monkeypatch):
+    captured = {}
+
+    def fake_run_single_stock_analysis(
+        ticker,
+        user_query,
+        include_news=True,
+        include_fundamentals=True,
+    ):
+        captured["ticker"] = ticker
+        captured["user_query"] = user_query
+        captured["include_news"] = include_news
+        captured["include_fundamentals"] = include_fundamentals
+        return {
+            "status": "success",
+            "ticker": ticker,
+            "technical_analysis": {},
+            "signals": {},
+            "news_analysis": {"summary": {"total_items": 0}},
+            "fundamentals": {"status": "skipped"},
+            "research_profile": {},
+            "exit_signal": {"status": "success", "exit_signal": "reduce"},
+        }
+
+    def fake_build_report(kind, data, analyst_mode="rule_based"):
+        return {
+            "report": f"{kind} report",
+            "analyst": {
+                "requested_mode": analyst_mode,
+                "mode_used": "rule_based",
+            },
+        }
+
+    monkeypatch.setattr(api, "run_single_stock_analysis", fake_run_single_stock_analysis)
+    monkeypatch.setattr(api, "build_report", fake_build_report)
+
+    result = api.query_market_agent(
+        api.QueryRequest(user_query="MU 如果我已經持有，現在要不要減碼")
+    )
+
+    assert captured["ticker"] == "MU"
+    assert result["intent"] == "single_stock_analysis"
+    assert result["route"]["intent"] == "single_stock_analysis"
+    assert result["status"] == "success"
+    assert result["data"]["exit_signal"]["exit_signal"] == "reduce"
+    assert "持有風險 / 出場觀察" in result["report"]
+    assert "目前 exit signal 為「reduce」" in result["report"]
+
+
+def test_analyze_single_endpoint_forces_exit_signal_section_for_holding_question(monkeypatch):
+    def fake_run_single_stock_analysis(
+        ticker,
+        user_query,
+        include_news=True,
+        include_fundamentals=True,
+    ):
+        return {
+            "status": "success",
+            "ticker": ticker,
+            "query": user_query,
+            "technical_analysis": {},
+            "signals": {},
+            "news_analysis": {"summary": {"total_items": 0}},
+            "fundamentals": {"status": "skipped"},
+            "research_profile": {},
+            "exit_signal": {"status": "success", "exit_signal": "reduce"},
+        }
+
+    def fake_build_report(kind, data, analyst_mode="rule_based"):
+        return {
+            "report": f"{kind} report",
+            "analyst": {
+                "requested_mode": analyst_mode,
+                "mode_used": "rule_based",
+            },
+        }
+
+    monkeypatch.setattr(api, "run_single_stock_analysis", fake_run_single_stock_analysis)
+    monkeypatch.setattr(api, "build_report", fake_build_report)
+
+    result = api.analyze_single_stock(
+        api.SingleStockAnalysisRequest(
+            ticker="MU",
+            user_query="MU 如果我已經持有，現在要不要減碼",
+        )
+    )
+
+    assert result["intent"] == "single_stock_analysis"
+    assert result["status"] == "success"
+    assert "持有風險 / 出場觀察" in result["report"]
+    assert "目前 exit signal 為「reduce」" in result["report"]
 
 
 def test_query_endpoint_dispatches_portfolio_workflow(monkeypatch):

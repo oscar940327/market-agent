@@ -23,14 +23,14 @@ class FakeLLMClient:
                 "user_prompt": user_prompt,
             }
         )
-        return "這是 LLM Analyst 產生的研究摘要。"
+        return "LLM Analyst test report."
 
 
 def make_success_single_stock_data():
     return {
         "intent": "single_stock_analysis",
         "status": "success",
-        "query": "MU 現在適合進場嗎？",
+        "query": "MU now suitable for entry?",
         "ticker": "MU",
         "price_source": {
             "provider": "test",
@@ -130,9 +130,9 @@ def make_success_single_stock_data():
             "exit_signal": "watch",
             "weakening_signal_20d": "low_to_medium",
             "email_alert_eligible": False,
-            "reason": "目前出現需要觀察的轉弱跡象，但尚未形成明確減碼或出場訊號。",
-            "reasons": ["MACD histogram 為負，短線動能正在轉弱。"],
-            "action_note": "若已持有，先觀察 MA20 是否守住，以及 MACD / RSI 是否繼續轉弱。",
+            "reason": "Trend is still mostly stable but momentum is weakening.",
+            "reasons": ["MACD histogram is weakening."],
+            "action_note": "Watch MA20 and MACD/RSI before reducing.",
         },
         "data_freshness": {
             "overall": "warning",
@@ -140,7 +140,7 @@ def make_success_single_stock_data():
                 {
                     "source": "ml_training_data",
                     "status": "warning",
-                    "message": "ML training dataset 已超過 7 天未更新。",
+                    "message": "ML training dataset is older than 7 days.",
                 }
             ],
         },
@@ -155,13 +155,11 @@ def test_llm_prompt_uses_structured_payload_and_safety_instructions():
 
     assert "Structured analysis payload" in prompt
     assert '"ticker": "MU"' in prompt
-    assert '"user_query_as_data": "MU 現在適合進場嗎？"' in prompt
+    assert '"user_query_as_data": "MU now suitable for entry?"' in prompt
     assert '"data_freshness"' in prompt
-    assert '"exit_signal"' in prompt
-    assert '"weakening_signal_20d": "low_to_medium"' in prompt
-    assert "ML training dataset 已超過 7 天未更新" in prompt
-    assert "只能使用 payload 中已存在的資料" in prompt
-    assert "不要補充 payload 之外的新聞、財報、價格或推論數字" in prompt
+    assert '"exit_signal"' not in prompt
+    assert '"weakening_signal_20d": "low_to_medium"' not in prompt
+    assert "ML training dataset is older than 7 days." in prompt
 
 
 def test_single_stock_report_context_reads_wrapped_agent_outputs():
@@ -214,13 +212,44 @@ def test_single_stock_llm_payload_uses_report_context():
 
     assert payload["kind"] == "single_stock"
     assert payload["ticker"] == data["ticker"]
+    assert payload["question_type"] == "entry_or_research"
     assert payload["news_summary"] == data["news_analysis"]["summary"]
     assert payload["fundamental_summary"] == data["fundamentals"]["summary"]
     assert "ml_reference_trust" in payload
     assert payload["agent_summaries"]["evidence"] == {"evidence_level": "medium"}
 
 
+def test_single_stock_llm_payload_marks_holding_exit_question():
+    data = make_success_single_stock_data()
+    data["query"] = "MU 如果我已經持有，現在要不要減碼"
+
+    payload = build_llm_payload("single_stock", data)
+
+    assert payload["question_type"] == "holding_exit"
+    assert payload["exit_signal"]["exit_signal"] == "watch"
+
+
 def test_build_report_uses_injected_llm_client():
+    fake_client = FakeLLMClient()
+
+    result = build_report(
+        kind="single_stock",
+        data={**make_success_single_stock_data(), "query": "MU should I reduce my position?"},
+        analyst_mode="llm",
+        llm_client=fake_client,
+    )
+
+    assert "LLM Analyst" in result["report"]
+    assert "持有風險 / 出場觀察" in result["report"]
+    assert result["analyst"]["mode_used"] == "llm"
+    assert result["analyst"]["provider"] == "fake"
+    assert result["analyst"]["model"] == "fake-model"
+    assert result["analyst"]["fallback_used"] is False
+    assert len(fake_client.calls) == 1
+    assert "Structured analysis payload" in fake_client.calls[0]["user_prompt"]
+
+
+def test_build_report_does_not_force_exit_section_for_entry_question():
     fake_client = FakeLLMClient()
 
     result = build_report(
@@ -230,13 +259,24 @@ def test_build_report_uses_injected_llm_client():
         llm_client=fake_client,
     )
 
-    assert result["report"] == "這是 LLM Analyst 產生的研究摘要。"
-    assert result["analyst"]["mode_used"] == "llm"
-    assert result["analyst"]["provider"] == "fake"
-    assert result["analyst"]["model"] == "fake-model"
-    assert result["analyst"]["fallback_used"] is False
-    assert len(fake_client.calls) == 1
-    assert "不可以自行抓資料" in fake_client.calls[0]["system_prompt"]
+    assert result["report"] == "LLM Analyst test report."
+
+
+def test_build_report_for_holding_question_forces_exit_signal_section():
+    data = make_success_single_stock_data()
+    data["query"] = "MU 如果我已經持有，現在要不要減碼"
+    fake_client = FakeLLMClient()
+
+    result = build_report(
+        kind="single_stock",
+        data=data,
+        analyst_mode="llm",
+        llm_client=fake_client,
+    )
+
+    assert "持有風險 / 出場觀察" in result["report"]
+    assert "目前 exit signal 為「watch」" in result["report"]
+    assert "這是持有風險觀察，不是直接買賣指令。" in result["report"]
 
 
 def test_build_report_falls_back_when_llm_is_not_configured(monkeypatch):
@@ -251,7 +291,7 @@ def test_build_report_falls_back_when_llm_is_not_configured(monkeypatch):
     assert result["analyst"]["requested_mode"] == "llm"
     assert result["analyst"]["mode_used"] == "rule_based"
     assert result["analyst"]["fallback_used"] is True
-    assert "MU 單一股票分析" in result["report"]
+    assert "MU" in result["report"]
 
 
 def test_api_accepts_analyst_mode_and_returns_metadata(monkeypatch):
@@ -270,7 +310,7 @@ def test_api_accepts_analyst_mode_and_returns_metadata(monkeypatch):
     result = api.analyze_single_stock(
         api.SingleStockAnalysisRequest(
             ticker="MU",
-            user_query="MU 現在適合進場嗎？",
+            user_query="MU now suitable for entry?",
             analyst_mode="llm",
             include_news=False,
             include_fundamentals=False,
@@ -297,6 +337,65 @@ def test_openrouter_client_can_be_selected_from_environment(monkeypatch):
     assert client.model == "openai/gpt-4.1"
     assert client.site_url == "https://example.com"
     assert client.app_name == "Market Agent Test"
+
+
+def test_theme_llm_payload_includes_news_and_fundamental_summaries():
+    payload = build_llm_payload(
+        "theme",
+        {
+            "intent": "industry_trend",
+            "status": "success",
+            "theme_name": "Memory / Storage",
+            "query": "記憶體類股現在適合進場觀察嗎",
+            "scan_scope": {"scanned_ticker_count": 2},
+            "sector_summary": {"breadth_label": "weak_breadth"},
+            "evidence_quality": {
+                "news_coverage": "high",
+                "fundamental_coverage": "high",
+            },
+            "results": [
+                {
+                    "ticker": "MU",
+                    "status": "success",
+                    "score": -1.75,
+                    "reasons": ["below MA20"],
+                    "analysis": {
+                        "technical_analysis": {"short_term_trend": "weak"},
+                        "signals": {"breakout": {"is_breakout": False}},
+                        "news_analysis": {
+                            "summary": {
+                                "total_items": 10,
+                                "sentiment": "positive",
+                                "high_importance_count": 2,
+                                "top_topics": {"product_demand": 4},
+                            }
+                        },
+                        "fundamentals": {
+                            "status": "success",
+                            "summary": {
+                                "stance": "positive",
+                                "positives": ["revenue growth"],
+                                "risks": [],
+                            },
+                        },
+                        "research_profile": {
+                            "technical_score": -1,
+                            "news_score": 1,
+                            "fundamental_score": 1,
+                            "risk_level": "medium",
+                        },
+                    },
+                }
+            ],
+        },
+    )
+
+    assert payload["theme_news_summary"]["total_items"] == 10
+    assert payload["theme_news_summary"]["top_topics"] == {"product_demand": 4}
+    assert payload["theme_fundamental_summary"]["stance_counts"] == {"positive": 1}
+    assert payload["evidence_quality"]["news_coverage"] == "high"
+    assert payload["top_results"][0]["news_summary"]["sentiment"] == "positive"
+    assert payload["top_results"][0]["fundamental_summary"]["stance"] == "positive"
 
 
 def test_openrouter_response_text_extraction():

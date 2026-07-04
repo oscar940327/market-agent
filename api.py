@@ -5,8 +5,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from agent.analyst import format_error_message
-from agent.reporting import build_report
-from agent.rule_based_router import detect_intent
+from agent.reporting import apply_required_report_sections, build_report
+from agent.rule_based_router import (
+    HISTORICAL_BACKTEST_TERMS,
+    STRATEGY_TERMS,
+    detect_intent,
+    query_contains_any,
+)
 from data.themes import get_all_theme_tickers
 from main import (
     run_backtest_query,
@@ -144,6 +149,14 @@ def get_explicit_request_fields(request: BaseModel) -> set[str]:
 
 
 def should_use_research_workflow_for_backtest_query(request: QueryRequest) -> bool:
+    query = request.user_query.lower()
+    if query_contains_any(request.user_query, query, STRATEGY_TERMS) and query_contains_any(
+        request.user_query,
+        query,
+        HISTORICAL_BACKTEST_TERMS,
+    ):
+        return False
+
     explicit_fields = get_explicit_request_fields(request)
     return (
         ("include_news" in explicit_fields and request.include_news)
@@ -206,6 +219,19 @@ def build_api_response(
     return response
 
 
+def finalize_single_stock_report(
+    *,
+    analysis_data: dict,
+    report: str,
+    user_query: str,
+) -> str:
+    return apply_required_report_sections(
+        kind="single_stock",
+        data={**analysis_data, "query": user_query},
+        report=report,
+    )
+
+
 @app.get("/health")
 def health_check() -> dict:
     return {
@@ -259,12 +285,17 @@ def query_market_agent(request: QueryRequest) -> dict:
             data=analysis_data,
             analyst_mode=request.analyst_mode,
         )
+        report = finalize_single_stock_report(
+            analysis_data=analysis_data,
+            report=report_result["report"],
+            user_query=request.user_query,
+        )
 
         return build_api_response(
             intent=intent,
             route=route_result,
             data=analysis_data,
-            report=report_result["report"],
+            report=report,
             analyst=report_result["analyst"],
         )
 
@@ -372,11 +403,16 @@ def analyze_single_stock(request: SingleStockAnalysisRequest) -> dict:
         data=analysis_data,
         analyst_mode=request.analyst_mode,
     )
+    report = finalize_single_stock_report(
+        analysis_data=analysis_data,
+        report=report_result["report"],
+        user_query=request.user_query,
+    )
 
     return build_api_response(
         intent="single_stock_analysis",
         data=analysis_data,
-        report=report_result["report"],
+        report=report,
         analyst=report_result["analyst"],
     )
 
