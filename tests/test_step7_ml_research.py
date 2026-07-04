@@ -151,8 +151,11 @@ def test_single_stock_report_displays_successful_ml_reference():
     report = format_single_stock_analysis(data)
 
     assert "ML Reference" in report
+    assert "信任狀態：降低信任" in report
     assert "5-day upside probability: 43.3% (slightly bearish)" in report
     assert "20-day large-drop risk: 78.8% (high large-drop risk)" in report
+    assert "20 日預測提醒" in report
+    assert "大跌風險提醒" in report
     assert "Model quality: upside direction signals are low" in report
     assert "ML baseline estimates 20-day large-drop risk at 78.8%" in report
     assert "5d expected return range: -1.0% ~ 3.0%" in report
@@ -172,6 +175,7 @@ def test_single_stock_report_displays_unavailable_ml_reference():
     report = format_single_stock_analysis(data)
 
     assert "ML Reference" in report
+    assert "信任狀態：暫時不可用" in report
     assert "ML reference is currently unavailable" in report
     assert "missing_ml_artifacts" in report
 

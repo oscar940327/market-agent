@@ -18,6 +18,7 @@ from agent.ml_research_agent import (
     build_saved_prediction_fallback_reason,
     safe_fetch_latest_ml_prediction,
 )
+from agent.ml_reference_trust import build_ml_reference_trust
 from agent.orchestration_policy import build_single_stock_orchestration_summary
 from backtesting.signal_evidence import build_signal_backtest_evidence
 from data_freshness import build_current_data_freshness
@@ -279,6 +280,7 @@ class MarketManagerAgent:
             ticker=ticker,
             include_ml=include_ml,
         )
+        ml_reference_trust = build_ml_reference_trust(ml_research, ml_prediction)
         exit_signal = build_exit_signal(
             technical=technical_agent["technical_analysis"],
             signals=technical_agent["signals"],
@@ -348,6 +350,7 @@ class MarketManagerAgent:
             "evidence_quality": research_profile["evidence_quality"],
             "ml_research": ml_research,
             "ml_prediction": ml_prediction,
+            "ml_reference_trust": ml_reference_trust,
             "exit_signal": exit_signal,
             "data_freshness": data_freshness,
         }

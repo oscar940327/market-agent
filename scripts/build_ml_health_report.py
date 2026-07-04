@@ -22,6 +22,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--metrics-path")
     parser.add_argument("--calibration-path")
     parser.add_argument("--drift-path")
+    parser.add_argument(
+        "--drift-policy",
+        choices=["required", "scheduled_weekly"],
+        default="required",
+        help="Use scheduled_weekly for daily reports where full drift runs in the weekly dataset workflow.",
+    )
     parser.add_argument("--model-upgrade-path")
     parser.add_argument("--output-dir", default=str(DEFAULT_OUTPUT_DIR))
     parser.add_argument("--send-alert", action="store_true")
@@ -37,6 +43,7 @@ def main(argv: list[str] | None = None) -> int:
         calibration_report=load_report(args.calibration_path, output_dir, "ml_calibration_report_*.json"),
         drift_report=load_report(args.drift_path, output_dir, "ml_drift_report_*.json"),
         model_upgrade_report=load_report(args.model_upgrade_path, output_dir, "ml_model_upgrade_review_*.json"),
+        drift_policy=args.drift_policy,
     )
     output_paths = write_ml_health_reports(report, output_dir=output_dir)
     alert_result = maybe_send_alert(report, output_paths=output_paths, args=args)

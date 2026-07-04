@@ -198,6 +198,7 @@ def test_single_stock_report_context_reads_wrapped_agent_outputs():
 
     assert context["news_events_summary"] == news_events_summary
     assert context["ml_research"] == ml_research
+    assert context["ml_reference_trust"]["status"] == "reduced_trust"
     assert context["agent_summaries"]["news"] == {"sentiment": "positive"}
 
 
@@ -215,6 +216,7 @@ def test_single_stock_llm_payload_uses_report_context():
     assert payload["ticker"] == data["ticker"]
     assert payload["news_summary"] == data["news_analysis"]["summary"]
     assert payload["fundamental_summary"] == data["fundamentals"]["summary"]
+    assert "ml_reference_trust" in payload
     assert payload["agent_summaries"]["evidence"] == {"evidence_level": "medium"}
 
 

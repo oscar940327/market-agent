@@ -1,7 +1,9 @@
 import json
 from datetime import UTC, date, datetime
 
+import data_freshness.service as freshness_service
 from data_freshness.service import (
+    build_current_data_freshness,
     parse_datetime,
     read_latest_pipeline_run_at,
     read_ml_metadata_generated_at,
@@ -138,6 +140,47 @@ def test_local_metadata_and_pipeline_log_readers(tmp_path):
         1,
         tzinfo=UTC,
     )
+
+
+def test_current_freshness_prefers_supabase_pipeline_run_over_local_log(tmp_path, monkeypatch):
+    metadata_path = tmp_path / "training_dataset_v1_metadata.json"
+    metadata_path.write_text(
+        json.dumps({"generated_at": "2026-07-02T00:00:00+00:00"}),
+        encoding="utf-8",
+    )
+    log_dir = tmp_path / "pipeline_runs"
+    log_dir.mkdir()
+    (log_dir / "daily_pipeline_2026-06-30_010101.json").write_text(
+        json.dumps({"finished_at": "2026-06-30T01:01:01+00:00"}),
+        encoding="utf-8",
+    )
+
+    def fake_fetch_latest_date(*, table, date_column="date", filters=None):
+        if table == "news_events":
+            return "2026-07-03T09:00:00+00:00"
+        return "2026-07-02"
+
+    def fake_fetch_latest_pipeline_run(*, pipeline="daily"):
+        return {"finished_at": "2026-07-03T10:00:00+00:00"}
+
+    monkeypatch.setattr(freshness_service, "fetch_latest_date", fake_fetch_latest_date)
+    monkeypatch.setattr(
+        freshness_service,
+        "fetch_latest_pipeline_run",
+        fake_fetch_latest_pipeline_run,
+    )
+
+    report = build_current_data_freshness(
+        ticker="MU",
+        today=date(2026, 7, 3),
+        now=datetime(2026, 7, 3, 12, tzinfo=UTC),
+        ml_metadata_path=metadata_path,
+        pipeline_log_dir=log_dir,
+    )
+
+    assert report["pipeline_last_run"]["status"] == "fresh"
+    assert report["pipeline_last_run"]["last_run_at"] == "2026-07-03T10:00:00+00:00"
+    assert report["overall"] == "fresh"
 
 
 def test_price_scope_ignores_news_freshness_warning():

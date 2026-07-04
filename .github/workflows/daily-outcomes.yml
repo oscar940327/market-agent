@@ -47,14 +47,11 @@ jobs:
       - name: Build ML calibration report
         run: python scripts/build_ml_calibration_report.py --days 90
 
-      - name: Build ML drift report
-        run: python scripts/build_ml_drift_report.py --recent-days 30 --baseline-days 365
-
       - name: Build ML model upgrade review
         run: python scripts/build_ml_model_upgrade_review.py --send-alert
 
       - name: Build ML health report
-        run: python scripts/build_ml_health_report.py --send-alert
+        run: python scripts/build_ml_health_report.py --drift-policy scheduled_weekly --send-alert
 
       - name: Send failure alert
         if: failure()

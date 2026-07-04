@@ -2,7 +2,7 @@ import json
 from datetime import UTC, date, datetime
 from pathlib import Path
 
-from data_store.supabase_store import fetch_latest_date
+from data_store.supabase_store import fetch_latest_date, fetch_latest_pipeline_run
 from market_regime import build_freshness_report
 
 
@@ -49,6 +49,11 @@ def build_current_data_freshness(
         filters={"ticker": f"eq.{price_ticker}"},
     )
 
+    pipeline_last_run = (
+        read_latest_pipeline_run_from_supabase()
+        or read_latest_pipeline_run_at(pipeline_log_dir)
+    )
+
     report = build_freshness_report(
         today=today,
         now=now,
@@ -57,7 +62,7 @@ def build_current_data_freshness(
         market_regimes_latest_date=parse_date(market_regimes_latest),
         news_latest_at=parse_datetime(news_latest),
         ml_training_generated_at=read_ml_metadata_generated_at(ml_metadata_path),
-        pipeline_last_run_at=read_latest_pipeline_run_at(pipeline_log_dir),
+        pipeline_last_run_at=pipeline_last_run,
     )
     report["scope"] = {
         "ticker": price_ticker,
@@ -83,6 +88,18 @@ def safe_fetch_latest_date(
         )
     except Exception:
         return None
+
+
+def read_latest_pipeline_run_from_supabase() -> datetime | None:
+    try:
+        row = fetch_latest_pipeline_run(pipeline="daily")
+    except Exception:
+        return None
+
+    if not row:
+        return None
+
+    return parse_datetime(row.get("finished_at"))
 
 
 def read_ml_metadata_generated_at(path: str | Path) -> datetime | None:

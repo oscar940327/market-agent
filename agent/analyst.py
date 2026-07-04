@@ -29,6 +29,7 @@ def format_single_stock_analysis(analysis_data: dict) -> str:
     research_profile = context["research_profile"]
     evidence_quality = context["evidence_quality"]
     ml_research = context["ml_research"]
+    ml_reference_trust = context["ml_reference_trust"]
     exit_signal = context["exit_signal"]
     data_freshness = context["data_freshness"]
 
@@ -87,7 +88,7 @@ def format_single_stock_analysis(analysis_data: dict) -> str:
             f"- 風險因素：{format_reason_list(fundamental_summary['risks'])}",
             "",
             "ML Reference",
-            *format_ml_reference_lines(ml_research),
+            *format_ml_reference_lines(ml_research, ml_reference_trust),
             "",
             "持有風險 / 出場觀察",
             *format_exit_signal_lines(exit_signal),
@@ -187,9 +188,14 @@ def format_data_freshness_warning_lines(data_freshness: dict | None) -> list[str
     return lines
 
 
-def format_ml_reference_lines(ml_research: dict | None) -> list[str]:
+def format_ml_reference_lines(
+    ml_research: dict | None,
+    ml_reference_trust: dict | None = None,
+) -> list[str]:
+    trust = ml_reference_trust or {}
     if not ml_research:
         return [
+            *format_ml_trust_lines(trust),
             "- ML reference is currently unavailable. Reason: missing ml_research output.",
         ]
 
@@ -201,10 +207,15 @@ def format_ml_reference_lines(ml_research: dict | None) -> list[str]:
         line = f"- ML reference is currently unavailable. Reason: {reason}."
         if message:
             line += f" Detail: {message}"
-        return [source_line, line] if source_line else [line]
+        return [
+            *format_ml_trust_lines(trust),
+            *([source_line] if source_line else []),
+            line,
+        ]
 
     targets = ml_research.get("targets", {})
     lines = [
+        *format_ml_trust_lines(trust),
         *format_optional_ml_source_line(ml_research.get("source")),
         format_ml_target_line(
             label="5-day upside probability",
@@ -218,10 +229,12 @@ def format_ml_reference_lines(ml_research: dict | None) -> list[str]:
             label="20-day upside probability",
             target=targets.get("up_20d"),
         ),
+        *format_ml_20d_policy_lines(trust, "upside"),
         format_ml_target_line(
             label="20-day large-drop risk",
             target=targets.get("large_drop_20d"),
         ),
+        *format_ml_20d_policy_lines(trust, "large_drop"),
         f"- {format_ml_quality_sentence(targets)}",
         *format_return_reference_lines(ml_research.get("return_reference")),
         *format_return_model_lines(ml_research.get("return_model")),
@@ -232,6 +245,35 @@ def format_ml_reference_lines(ml_research: dict | None) -> list[str]:
         lines.append(f"- {risk_note}")
 
     return lines
+
+
+def format_ml_trust_lines(ml_reference_trust: dict | None) -> list[str]:
+    if not ml_reference_trust:
+        return []
+
+    label = ml_reference_trust.get("label") or ml_reference_trust.get("status", "unknown")
+    display_note = ml_reference_trust.get("display_note") or ""
+    reason = ml_reference_trust.get("reason")
+    lines = [f"- 信任狀態：{label}。{display_note}"]
+    if reason:
+        lines.append(f"- 信任狀態原因：{reason}")
+    return lines
+
+
+def format_ml_20d_policy_lines(ml_reference_trust: dict | None, output: str) -> list[str]:
+    if not ml_reference_trust or ml_reference_trust.get("status") != "reduced_trust":
+        return []
+
+    affected = set(ml_reference_trust.get("affected_outputs") or [])
+    if output == "upside" and "20_day_upside_probability" in affected:
+        return [
+            "- 20 日預測提醒：目前 20 日模型表現較不穩，這個數字應保守看待。",
+        ]
+    if output == "large_drop":
+        return [
+            "- 大跌風險提醒：這個數字應作為風險控管參考，不應單獨作為出場依據。",
+        ]
+    return []
 
 
 def format_optional_ml_source_line(source: dict | None) -> list[str]:

@@ -6,6 +6,7 @@ from typing import Any
 
 STATUS_PRIORITY = {
     "healthy": 0,
+    "scheduled_weekly": 0,
     "warning": 1,
     "unknown": 2,
     "degraded": 3,
@@ -26,13 +27,14 @@ def build_ml_health_report(
     calibration_report: dict | None = None,
     drift_report: dict | None = None,
     model_upgrade_report: dict | None = None,
+    drift_policy: str = "required",
     generated_at: datetime | None = None,
 ) -> dict:
     generated = generated_at or datetime.now(UTC)
     components = {
         "model_quality": evaluate_metrics_report(metrics_report),
         "calibration": evaluate_calibration_report(calibration_report),
-        "drift": evaluate_drift_report(drift_report),
+        "drift": evaluate_drift_report(drift_report, policy=drift_policy),
         "model_upgrade": evaluate_model_upgrade_report(model_upgrade_report),
     }
     overall_status = combine_statuses(component["status"] for component in components.values())
@@ -109,8 +111,15 @@ def evaluate_calibration_report(report: dict | None) -> dict:
     )
 
 
-def evaluate_drift_report(report: dict | None) -> dict:
+def evaluate_drift_report(report: dict | None, *, policy: str = "required") -> dict:
     if not report:
+        if policy == "scheduled_weekly":
+            return build_component(
+                name="drift",
+                status="scheduled_weekly",
+                summary="Full drift report is scheduled weekly and is not required for the daily health report.",
+                action="No daily drift action needed; review the weekly drift report.",
+            )
         return build_component(
             name="drift",
             status="unknown",

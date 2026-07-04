@@ -1,3 +1,6 @@
+from agent.ml_reference_trust import build_ml_reference_trust
+
+
 def build_single_stock_report_context(data: dict) -> dict:
     news_analysis = data.get("news_analysis", default_news_analysis())
     fundamentals = data.get("fundamentals", default_fundamentals())
@@ -5,6 +8,17 @@ def build_single_stock_report_context(data: dict) -> dict:
     evidence_quality = data.get(
         "evidence_quality",
         research_profile.get("evidence_quality", default_evidence_quality()),
+    )
+    ml_research = (
+        data.get("ml_research")
+        or (data.get("agent_outputs", {}).get("ml_research") or {}).get("payload")
+        or data.get("agent_outputs", {}).get("ml_research")
+    )
+    ml_prediction = data.get("ml_prediction")
+    ml_reference_trust = (
+        data.get("ml_reference_trust")
+        or (ml_research or {}).get("ml_reference_trust")
+        or build_ml_reference_trust(ml_research, ml_prediction)
     )
 
     return {
@@ -25,10 +39,9 @@ def build_single_stock_report_context(data: dict) -> dict:
         "fundamental_summary": fundamentals.get("summary", {}),
         "research_profile": research_profile,
         "evidence_quality": evidence_quality,
-        "ml_research": data.get("ml_research")
-        or (data.get("agent_outputs", {}).get("ml_research") or {}).get("payload")
-        or data.get("agent_outputs", {}).get("ml_research"),
-        "ml_prediction": data.get("ml_prediction"),
+        "ml_research": ml_research,
+        "ml_prediction": ml_prediction,
+        "ml_reference_trust": ml_reference_trust,
         "exit_signal": data.get("exit_signal"),
         "data_freshness": data.get("data_freshness"),
         "agent_outputs": data.get("agent_outputs", {}),

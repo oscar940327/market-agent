@@ -163,6 +163,46 @@ def insert_ml_model_run(
     return {"status": "success", "row": rows[0] if rows else None}
 
 
+def insert_pipeline_run(
+    row: dict,
+    *,
+    supabase_url: str | None = None,
+    supabase_key: str | None = None,
+    open_url=urlopen,
+) -> dict:
+    base_url, api_key = resolve_supabase_credentials(
+        supabase_url=supabase_url,
+        supabase_key=supabase_key,
+    )
+    endpoint = f"{base_url}/rest/v1/pipeline_runs"
+    payload = json.dumps(row, allow_nan=False).encode("utf-8")
+    request = Request(
+        endpoint,
+        data=payload,
+        method="POST",
+        headers={
+            "apikey": api_key,
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "Prefer": "return=representation",
+        },
+    )
+
+    try:
+        with open_url(request, timeout=30) as response:
+            rows = json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace")
+        return {
+            "status": "error",
+            "message": f"Supabase insert failed with HTTP {exc.code}: {body}",
+        }
+    except Exception as exc:
+        return {"status": "error", "message": f"Supabase insert failed: {exc}"}
+
+    return {"status": "success", "row": rows[0] if rows else None}
+
+
 def upsert_ml_predictions(
     records: list[dict],
     *,
@@ -1219,6 +1259,46 @@ def fetch_latest_date(
         return None
 
     return rows[0].get(date_column)
+
+
+def fetch_latest_pipeline_run(
+    *,
+    pipeline: str = "daily",
+    statuses: tuple[str, ...] = ("success", "partial_success"),
+    supabase_url: str | None = None,
+    supabase_key: str | None = None,
+    open_url=urlopen,
+) -> dict | None:
+    base_url, api_key = resolve_supabase_credentials(
+        supabase_url=supabase_url,
+        supabase_key=supabase_key,
+    )
+    status_filter = ",".join(statuses)
+    endpoint = (
+        f"{base_url}/rest/v1/pipeline_runs?"
+        "select=pipeline,status,started_at,finished_at,duration_seconds,created_at"
+        f"&pipeline=eq.{pipeline}"
+        f"&status=in.({status_filter})"
+        "&order=finished_at.desc"
+        "&limit=1"
+    )
+    request = Request(
+        endpoint,
+        method="GET",
+        headers={
+            "apikey": api_key,
+            "Authorization": f"Bearer {api_key}",
+            "Accept": "application/json",
+        },
+    )
+
+    with open_url(request, timeout=30) as response:
+        rows = json.loads(response.read().decode("utf-8"))
+
+    if not rows:
+        return None
+
+    return rows[0]
 
 
 def resolve_supabase_credentials(

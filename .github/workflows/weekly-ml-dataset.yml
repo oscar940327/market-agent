@@ -38,6 +38,21 @@ jobs:
       - name: Build ML training dataset
         run: python scripts/build_ml_training_dataset.py
 
+      - name: Build ML monitoring metrics
+        run: python scripts/build_ml_monitoring_metrics.py --days 90
+
+      - name: Build ML calibration report
+        run: python scripts/build_ml_calibration_report.py --days 90
+
+      - name: Build ML drift report
+        run: python scripts/build_ml_drift_report.py --recent-days 30 --baseline-days 365
+
+      - name: Build ML model upgrade review
+        run: python scripts/build_ml_model_upgrade_review.py --send-alert
+
+      - name: Build ML health report
+        run: python scripts/build_ml_health_report.py --send-alert
+
       - name: Send failure alert
         if: failure()
         run: >
@@ -54,3 +69,11 @@ jobs:
             data/ml/training_dataset_v1.csv
             data/ml/training_dataset_v1_metadata.json
           if-no-files-found: error
+
+      - name: Upload monitoring reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: weekly-ml-monitoring-reports
+          path: data/ml/monitoring/*
+          if-no-files-found: ignore

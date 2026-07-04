@@ -15,6 +15,8 @@ LLM_ANALYST_SYSTEM_PROMPT = """
 - 解釋技術面、新聞面、基本面、回測或主題廣度是否互相支持。
 - 明確指出風險、資料限制與研究信心。
 - 如果 payload 有 exit_signal，請加入「持有風險 / 出場觀察」段落；它只能是觀察訊號，不是買賣指令。
+- 如果 payload 有 ml_reference_trust，請在「ML Reference」段落開頭說明信任狀態；`reduced_trust` 請寫成「降低信任」。
+- 如果 ML Reference 是降低信任，20 日上漲機率要保守看待，20 日中途大跌風險只能作為風險控管參考，不可單獨當作出場依據。
 
 嚴格限制：
 - 不可以自行抓資料。
@@ -243,6 +245,7 @@ def build_single_stock_payload(data: dict) -> dict:
         "fundamental_summary": context["fundamental_summary"],
         "ml_research": context["ml_research"],
         "ml_prediction": context["ml_prediction"],
+        "ml_reference_trust": context["ml_reference_trust"],
         "exit_signal": context["exit_signal"],
         "data_freshness": context["data_freshness"],
         "research_profile": context["research_profile"],

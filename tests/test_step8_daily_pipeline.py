@@ -1,6 +1,7 @@
 import json
 import subprocess
 
+import scripts.run_daily_pipeline as daily_pipeline
 from scripts.run_daily_pipeline import (
     build_parser,
     build_pipeline_steps,
@@ -36,6 +37,32 @@ def test_price_only_dry_run_includes_freshness_and_writes_log(tmp_path):
     assert log["latest_log_path"].endswith("latest_daily_pipeline.json")
     assert json.loads((tmp_path / log["log_path"].split("\\")[-1]).read_text(encoding="utf-8"))["status"] == "success"
     assert json.loads((tmp_path / "latest_daily_pipeline.json").read_text(encoding="utf-8"))["status"] == "success"
+    assert log["supabase_log"]["status"] == "skipped"
+
+
+def test_pipeline_writes_run_summary_to_supabase_and_local_log(tmp_path, monkeypatch):
+    args = parse_args(["--only", "prices", "--limit", "3", "--no-alert", "--log-dir", str(tmp_path)])
+    captured = {}
+
+    def fake_runner(command):
+        return subprocess.CompletedProcess(command, 0, stdout="ok", stderr="")
+
+    def fake_insert_pipeline_run(row):
+        captured["row"] = row
+        return {"status": "success", "row": {"id": "pipeline-run-1"}}
+
+    monkeypatch.setattr(daily_pipeline, "insert_pipeline_run", fake_insert_pipeline_run)
+
+    log = run_pipeline(args, command_runner=fake_runner)
+    latest_log = json.loads((tmp_path / "latest_daily_pipeline.json").read_text(encoding="utf-8"))
+
+    assert log["status"] == "success"
+    assert captured["row"]["pipeline"] == "daily"
+    assert captured["row"]["status"] == "success"
+    assert captured["row"]["options"]["only"] == "prices"
+    assert captured["row"]["steps"][0]["name"] == "benchmark_prices"
+    assert log["supabase_log"]["id"] == "pipeline-run-1"
+    assert latest_log["supabase_log"]["id"] == "pipeline-run-1"
 
 
 def test_skip_llm_news_uses_rule_based_classification():

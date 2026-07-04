@@ -13,6 +13,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from alerts import send_pipeline_alert_if_needed  # noqa: E402
+from data_store import insert_pipeline_run  # noqa: E402
 
 
 @dataclass(frozen=True)
@@ -234,12 +235,66 @@ def run_pipeline(
         "errors": errors,
         "steps": results,
     }
+    supabase_log_result = write_pipeline_run_to_supabase(log)
+    log["supabase_log"] = supabase_log_result
     write_pipeline_log(log, log_paths)
     if not args.no_alert:
         alert_result = send_pipeline_alert_if_needed(log)
         log["alert"] = summarize_alert_result(alert_result)
         write_pipeline_log(log, log_paths)
     return log
+
+
+def write_pipeline_run_to_supabase(log: dict) -> dict:
+    if log.get("options", {}).get("dry_run"):
+        return {
+            "status": "skipped",
+            "id": None,
+            "message": "Dry run does not write pipeline_runs to Supabase.",
+        }
+
+    row = build_pipeline_run_row(log)
+    try:
+        result = insert_pipeline_run(row)
+    except Exception as exc:
+        result = {
+            "status": "error",
+            "message": f"Failed to write pipeline run to Supabase: {exc}",
+        }
+    if result.get("status") != "success":
+        log.setdefault("warnings", []).append(
+            {
+                "step": "pipeline_run_log",
+                "status": "warning",
+                "message": result.get("message", "Failed to write pipeline run to Supabase."),
+            }
+        )
+    return summarize_supabase_pipeline_log_result(result)
+
+
+def build_pipeline_run_row(log: dict) -> dict:
+    return {
+        "pipeline": log["pipeline"],
+        "status": log["status"],
+        "started_at": log["started_at"],
+        "finished_at": log["finished_at"],
+        "duration_seconds": log["duration_seconds"],
+        "options": log.get("options", {}),
+        "warnings": log.get("warnings", []),
+        "errors": log.get("errors", []),
+        "steps": log.get("steps", []),
+        "log_path": log.get("log_path"),
+        "latest_log_path": log.get("latest_log_path"),
+    }
+
+
+def summarize_supabase_pipeline_log_result(result: dict) -> dict:
+    row = result.get("row") or {}
+    return {
+        "status": result.get("status"),
+        "id": row.get("id"),
+        "message": result.get("message"),
+    }
 
 
 def run_step(

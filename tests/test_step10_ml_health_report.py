@@ -108,6 +108,21 @@ def test_ml_health_report_marks_missing_reports_unknown_and_alertable():
     assert report["alert"]["should_alert"] is True
 
 
+def test_ml_health_report_allows_daily_drift_to_be_scheduled_weekly():
+    report = build_ml_health_report(
+        metrics_report=make_metrics(),
+        calibration_report=make_calibration(),
+        drift_report=None,
+        model_upgrade_report=make_upgrade(),
+        drift_policy="scheduled_weekly",
+    )
+
+    assert report["overall_status"] == "healthy"
+    assert report["components"]["drift"]["status"] == "scheduled_weekly"
+    assert report["ml_reference_policy"]["status"] == "normal"
+    assert report["alert"]["should_alert"] is False
+
+
 def test_ml_health_summary_markdown_and_email_summary_are_readable():
     report = build_ml_health_report(
         metrics_report=make_metrics(),
