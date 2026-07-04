@@ -23,6 +23,7 @@ done/
 
 data/market
 data/ml/*
+!data/ml/training_dataset_v1_metadata.json
 !data/ml/models/
 !data/ml/models/*.pkl
 !data/ml/return_models/
