@@ -52,6 +52,7 @@ def build_single_stock_report_context(data: dict) -> dict:
         "fundamental_summary": fundamentals.get("summary", {}),
         "research_profile": research_profile,
         "evidence_quality": evidence_quality,
+        "backtest_evidence": data.get("backtest_evidence", {}),
         "ml_research": ml_research,
         "ml_prediction": ml_prediction,
         "ml_reference_trust": ml_reference_trust,

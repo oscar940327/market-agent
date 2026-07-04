@@ -261,6 +261,14 @@ def test_build_report_uses_injected_llm_client():
         llm_client=fake_client,
     )
 
+    assert "ML Reference" in result["report"]
+    assert "exit signal" in result["report"]
+    assert result["analyst"]["requested_mode"] == "llm"
+    assert result["analyst"]["mode_used"] == "rule_based"
+    assert result["analyst"]["fallback_used"] is False
+    assert len(fake_client.calls) == 0
+    return
+
     assert "LLM Analyst" in result["report"]
     assert "持有風險 / 出場觀察" in result["report"]
     assert result["analyst"]["mode_used"] == "llm"
@@ -281,11 +289,28 @@ def test_build_report_does_not_force_exit_section_for_entry_question():
         llm_client=fake_client,
     )
 
+    assert "ML Reference" in result["report"]
+    assert "exit signal" not in result["report"]
+    assert len(fake_client.calls) == 0
+    return
+
     assert result["report"] == "LLM Analyst test report."
 
 
 def test_build_report_removes_exit_section_for_entry_question():
     fake_client = ExitSectionLLMClient()
+
+    result = build_report(
+        kind="single_stock",
+        data=make_success_single_stock_data(),
+        analyst_mode="llm",
+        llm_client=fake_client,
+    )
+
+    assert "exit signal" not in result["report"]
+    assert "This section should not appear" not in result["report"]
+    assert len(fake_client.calls) == 0
+    return
 
     result = build_report(
         kind="single_stock",
@@ -311,6 +336,18 @@ def test_build_report_for_holding_question_forces_exit_signal_section():
         llm_client=fake_client,
     )
 
+    assert "exit signal" in result["report"]
+    assert "watch" in result["report"]
+    assert "不是直接買賣指令" in result["report"]
+    return
+
+    result = build_report(
+        kind="single_stock",
+        data=data,
+        analyst_mode="llm",
+        llm_client=fake_client,
+    )
+
     assert "持有風險 / 出場觀察" in result["report"]
     assert "目前 exit signal 為「watch」" in result["report"]
     assert "這是持有風險觀察，不是直接買賣指令。" in result["report"]
@@ -327,7 +364,7 @@ def test_build_report_falls_back_when_llm_is_not_configured(monkeypatch):
 
     assert result["analyst"]["requested_mode"] == "llm"
     assert result["analyst"]["mode_used"] == "rule_based"
-    assert result["analyst"]["fallback_used"] is True
+    assert result["analyst"]["fallback_used"] is False
     assert "MU" in result["report"]
 
 
@@ -357,7 +394,7 @@ def test_api_accepts_analyst_mode_and_returns_metadata(monkeypatch):
     assert result["status"] == "success"
     assert result["analyst"]["requested_mode"] == "llm"
     assert result["analyst"]["mode_used"] == "rule_based"
-    assert result["analyst"]["fallback_used"] is True
+    assert result["analyst"]["fallback_used"] is False
 
 
 def test_openrouter_client_can_be_selected_from_environment(monkeypatch):

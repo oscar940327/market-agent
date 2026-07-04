@@ -7,6 +7,7 @@ from agent.analyst import (
     format_single_stock_analysis,
     format_theme_analysis,
 )
+from agent.fixed_single_stock_report import build_fixed_single_stock_report
 from agent.llm_analyst import OpenAIResponsesClient, generate_llm_report
 from agent.llm_analyst import OpenRouterChatClient
 from agent.report_context import build_single_stock_report_context
@@ -56,6 +57,18 @@ def build_report(
                 mode_used="rule_based",
                 fallback_used=True,
                 message="非 success 狀態一律使用 rule-based error report。",
+            ),
+        }
+
+    if kind == "single_stock":
+        fixed_report = build_fixed_single_stock_report(data)
+        return {
+            "report": fixed_report,
+            "analyst": build_analyst_metadata(
+                requested_mode=requested_mode,
+                mode_used="rule_based",
+                fallback_used=False,
+                message="使用固定格式 single-stock report，避免 LLM 改變 Research Report 版型。",
             ),
         }
 
