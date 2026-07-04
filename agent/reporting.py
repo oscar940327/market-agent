@@ -123,7 +123,11 @@ def apply_required_report_sections(*, kind: str, data: dict, report: str) -> str
 
     context = build_single_stock_report_context(data)
     if context.get("question_type") != "holding_exit":
-        return report
+        return remove_report_section(
+            report,
+            section_titles=["持有風險 / 出場觀察"],
+            following_titles=["綜合評估", "資料與風險提醒", "風險提醒"],
+        )
 
     if not context.get("exit_signal"):
         return report
@@ -181,6 +185,29 @@ def insert_section_before_summary(report: str, section: str) -> str:
         return report.replace(marker, f"\n{section}\n{marker}", 1)
 
     return f"{report.rstrip()}\n\n{section}"
+
+
+def remove_report_section(
+    report: str,
+    *,
+    section_titles: list[str],
+    following_titles: list[str],
+) -> str:
+    lines = report.splitlines()
+    result = []
+    skip = False
+
+    for line in lines:
+        stripped = line.strip()
+        if stripped in section_titles:
+            skip = True
+            continue
+        if skip and stripped in following_titles:
+            skip = False
+        if not skip:
+            result.append(line)
+
+    return "\n".join(result).strip()
 
 
 def build_rule_based_report(kind: str, data: dict) -> str:

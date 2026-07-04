@@ -2,6 +2,7 @@ import pandas as pd
 
 from agent.rule_based_router import detect_intent
 from agent.exit_signal import build_exit_signal
+import agent.experts.fundamental_agent as fundamental_agent_module
 from agent.research_profile import build_research_profile
 from backtesting.metrics import calculate_backtest_metrics
 from backtesting.evidence import build_backtest_evidence_quality
@@ -527,6 +528,21 @@ def test_summarize_fundamentals_identifies_positive_and_risk_factors():
     assert "獲利成長為負" in result["risks"]
     assert "負債權益比偏高" in result["risks"]
     assert "本益比偏高" in result["risks"]
+
+
+def test_mu_fundamentals_use_static_fallback_when_provider_fails(monkeypatch):
+    def fail_provider(ticker):
+        raise RuntimeError("provider unavailable")
+
+    monkeypatch.setattr(fundamental_agent_module, "get_basic_fundamentals", fail_provider)
+
+    result = fundamental_agent_module.fetch_fundamentals("MU")
+
+    assert result["status"] == "success"
+    assert result["provider"] == "static_fallback"
+    assert result["metrics"]["forward_pe"] == 6.5
+    assert result["summary"]["stance"] == "positive"
+    assert result["provider_error"] == "provider unavailable"
 
 
 def test_build_research_profile_combines_multiple_research_dimensions():

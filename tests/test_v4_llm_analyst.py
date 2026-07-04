@@ -26,6 +26,28 @@ class FakeLLMClient:
         return "LLM Analyst test report."
 
 
+class ExitSectionLLMClient(FakeLLMClient):
+    def generate(self, system_prompt: str, user_prompt: str) -> str:
+        self.calls.append(
+            {
+                "system_prompt": system_prompt,
+                "user_prompt": user_prompt,
+            }
+        )
+        return "\n".join(
+            [
+                "研究摘要",
+                "Entry question report.",
+                "",
+                "持有風險 / 出場觀察",
+                "- This section should not appear for entry questions.",
+                "",
+                "風險提醒",
+                "- Test risk note.",
+            ]
+        )
+
+
 def make_success_single_stock_data():
     return {
         "intent": "single_stock_analysis",
@@ -260,6 +282,21 @@ def test_build_report_does_not_force_exit_section_for_entry_question():
     )
 
     assert result["report"] == "LLM Analyst test report."
+
+
+def test_build_report_removes_exit_section_for_entry_question():
+    fake_client = ExitSectionLLMClient()
+
+    result = build_report(
+        kind="single_stock",
+        data=make_success_single_stock_data(),
+        analyst_mode="llm",
+        llm_client=fake_client,
+    )
+
+    assert "持有風險 / 出場觀察" not in result["report"]
+    assert "This section should not appear" not in result["report"]
+    assert "風險提醒" in result["report"]
 
 
 def test_build_report_for_holding_question_forces_exit_signal_section():
