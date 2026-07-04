@@ -1,113 +1,27 @@
+from agent.agent_output import build_agent_output, wrap_legacy_agent_output
 from agent.experts.backtest_agent import run_backtest_agent, select_backtest_strategy
 from agent.experts.fundamental_agent import run_fundamental_agent
 from agent.experts.news_agent import run_news_agent
 from agent.experts.portfolio_agent import normalize_holdings, run_portfolio_agent
 from agent.experts.technical_agent import run_technical_agent
 from agent.exit_signal import build_exit_signal
-from agent.research_profile import build_research_profile
-from backtesting.evidence import REQUIRED_HISTORY_YEARS
+from agent.evidence_agent import run_evidence_agent
+from agent.market_data_agent import (
+    build_market_data_agent_output,
+    build_price_data_window,
+    fetch_price_data,
+    validate_price_data,
+)
+from agent.ml_research_agent import (
+    build_ml_research_agent_output,
+    build_ml_research_for_single_stock as run_ml_research_agent,
+    build_saved_prediction_fallback_reason,
+    safe_fetch_latest_ml_prediction,
+)
+from agent.orchestration_policy import build_single_stock_orchestration_summary
 from backtesting.signal_evidence import build_signal_backtest_evidence
 from data_freshness import build_current_data_freshness
-from daily_ml_predictions import (
-    build_runtime_fallback_source,
-    build_unavailable_source,
-    convert_saved_prediction_to_ml_research,
-    is_saved_prediction_usable,
-)
-from data_store import fetch_latest_ml_prediction
 from ml_research import build_single_stock_ml_research
-from skills.stock_price_skill import get_recent_price_result
-
-
-def validate_price_data(price_data, ticker: str, min_rows: int):
-    if price_data is None or price_data.empty:
-        return {
-            "ticker": ticker,
-            "status": "no_price_data",
-            "message": "沒有取得股價資料，請確認股票代號是否正確或稍後再試。",
-        }
-
-    missing_columns = [
-        column for column in ["Close", "Volume"] if column not in price_data.columns
-    ]
-
-    if missing_columns:
-        return {
-            "ticker": ticker,
-            "status": "invalid_price_data",
-            "message": f"股價資料缺少必要欄位：{', '.join(missing_columns)}。",
-        }
-
-    if len(price_data) < min_rows:
-        return {
-            "ticker": ticker,
-            "status": "not_enough_price_data",
-            "message": f"目前只有 {len(price_data)} 筆資料，至少需要 {min_rows} 筆。",
-        }
-
-    return None
-
-
-def fetch_price_data(ticker: str, period: str):
-    try:
-        price_result = get_recent_price_result(ticker, period=period)
-    except Exception as error:
-        return None, {
-            "ticker": ticker,
-            "status": "price_data_error",
-            "message": f"取得股價資料時發生錯誤：{error}",
-            "price_source": {
-                "provider": None,
-                "attempted_providers": [],
-                "errors": [{"provider": "price_service", "message": str(error)}],
-            },
-        }, None
-
-    price_source = {
-        "provider": price_result.provider,
-        "attempted_providers": price_result.attempted_providers,
-        "errors": price_result.errors,
-    }
-
-    return price_result.data, None, price_source
-
-
-def build_price_data_window(price_data, required_years: int = REQUIRED_HISTORY_YEARS):
-    sorted_data = price_data.sort_index()
-    latest_date = sorted_data.index.max()
-    target_start_date = latest_date - required_years_to_offset(required_years)
-    window_data = sorted_data.loc[sorted_data.index >= target_start_date]
-
-    if window_data.empty:
-        window_data = sorted_data
-
-    data_start = window_data.index.min()
-    data_end = window_data.index.max()
-    history_years = (data_end - data_start).days / 365.25
-    has_required_history = data_start <= target_start_date + required_history_tolerance()
-
-    return window_data, {
-        "data_start_date": data_start.date().isoformat(),
-        "data_end_date": data_end.date().isoformat(),
-        "data_as_of": data_end.date().isoformat(),
-        "target_start_date": target_start_date.date().isoformat(),
-        "history_years": round(history_years, 2),
-        "required_history_years": required_years,
-        "has_required_history": bool(has_required_history),
-    }
-
-
-def required_years_to_offset(years: int):
-    import pandas as pd
-
-    return pd.DateOffset(years=years)
-
-
-def required_history_tolerance():
-    import pandas as pd
-
-    # The target date may fall on a weekend or holiday, so allow a few calendar days.
-    return pd.Timedelta(days=7)
 
 
 def has_triggered_strategy_signal(signals: dict) -> bool:
@@ -119,51 +33,55 @@ def has_triggered_strategy_signal(signals: dict) -> bool:
 
 
 def build_ml_research_for_single_stock(ticker: str, include_ml: bool = True) -> tuple[dict, dict | None]:
-    if not include_ml:
-        return (
-            {
-                "status": "skipped",
-                "usage_policy": "reference_only",
-                "reason": "ml_disabled_for_internal_workflow",
-                "summary": "ML reference was skipped for this internal workflow.",
-                "source": {"type": "skipped", "reason": "include_ml_false"},
-            },
-            None,
-        )
-
-    saved_prediction = safe_fetch_latest_ml_prediction(ticker=ticker)
-    if is_saved_prediction_usable(saved_prediction):
-        return convert_saved_prediction_to_ml_research(saved_prediction), saved_prediction
-
-    fallback_reason = build_saved_prediction_fallback_reason(saved_prediction)
-    runtime_ml_research = build_single_stock_ml_research(ticker=ticker)
-    if runtime_ml_research.get("status") == "success":
-        runtime_ml_research["source"] = build_runtime_fallback_source(
-            reason=fallback_reason,
-            saved_prediction=saved_prediction,
-        )
-    else:
-        runtime_ml_research["source"] = build_unavailable_source(
-            reason=fallback_reason,
-            saved_prediction=saved_prediction,
-        )
-    return runtime_ml_research, saved_prediction
+    return run_ml_research_agent(
+        ticker=ticker,
+        include_ml=include_ml,
+        fetch_prediction=safe_fetch_latest_ml_prediction,
+        runtime_builder=build_single_stock_ml_research,
+    )
 
 
-def safe_fetch_latest_ml_prediction(ticker: str) -> dict | None:
-    try:
-        return fetch_latest_ml_prediction(ticker=ticker)
-    except Exception:
-        return None
+def map_backtest_evidence_status(backtest_evidence: dict) -> str:
+    status = backtest_evidence.get("status", "success")
+
+    if status == "success":
+        return "success"
+    if status == "no_triggered_signals":
+        return "skipped"
+    if status in {"no_price_data", "invalid_price_data", "not_enough_price_data"}:
+        return "unavailable"
+    if status == "price_data_error":
+        return "failed"
+
+    return "partial_success"
 
 
-def build_saved_prediction_fallback_reason(saved_prediction: dict | None) -> str:
-    if not saved_prediction:
-        return "no_saved_daily_prediction"
+def build_backtest_evidence_warnings(backtest_evidence: dict) -> list[str]:
+    status = backtest_evidence.get("status")
+    if status in {None, "success"}:
+        return []
 
-    status = saved_prediction.get("prediction_status", "unknown")
-    freshness = saved_prediction.get("prediction_freshness", "unknown")
-    return f"saved_prediction_not_usable:{status}/{freshness}"
+    message = (backtest_evidence.get("summary") or {}).get("message")
+    if message:
+        return [message]
+
+    return [f"backtest_evidence_status:{status}"]
+
+
+def map_exit_signal_status(exit_signal: dict) -> str:
+    status = exit_signal.get("status", "unavailable")
+    if status in {"success", "skipped", "unavailable", "failed"}:
+        return status
+
+    return "partial_success"
+
+
+def build_exit_signal_warnings(exit_signal: dict) -> list[str]:
+    if exit_signal.get("status") == "success":
+        return []
+
+    reason = exit_signal.get("reason") or exit_signal.get("status", "unknown")
+    return [str(reason)]
 
 
 class MarketManagerAgent:
@@ -226,6 +144,13 @@ class MarketManagerAgent:
             include_fundamentals=include_fundamentals,
         )
         price_data, fetch_error, price_source = fetch_price_data(ticker, period="1y")
+        market_data_agent = build_market_data_agent_output(
+            ticker=ticker,
+            period="1y",
+            price_data=price_data,
+            price_source=price_source,
+            error=fetch_error,
+        )
 
         if fetch_error:
             return {
@@ -238,6 +163,13 @@ class MarketManagerAgent:
         data_error = validate_price_data(price_data, ticker=ticker, min_rows=50)
 
         if data_error:
+            market_data_agent = build_market_data_agent_output(
+                ticker=ticker,
+                period="1y",
+                price_data=price_data,
+                price_source=price_source,
+                error=data_error,
+            )
             return {
                 "intent": "single_stock_analysis",
                 "query": user_query,
@@ -261,6 +193,13 @@ class MarketManagerAgent:
             historical_price_data, history_fetch_error, history_price_source = (
                 fetch_price_data(ticker, period="max")
             )
+            historical_market_data_agent = build_market_data_agent_output(
+                ticker=ticker,
+                period="max",
+                price_data=historical_price_data,
+                price_source=history_price_source,
+                error=history_fetch_error,
+            )
 
             if history_fetch_error:
                 backtest_evidence = {
@@ -277,6 +216,13 @@ class MarketManagerAgent:
                 historical_window_data, data_window = build_price_data_window(
                     historical_price_data
                 )
+                historical_market_data_agent = build_market_data_agent_output(
+                    ticker=ticker,
+                    period="max",
+                    price_data=historical_window_data,
+                    price_source=history_price_source,
+                    data_window=data_window,
+                )
                 history_data_error = validate_price_data(
                     historical_window_data,
                     ticker=ticker,
@@ -284,6 +230,14 @@ class MarketManagerAgent:
                 )
 
                 if history_data_error:
+                    historical_market_data_agent = build_market_data_agent_output(
+                        ticker=ticker,
+                        period="max",
+                        price_data=historical_window_data,
+                        price_source=history_price_source,
+                        error=history_data_error,
+                        data_window=data_window,
+                    )
                     backtest_evidence = {
                         "status": history_data_error["status"],
                         "ticker": ticker,
@@ -310,7 +264,7 @@ class MarketManagerAgent:
             include_fundamentals=include_fundamentals,
         )
 
-        research_profile = build_research_profile(
+        evidence_agent = run_evidence_agent(
             technical=technical_agent["technical_analysis"],
             signals=technical_agent["signals"],
             news_analysis=news_agent["news_analysis"],
@@ -320,6 +274,7 @@ class MarketManagerAgent:
             include_fundamentals=include_fundamentals,
             backtest_evidence=backtest_evidence,
         )
+        research_profile = evidence_agent["payload"]["research_profile"]
         ml_research, ml_prediction = build_ml_research_for_single_stock(
             ticker=ticker,
             include_ml=include_ml,
@@ -330,6 +285,49 @@ class MarketManagerAgent:
             ml_research=ml_research,
         )
         data_freshness = build_current_data_freshness(ticker=ticker)
+        agent_outputs = {
+            "technical": wrap_legacy_agent_output(technical_agent),
+            "news": wrap_legacy_agent_output(
+                news_agent,
+                fallback_used=news_agent.get("source") == "legacy_news_skill",
+            ),
+            "fundamental": wrap_legacy_agent_output(fundamental_agent),
+            "backtest_evidence": build_agent_output(
+                agent="backtest_evidence",
+                status=map_backtest_evidence_status(backtest_evidence),
+                summary=backtest_evidence.get("summary", ""),
+                payload=backtest_evidence,
+                warnings=build_backtest_evidence_warnings(backtest_evidence),
+                metadata={
+                    "ticker": ticker,
+                    "source": "historical_signal_evidence",
+                },
+                fallback_used=False,
+                legacy_fields=backtest_evidence,
+            ),
+            "ml_research": build_ml_research_agent_output(ticker, ml_research),
+            "evidence": evidence_agent,
+            "exit_signal": build_agent_output(
+                agent="exit_signal",
+                status=map_exit_signal_status(exit_signal),
+                summary={
+                    "exit_signal": exit_signal["exit_signal"],
+                    "weakening_signal_20d": exit_signal["weakening_signal_20d"],
+                    "email_alert_eligible": exit_signal["email_alert_eligible"],
+                },
+                payload=exit_signal,
+                warnings=build_exit_signal_warnings(exit_signal),
+                metadata={"ticker": ticker},
+                fallback_used=False,
+                legacy_fields=exit_signal,
+            ),
+        }
+        orchestration = build_single_stock_orchestration_summary(
+            {
+                "market_data": market_data_agent,
+                **agent_outputs,
+            }
+        )
 
         return {
             "intent": "single_stock_analysis",
@@ -338,22 +336,8 @@ class MarketManagerAgent:
             "ticker": ticker,
             "price_source": price_source,
             "execution_plan": execution_plan,
-            "agent_outputs": {
-                "technical": technical_agent,
-                "news": news_agent,
-                "fundamental": fundamental_agent,
-                "backtest_evidence": backtest_evidence,
-                "ml_research": ml_research,
-                "exit_signal": {
-                    "agent": "exit_signal",
-                    "status": exit_signal["status"],
-                    "summary": {
-                        "exit_signal": exit_signal["exit_signal"],
-                        "weakening_signal_20d": exit_signal["weakening_signal_20d"],
-                        "email_alert_eligible": exit_signal["email_alert_eligible"],
-                    },
-                },
-            },
+            "orchestration": orchestration,
+            "agent_outputs": agent_outputs,
             "technical_analysis": technical_agent["technical_analysis"],
             "signals": technical_agent["signals"],
             "backtest_evidence": backtest_evidence,
@@ -384,6 +368,13 @@ class MarketManagerAgent:
             }
 
         price_data, fetch_error, price_source = fetch_price_data(ticker, period="max")
+        market_data_agent = build_market_data_agent_output(
+            ticker=ticker,
+            period="max",
+            price_data=price_data,
+            price_source=price_source,
+            error=fetch_error,
+        )
 
         if fetch_error:
             return {
@@ -395,6 +386,13 @@ class MarketManagerAgent:
             }
 
         backtest_price_data, data_window = build_price_data_window(price_data)
+        market_data_agent = build_market_data_agent_output(
+            ticker=ticker,
+            period="max",
+            price_data=backtest_price_data,
+            price_source=price_source,
+            data_window=data_window,
+        )
 
         data_error = validate_price_data(
             backtest_price_data,
@@ -403,6 +401,14 @@ class MarketManagerAgent:
         )
 
         if data_error:
+            market_data_agent = build_market_data_agent_output(
+                ticker=ticker,
+                period="max",
+                price_data=backtest_price_data,
+                price_source=price_source,
+                error=data_error,
+                data_window=data_window,
+            )
             return {
                 "intent": "backtest_query",
                 "strategy": strategy,
@@ -419,6 +425,7 @@ class MarketManagerAgent:
             price_data=backtest_price_data,
             data_window=data_window,
         )
+        _ = market_data_agent
 
         return {
             "intent": "backtest_query",

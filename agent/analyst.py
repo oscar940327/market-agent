@@ -1,3 +1,6 @@
+from agent.report_context import build_single_stock_report_context
+
+
 def format_bool(value: bool) -> str:
     if value:
         return "是"
@@ -12,76 +15,22 @@ def format_single_stock_analysis(analysis_data: dict) -> str:
     if analysis_data["status"] != "success":
         return format_error_message(analysis_data)
 
-    technical = analysis_data["technical_analysis"]
-    signals = analysis_data["signals"]
+    context = build_single_stock_report_context(analysis_data)
+    technical = context["technical_analysis"]
+    signals = context["signals"]
     breakout = signals["breakout"]
     volume_surge = signals["volume_surge"]
     pullback = signals["pullback"]
-    news_items = analysis_data["news"]
-    news_analysis = analysis_data.get(
-        "news_analysis",
-        {
-            "summary": {
-                "total_items": 0,
-                "sentiment": "neutral",
-                "high_importance_count": 0,
-                "top_topics": {},
-            }
-        },
-    )
-    news_summary = news_analysis["summary"]
-    news_events_summary = analysis_data.get("agent_outputs", {}).get("news", {}).get(
-        "news_events_summary"
-    )
-    fundamentals = analysis_data.get(
-        "fundamentals",
-        {
-            "status": "skipped",
-            "summary": {
-                "stance": "unknown",
-                "positives": [],
-                "risks": [],
-            },
-        },
-    )
-    fundamental_summary = fundamentals["summary"]
-    research_profile = analysis_data.get(
-        "research_profile",
-        {
-            "technical_score": 0,
-            "news_score": 0,
-            "fundamental_score": 0,
-            "risk_score": 0,
-            "combined_score": 0,
-            "setup_quality": "unknown",
-            "risk_level": "unknown",
-            "research_confidence": "low",
-            "evidence_quality": {
-                "level": "low",
-                "reason": "證據品質資料不足。",
-            },
-        },
-    )
-    evidence_quality = analysis_data.get(
-        "evidence_quality",
-        research_profile.get(
-            "evidence_quality",
-            {
-                "level": "low",
-                "stock_specific": "unknown",
-                "peer_group": "not_used",
-                "market_wide": "not_used",
-                "data_completeness": "unknown",
-                "signal_clarity": "unknown",
-                "reason": "證據品質資料不足。",
-            },
-        ),
-    )
-    ml_research = analysis_data.get("ml_research") or analysis_data.get(
-        "agent_outputs", {}
-    ).get("ml_research")
-    exit_signal = analysis_data.get("exit_signal")
-    data_freshness = analysis_data.get("data_freshness")
+    news_items = context["news"]
+    news_summary = context["news_summary"]
+    news_events_summary = context["news_events_summary"]
+    fundamentals = context["fundamentals"]
+    fundamental_summary = context["fundamental_summary"]
+    research_profile = context["research_profile"]
+    evidence_quality = context["evidence_quality"]
+    ml_research = context["ml_research"]
+    exit_signal = context["exit_signal"]
+    data_freshness = context["data_freshness"]
 
     lines = [
         f"{analysis_data['ticker']} 單一股票分析",

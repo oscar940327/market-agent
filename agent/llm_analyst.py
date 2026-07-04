@@ -4,6 +4,8 @@ import urllib.error
 import urllib.request
 from typing import Protocol
 
+from agent.report_context import build_single_stock_report_context
+
 
 LLM_ANALYST_SYSTEM_PROMPT = """
 你是 Market Agent 的 LLM Analyst。
@@ -224,33 +226,27 @@ def build_llm_payload(kind: str, data: dict) -> dict:
 
 
 def build_single_stock_payload(data: dict) -> dict:
-    news_analysis = data.get("news_analysis", {})
-    fundamentals = data.get("fundamentals", {})
+    context = build_single_stock_report_context(data)
 
     return {
         "kind": "single_stock",
-        "intent": data.get("intent"),
-        "status": data.get("status"),
-        "ticker": data.get("ticker"),
-        "user_query_as_data": data.get("query"),
-        "execution_plan": data.get("execution_plan", []),
-        "price_source": data.get("price_source"),
-        "technical_analysis": data.get("technical_analysis"),
-        "signals": data.get("signals"),
-        "news_summary": news_analysis.get("summary", {}),
-        "news_events_summary": data.get("agent_outputs", {})
-        .get("news", {})
-        .get("news_events_summary"),
-        "fundamental_summary": fundamentals.get("summary", {}),
-        "ml_research": data.get("ml_research"),
-        "ml_prediction": data.get("ml_prediction"),
-        "exit_signal": data.get("exit_signal"),
-        "data_freshness": data.get("data_freshness"),
-        "research_profile": data.get("research_profile"),
-        "agent_summaries": {
-            name: output.get("summary", {})
-            for name, output in data.get("agent_outputs", {}).items()
-        },
+        "intent": context["intent"],
+        "status": context["status"],
+        "ticker": context["ticker"],
+        "user_query_as_data": context["query"],
+        "execution_plan": context["execution_plan"],
+        "price_source": context["price_source"],
+        "technical_analysis": context["technical_analysis"],
+        "signals": context["signals"],
+        "news_summary": context["news_summary"],
+        "news_events_summary": context["news_events_summary"],
+        "fundamental_summary": context["fundamental_summary"],
+        "ml_research": context["ml_research"],
+        "ml_prediction": context["ml_prediction"],
+        "exit_signal": context["exit_signal"],
+        "data_freshness": context["data_freshness"],
+        "research_profile": context["research_profile"],
+        "agent_summaries": context["agent_summaries"],
     }
 
 

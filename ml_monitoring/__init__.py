@@ -10,6 +10,7 @@ from ml_monitoring.drift import (
     build_drift_report,
     build_drift_report_from_csv,
     build_drift_summary_markdown,
+    build_unavailable_drift_report,
 )
 from ml_monitoring.acceptance import (
     DEFAULT_ACCEPTANCE_THRESHOLDS,
@@ -33,6 +34,7 @@ __all__ = [
     "build_drift_report",
     "build_drift_report_from_csv",
     "build_drift_summary_markdown",
+    "build_unavailable_drift_report",
     "DEFAULT_ACCEPTANCE_THRESHOLDS",
     "build_model_acceptance_email_summary",
     "build_model_acceptance_report",

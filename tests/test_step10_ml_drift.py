@@ -127,3 +127,30 @@ def test_build_ml_drift_report_script_writes_json_and_markdown(tmp_path):
     report = json.loads(json_path.read_text(encoding="utf-8"))
     assert report["recent_days"] == 30
     assert report["baseline_days"] == 365
+
+
+def test_build_ml_drift_report_script_handles_missing_dataset(tmp_path):
+    missing_dataset_path = tmp_path / "missing_training_dataset.csv"
+
+    result = script.main(
+        [
+            "--dataset-path",
+            str(missing_dataset_path),
+            "--output-dir",
+            str(tmp_path),
+            "--recent-days",
+            "30",
+            "--baseline-days",
+            "365",
+            "--skip-freshness",
+        ]
+    )
+
+    json_path = tmp_path / "ml_drift_report_30d_vs_365d_v1.json"
+    report = json.loads(json_path.read_text(encoding="utf-8"))
+
+    assert result == 0
+    assert report["status"] == "unavailable"
+    assert report["dataset_rows"] == 0
+    assert report["alert"]["reason"] == "drift_dataset_unavailable"
+    assert report["warnings"][0]["source"] == "dataset"

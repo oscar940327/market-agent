@@ -81,10 +81,11 @@ def classify_trading_day_freshness(
             "message": f"{label} 找不到最新日期。",
         }
 
-    lag = count_business_days_between(latest_date, today)
+    lag = count_trading_days_between(latest_date, today)
     payload = {
         "latest_date": latest_date.isoformat(),
         "business_day_lag": lag,
+        "trading_day_lag": lag,
     }
 
     if lag >= PRICE_STALE_TRADING_DAYS:
@@ -133,11 +134,12 @@ def classify_dependency_freshness(
             "message": f"{label} 找不到依賴的 {dependency_label} 日期。",
         }
 
-    lag = count_business_days_between(latest_date, dependency_latest_date)
+    lag = count_trading_days_between(latest_date, dependency_latest_date)
     payload = {
         "latest_date": latest_date.isoformat(),
         "dependency_latest_date": dependency_latest_date.isoformat(),
         "business_day_lag": lag,
+        "trading_day_lag": lag,
     }
 
     if lag >= PRICE_STALE_TRADING_DAYS:
@@ -310,6 +312,10 @@ def build_warning_messages(sections: dict[str, dict]) -> list[str]:
 
 
 def count_business_days_between(start: date, end: date) -> int:
+    return count_trading_days_between(start, end)
+
+
+def count_trading_days_between(start: date, end: date) -> int:
     if start >= end:
         return 0
 
@@ -317,9 +323,82 @@ def count_business_days_between(start: date, end: date) -> int:
     count = 0
     while current < end:
         current += timedelta(days=1)
-        if current.weekday() < 5:
+        if is_nyse_trading_day(current):
             count += 1
     return count
+
+
+def is_nyse_trading_day(value: date) -> bool:
+    if value.weekday() >= 5:
+        return False
+
+    return value not in nyse_holidays_for_range(value.year - 1, value.year + 1)
+
+
+def nyse_holidays_for_range(start_year: int, end_year: int) -> set[date]:
+    holidays = set()
+    for year in range(start_year, end_year + 1):
+        holidays.update(nyse_holidays(year))
+    return holidays
+
+
+def nyse_holidays(year: int) -> set[date]:
+    return {
+        observed_fixed_holiday(year, 1, 1),
+        nth_weekday(year, 1, weekday=0, n=3),
+        nth_weekday(year, 2, weekday=0, n=3),
+        easter_sunday(year) - timedelta(days=2),
+        last_weekday(year, 5, weekday=0),
+        observed_fixed_holiday(year, 6, 19),
+        observed_fixed_holiday(year, 7, 4),
+        nth_weekday(year, 9, weekday=0, n=1),
+        nth_weekday(year, 11, weekday=3, n=4),
+        observed_fixed_holiday(year, 12, 25),
+    }
+
+
+def observed_fixed_holiday(year: int, month: int, day: int) -> date:
+    actual = date(year, month, day)
+    if actual.weekday() == 5:
+        return actual - timedelta(days=1)
+    if actual.weekday() == 6:
+        return actual + timedelta(days=1)
+    return actual
+
+
+def nth_weekday(year: int, month: int, *, weekday: int, n: int) -> date:
+    current = date(year, month, 1)
+    while current.weekday() != weekday:
+        current += timedelta(days=1)
+    return current + timedelta(days=7 * (n - 1))
+
+
+def last_weekday(year: int, month: int, *, weekday: int) -> date:
+    if month == 12:
+        current = date(year, 12, 31)
+    else:
+        current = date(year, month + 1, 1) - timedelta(days=1)
+    while current.weekday() != weekday:
+        current -= timedelta(days=1)
+    return current
+
+
+def easter_sunday(year: int) -> date:
+    a = year % 19
+    b = year // 100
+    c = year % 100
+    d = b // 4
+    e = b % 4
+    f = (b + 8) // 25
+    g = (b - f + 1) // 3
+    h = (19 * a + b - d - g + 15) % 30
+    i = c // 4
+    k = c % 4
+    l = (32 + 2 * e + 2 * i - h - k) % 7
+    m = (a + 11 * h + 22 * l) // 451
+    month = (h + l - 7 * m + 114) // 31
+    day = ((h + l - 7 * m + 114) % 31) + 1
+    return date(year, month, day)
 
 
 def coerce_datetime(value: datetime | date) -> datetime:

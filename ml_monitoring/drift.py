@@ -38,6 +38,16 @@ def build_drift_report_from_csv(
     generated_at: datetime | None = None,
     thresholds: dict | None = None,
 ) -> dict:
+    csv_path = Path(csv_path)
+    if not csv_path.exists():
+        return build_unavailable_drift_report(
+            csv_path=csv_path,
+            recent_days=recent_days,
+            baseline_days=baseline_days,
+            freshness_report=freshness_report,
+            generated_at=generated_at,
+        )
+
     dataset = pd.read_csv(csv_path)
     return build_drift_report(
         dataset,
@@ -47,6 +57,62 @@ def build_drift_report_from_csv(
         generated_at=generated_at,
         thresholds=thresholds,
     )
+
+
+def build_unavailable_drift_report(
+    *,
+    csv_path: str | Path,
+    recent_days: int,
+    baseline_days: int,
+    freshness_report: dict | None = None,
+    generated_at: datetime | None = None,
+) -> dict:
+    generated = generated_at or datetime.now(UTC)
+    warning = {
+        "source": "dataset",
+        "status": "unavailable",
+        "metric": "training_dataset",
+        "value": str(csv_path),
+        "threshold": "dataset_file_exists",
+        "message": f"Training dataset not found: {csv_path}",
+    }
+    data_freshness_drift = build_data_freshness_drift(freshness_report)
+    warnings = [warning] + data_freshness_drift["warnings"]
+    return {
+        "report_version": "ml_drift_report_v1",
+        "status": "unavailable",
+        "generated_at": generated.replace(microsecond=0).isoformat(),
+        "recent_days": recent_days,
+        "baseline_days": baseline_days,
+        "dataset_rows": 0,
+        "recent_rows": 0,
+        "baseline_rows": 0,
+        "date_range": {"start": None, "end": None},
+        "feature_drift": {"features": [], "warnings": []},
+        "market_regime_drift": {
+            "latest_market_regime": None,
+            "latest_qqq_above_ma200": None,
+            "latest_regime_changed": None,
+            "recent_regime_counts": {},
+            "recent_qqq_above_ma200_rate": None,
+            "recent_regime_changed_rate": None,
+            "warnings": [],
+        },
+        "news_coverage_drift": {
+            "recent_news_missing_ratio": None,
+            "recent_avg_news_count_30d": None,
+            "baseline_avg_news_count_30d": None,
+            "news_count_ratio": None,
+            "warnings": [],
+        },
+        "data_freshness_drift": data_freshness_drift,
+        "warnings": warnings,
+        "alert": {
+            "should_alert": True,
+            "severity": "warning",
+            "reason": "drift_dataset_unavailable",
+        },
+    }
 
 
 def build_drift_report(

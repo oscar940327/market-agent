@@ -11,6 +11,7 @@ from market_regime.freshness import (
     classify_ml_training_freshness,
     classify_news_freshness,
     classify_trading_day_freshness,
+    is_nyse_trading_day,
 )
 from scripts.check_freshness import apply_scope
 
@@ -24,6 +25,31 @@ def test_price_freshness_marks_one_trading_day_as_warning():
 
     assert result["status"] == "warning"
     assert result["business_day_lag"] == 1
+
+
+def test_price_freshness_ignores_nyse_independence_day_observed():
+    result = classify_trading_day_freshness(
+        today=date(2026, 7, 3),
+        latest_date=date(2026, 7, 2),
+        label="daily_prices",
+    )
+
+    assert is_nyse_trading_day(date(2026, 7, 3)) is False
+    assert result["status"] == "fresh"
+    assert result["business_day_lag"] == 0
+    assert result["trading_day_lag"] == 0
+
+
+def test_price_freshness_counts_next_nyse_trading_day_after_holiday():
+    result = classify_trading_day_freshness(
+        today=date(2026, 7, 6),
+        latest_date=date(2026, 7, 2),
+        label="daily_prices",
+    )
+
+    assert result["status"] == "warning"
+    assert result["business_day_lag"] == 1
+    assert result["trading_day_lag"] == 1
 
 
 def test_news_freshness_marks_no_recent_news_as_stale():

@@ -3,7 +3,14 @@ import pandas as pd
 import agent.market_manager as market_manager_module
 from agent.experts.backtest_agent import select_backtest_strategy
 from agent.experts.technical_agent import run_technical_agent
+from agent.evidence_agent import run_evidence_agent
+from agent.market_data_agent import (
+    build_market_data_agent_output,
+    build_price_data_window,
+    validate_price_data,
+)
 from agent.market_manager import MarketManagerAgent
+from agent.orchestration_policy import build_single_stock_orchestration_summary
 
 
 def make_price_data(closes, volumes=None):
@@ -50,6 +57,55 @@ def test_backtest_agent_selects_strategy_from_user_query():
     assert select_backtest_strategy("MU 放量後勝率如何？") == "volume_surge"
     assert select_backtest_strategy("MU 拉回策略以前表現怎麼樣？") == "pullback"
     assert select_backtest_strategy("MU 以前表現怎麼樣？") == "unknown"
+
+
+def test_market_data_agent_wraps_successful_price_data():
+    price_data = make_price_data(list(range(1, 61)))
+    price_source = {"provider": "test", "attempted_providers": ["test"], "errors": []}
+
+    result = build_market_data_agent_output(
+        ticker="MU",
+        period="1y",
+        price_data=price_data,
+        price_source=price_source,
+    )
+
+    assert result["agent"] == "market_data"
+    assert result["status"] == "success"
+    assert result["payload"]["price_data"].equals(price_data)
+    assert result["payload"]["price_source"] == price_source
+    assert result["metadata"]["provider"] == "test"
+    assert result["fallback_used"] is False
+
+
+def test_market_data_agent_wraps_validation_error_as_unavailable():
+    price_data = make_price_data([1, 2, 3])
+    error = validate_price_data(price_data, ticker="MU", min_rows=50)
+
+    result = build_market_data_agent_output(
+        ticker="MU",
+        period="1y",
+        price_data=price_data,
+        price_source={"provider": "test"},
+        error=error,
+    )
+
+    assert result["status"] == "unavailable"
+    assert result["payload"]["error"]["status"] == "not_enough_price_data"
+    assert result["warnings"]
+    assert result["errors"] == []
+
+
+def test_market_data_agent_builds_required_history_window():
+    price_data = make_price_data(list(range(1, 6001)))
+
+    window_data, data_window = build_price_data_window(price_data)
+
+    assert len(window_data) <= len(price_data)
+    assert data_window["required_history_years"] == 15
+    assert "data_start_date" in data_window
+    assert "data_end_date" in data_window
+    assert "target_start_date" in data_window
 
 
 def test_market_manager_single_stock_aggregates_expert_outputs(monkeypatch):
@@ -128,12 +184,22 @@ def test_market_manager_single_stock_aggregates_expert_outputs(monkeypatch):
         "news_skipped",
         "fundamental_skipped",
     ]
+    assert result["orchestration"]["workflow"] == "single_stock"
+    assert result["orchestration"]["overall_status"] == "success"
+    assert result["orchestration"]["required_agents"] == [
+        "market_data",
+        "technical",
+        "evidence",
+    ]
+    assert result["orchestration"]["failed_required_agents"] == []
+    assert result["orchestration"]["should_alert"] is False
     assert set(result["agent_outputs"]) == {
         "technical",
         "news",
         "fundamental",
         "backtest_evidence",
         "ml_research",
+        "evidence",
         "exit_signal",
     }
     assert result["agent_outputs"]["technical"]["agent"] == "technical"
@@ -146,16 +212,164 @@ def test_market_manager_single_stock_aggregates_expert_outputs(monkeypatch):
     assert "research_profile" in result
     assert "evidence_quality" in result
     assert result["evidence_quality"]["peer_group"] == "not_used"
+    assert (
+        result["agent_outputs"]["evidence"]["payload"]["research_profile"]
+        == result["research_profile"]
+    )
+    assert (
+        result["agent_outputs"]["evidence"]["payload"]["evidence_quality"]
+        == result["evidence_quality"]
+    )
     assert "backtest_evidence" in result
     assert "ml_research" in result
     assert result["exit_signal"]["status"] == "success"
-    assert result["agent_outputs"]["ml_research"] == result["ml_research"]
+    for agent_output in result["agent_outputs"].values():
+        assert set(
+            [
+                "agent",
+                "status",
+                "summary",
+                "payload",
+                "warnings",
+                "errors",
+                "metadata",
+                "fallback_used",
+            ]
+        ).issubset(agent_output)
+    assert result["agent_outputs"]["ml_research"]["payload"] == result["ml_research"]
     assert result["agent_outputs"]["exit_signal"]["summary"]["exit_signal"] in {
         "hold",
         "watch",
         "reduce",
         "exit",
     }
+
+
+def test_orchestration_summary_tracks_required_and_optional_agent_statuses():
+    summary = build_single_stock_orchestration_summary(
+        {
+            "market_data": {
+                "status": "success",
+                "warnings": [],
+                "fallback_used": False,
+            },
+            "technical": {
+                "status": "success",
+                "warnings": [],
+                "fallback_used": False,
+            },
+            "evidence": {
+                "status": "success",
+                "warnings": ["peer_group_not_used"],
+                "fallback_used": False,
+            },
+            "news": {
+                "status": "unavailable",
+                "warnings": ["news source unavailable"],
+                "fallback_used": False,
+            },
+            "fundamental": {
+                "status": "skipped",
+                "warnings": [],
+                "fallback_used": False,
+            },
+            "backtest_evidence": {
+                "status": "skipped",
+                "warnings": [],
+                "fallback_used": False,
+            },
+            "ml_research": {
+                "status": "success",
+                "warnings": ["runtime fallback"],
+                "fallback_used": True,
+            },
+            "exit_signal": {
+                "status": "success",
+                "warnings": [],
+                "fallback_used": False,
+            },
+        }
+    )
+
+    assert summary["overall_status"] == "success"
+    assert summary["failed_required_agents"] == []
+    assert summary["unavailable_optional_agents"] == ["news"]
+    assert summary["fallback_agents"] == ["ml_research"]
+    assert summary["warning_agents"] == ["evidence", "news", "ml_research"]
+    assert summary["should_alert"] is False
+
+
+def test_orchestration_summary_alerts_on_required_agent_failure():
+    summary = build_single_stock_orchestration_summary(
+        {
+            "market_data": {
+                "status": "failed",
+                "warnings": [],
+                "fallback_used": False,
+            },
+            "technical": {
+                "status": "success",
+                "warnings": [],
+                "fallback_used": False,
+            },
+            "evidence": {
+                "status": "success",
+                "warnings": [],
+                "fallback_used": False,
+            },
+        }
+    )
+
+    assert summary["overall_status"] == "failed"
+    assert summary["failed_required_agents"] == ["market_data"]
+    assert summary["should_alert"] is True
+
+
+def test_evidence_agent_wraps_research_profile_without_changing_shape():
+    technical = {
+        "short_term_trend": "strong",
+        "is_above_ma20": True,
+        "momentum_state": "bullish_momentum",
+        "rsi14": 55,
+    }
+    signals = {
+        "breakout": {"is_breakout": False},
+        "volume_surge": {"is_volume_surge": False},
+        "pullback": {"is_pullback": False},
+    }
+    news_analysis = {
+        "summary": {
+            "total_items": 0,
+            "sentiment": "neutral",
+            "sentiment_counts": {},
+            "top_topics": {},
+            "high_importance_count": 0,
+        }
+    }
+    fundamentals = {
+        "status": "skipped",
+        "metrics": {},
+        "summary": {"stance": "unknown", "positives": [], "risks": []},
+    }
+
+    result = run_evidence_agent(
+        technical=technical,
+        signals=signals,
+        news_analysis=news_analysis,
+        fundamentals=fundamentals,
+        price_history_rows=60,
+        include_news=False,
+        include_fundamentals=False,
+    )
+
+    assert result["agent"] == "evidence"
+    assert result["status"] == "success"
+    assert result["payload"]["research_profile"]["evidence_quality"] == result[
+        "payload"
+    ]["evidence_quality"]
+    assert result["summary"]["evidence_level"] == result["payload"][
+        "evidence_quality"
+    ]["level"]
 
 
 def test_market_manager_single_stock_adds_backtest_evidence_for_triggered_signals(monkeypatch):
@@ -216,7 +430,10 @@ def test_market_manager_single_stock_adds_backtest_evidence_for_triggered_signal
         "10",
         "20",
     }
-    assert result["agent_outputs"]["backtest_evidence"] == result["backtest_evidence"]
+    assert (
+        result["agent_outputs"]["backtest_evidence"]["payload"]
+        == result["backtest_evidence"]
+    )
 
 
 def test_market_manager_single_stock_skips_backtest_evidence_fetch_without_triggered_signals(monkeypatch):

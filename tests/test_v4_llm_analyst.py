@@ -1,8 +1,10 @@
 from agent.llm_analyst import (
     OpenRouterChatClient,
+    build_llm_payload,
     build_llm_user_prompt,
     extract_chat_completion_text,
 )
+from agent.report_context import build_single_stock_report_context
 from agent.reporting import build_report, get_llm_client_from_env
 import api
 
@@ -160,6 +162,60 @@ def test_llm_prompt_uses_structured_payload_and_safety_instructions():
     assert "ML training dataset 已超過 7 天未更新" in prompt
     assert "只能使用 payload 中已存在的資料" in prompt
     assert "不要補充 payload 之外的新聞、財報、價格或推論數字" in prompt
+
+
+def test_single_stock_report_context_reads_wrapped_agent_outputs():
+    data = make_success_single_stock_data()
+    news_events_summary = {
+        "status": "success",
+        "total_events": 2,
+        "overall_sentiment": "positive",
+    }
+    ml_research = {"status": "success", "targets": {}}
+    data["agent_outputs"]["news"] = {
+        "agent": "news",
+        "status": "success",
+        "summary": {"sentiment": "positive"},
+        "payload": {"news_events_summary": news_events_summary},
+        "warnings": [],
+        "errors": [],
+        "metadata": {},
+        "fallback_used": False,
+    }
+    data["agent_outputs"]["ml_research"] = {
+        "agent": "ml_research",
+        "status": "success",
+        "summary": {},
+        "payload": ml_research,
+        "warnings": [],
+        "errors": [],
+        "metadata": {},
+        "fallback_used": False,
+    }
+    data.pop("ml_research", None)
+
+    context = build_single_stock_report_context(data)
+
+    assert context["news_events_summary"] == news_events_summary
+    assert context["ml_research"] == ml_research
+    assert context["agent_summaries"]["news"] == {"sentiment": "positive"}
+
+
+def test_single_stock_llm_payload_uses_report_context():
+    data = make_success_single_stock_data()
+    data["agent_outputs"]["evidence"] = {
+        "agent": "evidence",
+        "status": "success",
+        "summary": {"evidence_level": "medium"},
+    }
+
+    payload = build_llm_payload("single_stock", data)
+
+    assert payload["kind"] == "single_stock"
+    assert payload["ticker"] == data["ticker"]
+    assert payload["news_summary"] == data["news_analysis"]["summary"]
+    assert payload["fundamental_summary"] == data["fundamentals"]["summary"]
+    assert payload["agent_summaries"]["evidence"] == {"evidence_level": "medium"}
 
 
 def test_build_report_uses_injected_llm_client():
