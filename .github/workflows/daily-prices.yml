@@ -39,6 +39,9 @@ jobs:
       - name: Run daily prices pipeline
         run: python scripts/run_daily_pipeline.py --only prices
 
+      - name: Run daily fundamentals pipeline
+        run: python scripts/run_daily_pipeline.py --only fundamentals
+
       - name: Send failure alert
         if: failure()
         run: >

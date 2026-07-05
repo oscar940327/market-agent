@@ -1,4 +1,5 @@
-from skills.fundamental_skill import get_basic_fundamentals
+from data_store import fetch_latest_fundamental_snapshot
+from skills.fundamental_skill import get_basic_fundamentals, summarize_fundamentals
 
 
 SKIPPED_FUNDAMENTALS = {
@@ -64,7 +65,53 @@ def get_static_fundamental_fallback(ticker: str) -> dict | None:
     }
 
 
+def fetch_supabase_fundamentals(ticker: str) -> dict | None:
+    try:
+        snapshot = fetch_latest_fundamental_snapshot(ticker=ticker)
+    except Exception:
+        return None
+
+    if not snapshot:
+        return None
+
+    return build_fundamentals_from_snapshot(snapshot)
+
+
+def build_fundamentals_from_snapshot(snapshot: dict) -> dict:
+    metrics = {
+        "market_cap": snapshot.get("market_cap"),
+        "trailing_pe": snapshot.get("trailing_pe"),
+        "forward_pe": snapshot.get("forward_pe"),
+        "price_to_sales": snapshot.get("price_to_sales"),
+        "revenue_growth": snapshot.get("revenue_growth"),
+        "earnings_growth": snapshot.get("earnings_growth"),
+        "gross_margins": snapshot.get("gross_margins"),
+        "operating_margins": snapshot.get("operating_margins"),
+        "profit_margins": snapshot.get("profit_margins"),
+        "free_cashflow": snapshot.get("free_cashflow"),
+        "debt_to_equity": snapshot.get("debt_to_equity"),
+        "earnings_date": snapshot.get("earnings_date"),
+        "sector": snapshot.get("sector"),
+        "industry": snapshot.get("industry"),
+    }
+    summary = snapshot.get("summary") or summarize_fundamentals(metrics)
+
+    return {
+        "status": "success",
+        "provider": "supabase_fundamental_snapshots",
+        "source_provider": snapshot.get("provider"),
+        "as_of": snapshot.get("as_of_date"),
+        "fetched_at": snapshot.get("fetched_at"),
+        "metrics": metrics,
+        "summary": summary,
+    }
+
+
 def fetch_fundamentals(ticker: str) -> dict:
+    supabase_fundamentals = fetch_supabase_fundamentals(ticker)
+    if supabase_fundamentals:
+        return supabase_fundamentals
+
     try:
         return get_basic_fundamentals(ticker)
     except Exception as error:

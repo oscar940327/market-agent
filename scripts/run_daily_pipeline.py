@@ -30,7 +30,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--only",
-        choices=["all", "prices", "news", "freshness"],
+        choices=["all", "prices", "fundamentals", "news", "freshness"],
         default="all",
         help="Run one pipeline slice. Default: all.",
     )
@@ -66,6 +66,9 @@ def build_pipeline_steps(args: argparse.Namespace) -> list[PipelineStep]:
 
     if args.only in {"all", "prices"}:
         steps.extend(build_price_steps(args))
+
+    if args.only in {"all", "fundamentals"}:
+        steps.extend(build_fundamental_steps(args))
 
     if args.only == "freshness":
         steps.append(
@@ -177,6 +180,18 @@ def build_news_steps(args: argparse.Namespace) -> list[PipelineStep]:
             core=False,
             retryable=True,
         ),
+    ]
+
+
+def build_fundamental_steps(args: argparse.Namespace) -> list[PipelineStep]:
+    ticker_args = optional_tickers_and_limit(args)
+    return [
+        PipelineStep(
+            name="fundamentals",
+            command=script_command("ingest_fundamentals.py", *ticker_args),
+            core=False,
+            retryable=True,
+        )
     ]
 
 

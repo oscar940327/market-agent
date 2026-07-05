@@ -260,6 +260,105 @@ def upsert_ml_predictions(
     return {"status": "success", "upserted_count": total_count}
 
 
+def upsert_fundamental_snapshots(
+    records: list[dict],
+    *,
+    supabase_url: str | None = None,
+    supabase_key: str | None = None,
+    open_url=urlopen,
+    chunk_size: int = 100,
+) -> dict:
+    if not records:
+        return {"status": "skipped", "upserted_count": 0, "message": "No records."}
+
+    base_url, api_key = resolve_supabase_credentials(
+        supabase_url=supabase_url,
+        supabase_key=supabase_key,
+    )
+    total_count = 0
+
+    for chunk in chunk_records(records, chunk_size):
+        endpoint = (
+            f"{base_url}/rest/v1/fundamental_snapshots?"
+            "on_conflict=ticker,as_of_date,provider"
+        )
+        payload = json.dumps(chunk, allow_nan=False).encode("utf-8")
+        request = Request(
+            endpoint,
+            data=payload,
+            method="POST",
+            headers={
+                "apikey": api_key,
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+                "Prefer": "resolution=merge-duplicates,return=minimal",
+            },
+        )
+
+        try:
+            with open_url(request, timeout=30) as response:
+                response.read()
+        except HTTPError as exc:
+            body = exc.read().decode("utf-8", errors="replace")
+            return {
+                "status": "error",
+                "upserted_count": total_count,
+                "message": f"Supabase upsert failed with HTTP {exc.code}: {body}",
+            }
+        except Exception as exc:
+            return {
+                "status": "error",
+                "upserted_count": total_count,
+                "message": f"Supabase upsert failed: {exc}",
+            }
+
+        total_count += len(chunk)
+
+    return {"status": "success", "upserted_count": total_count}
+
+
+def fetch_latest_fundamental_snapshot(
+    *,
+    ticker: str,
+    provider: str | None = None,
+    supabase_url: str | None = None,
+    supabase_key: str | None = None,
+    open_url=urlopen,
+) -> dict | None:
+    base_url, api_key = resolve_supabase_credentials(
+        supabase_url=supabase_url,
+        supabase_key=supabase_key,
+    )
+    query = {
+        "select": "*",
+        "ticker": f"eq.{ticker.upper()}",
+        "status": "eq.success",
+        "order": "as_of_date.desc,fetched_at.desc",
+        "limit": "1",
+    }
+    if provider:
+        query["provider"] = f"eq.{provider}"
+
+    endpoint = f"{base_url}/rest/v1/fundamental_snapshots?{urlencode(query)}"
+    request = Request(
+        endpoint,
+        method="GET",
+        headers={
+            "apikey": api_key,
+            "Authorization": f"Bearer {api_key}",
+            "Accept": "application/json",
+        },
+    )
+
+    with open_url(request, timeout=30) as response:
+        rows = json.loads(response.read().decode("utf-8"))
+
+    if not rows:
+        return None
+
+    return rows[0]
+
+
 def fetch_latest_ml_prediction(
     *,
     ticker: str,
