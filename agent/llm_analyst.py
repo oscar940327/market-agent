@@ -325,6 +325,7 @@ def build_theme_payload(data: dict) -> dict:
         "sector_summary": data.get("sector_summary"),
         "theme_news_summary": summarize_theme_news(successful_results),
         "theme_fundamental_summary": summarize_theme_fundamentals(successful_results),
+        "theme_ml_reference": data.get("theme_ml_reference") or data.get("ml_research"),
         "evidence_quality": data.get("evidence_quality", {}),
         "top_results": top_results,
     }

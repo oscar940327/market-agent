@@ -137,6 +137,7 @@ def run_theme_analysis(user_query: str) -> dict:
     )
     sector_summary = build_sector_summary(sorted_results)
     evidence_quality = build_theme_evidence_quality(sorted_results)
+    theme_ml_reference = build_theme_ml_reference(sorted_results)
 
     return {
         "intent": "industry_trend",
@@ -152,6 +153,8 @@ def run_theme_analysis(user_query: str) -> dict:
         },
         "sector_summary": sector_summary,
         "evidence_quality": evidence_quality,
+        "theme_ml_reference": theme_ml_reference,
+        "ml_research": theme_ml_reference,
         "results": sorted_results,
     }
 
@@ -242,9 +245,198 @@ def build_theme_single_stock_kwargs(ticker: str, user_query: str) -> dict:
     }
     signature = inspect.signature(run_single_stock_analysis)
     if "include_ml" in signature.parameters:
-        kwargs["include_ml"] = False
+        kwargs["include_ml"] = True
 
     return kwargs
+
+
+def build_theme_ml_reference(results: list[dict]) -> dict:
+    successful_results = [result for result in results if result["status"] == "success"]
+    ml_items = []
+
+    for result in successful_results:
+        ml_research = (result.get("analysis") or {}).get("ml_research") or {}
+        if ml_research.get("status") != "success":
+            continue
+        ml_items.append({"ticker": result["ticker"], "ml_research": ml_research})
+
+    if not successful_results:
+        return {
+            "status": "unavailable",
+            "source": {"type": "theme_aggregate", "reason": "no_successful_tickers"},
+            "coverage": {"covered_ticker_count": 0, "total_ticker_count": 0, "coverage_ratio": 0},
+            "summary": "Theme ML Reference is unavailable because no tickers were analyzed successfully.",
+        }
+
+    if not ml_items:
+        return {
+            "status": "skipped",
+            "source": {"type": "skipped", "reason": "no_constituent_ml_reference"},
+            "coverage": {
+                "covered_ticker_count": 0,
+                "total_ticker_count": len(successful_results),
+                "coverage_ratio": 0,
+            },
+            "summary": "Theme ML Reference was skipped because no constituent ML references were available.",
+        }
+
+    targets = {
+        "up_5d": aggregate_probability_target(ml_items, "up_5d"),
+        "up_10d": aggregate_probability_target(ml_items, "up_10d"),
+        "up_20d": aggregate_probability_target(ml_items, "up_20d"),
+        "large_drop_20d": aggregate_probability_target(ml_items, "large_drop_20d"),
+    }
+    up20_counts = count_signal_labels(ml_items, "up_20d")
+    freshness_values = [
+        ((item["ml_research"].get("source") or {}).get("prediction_freshness"))
+        for item in ml_items
+    ]
+    freshness_values = [value for value in freshness_values if value]
+
+    coverage_ratio = len(ml_items) / len(successful_results)
+    return {
+        "status": "success",
+        "usage_policy": "reference_only",
+        "source": {
+            "type": "theme_aggregate",
+            "constituent_source": "saved_daily_prediction",
+            "prediction_freshness": classify_theme_ml_freshness(freshness_values),
+        },
+        "coverage": {
+            "covered_ticker_count": len(ml_items),
+            "total_ticker_count": len(successful_results),
+            "coverage_ratio": round(coverage_ratio, 4),
+            "covered_tickers": [item["ticker"] for item in ml_items],
+        },
+        "targets": targets,
+        "theme_signal": classify_theme_ml_signal(targets, up20_counts),
+        "constituent_signal_counts": up20_counts,
+        "summary": build_theme_ml_summary(targets, len(ml_items), len(successful_results)),
+    }
+
+
+def aggregate_probability_target(ml_items: list[dict], target_name: str) -> dict:
+    values = []
+    labels = []
+    qualities = []
+
+    for item in ml_items:
+        target = ((item["ml_research"].get("targets") or {}).get(target_name)) or {}
+        probability = target.get("probability")
+        if probability is None:
+            continue
+        values.append(float(probability))
+        labels.append(target.get("signal_label") or "unknown")
+        qualities.append(target.get("signal_quality") or "unknown")
+
+    if not values:
+        return {
+            "probability": None,
+            "probability_percent": None,
+            "signal_label": "unknown",
+            "signal_quality": "unknown",
+            "sample_size": 0,
+        }
+
+    probability = sum(values) / len(values)
+    return {
+        "probability": probability,
+        "probability_percent": round(probability * 100, 1),
+        "signal_label": classify_theme_target_label(target_name, probability),
+        "signal_quality": aggregate_signal_quality(qualities),
+        "sample_size": len(values),
+        "constituent_label_counts": count_values(labels),
+    }
+
+
+def classify_theme_target_label(target_name: str, probability: float) -> str:
+    if target_name == "large_drop_20d":
+        if probability >= 0.45:
+            return "high large-drop risk"
+        if probability >= 0.30:
+            return "medium large-drop risk"
+        if probability >= 0.18:
+            return "low-to-medium large-drop risk"
+        return "low large-drop risk"
+
+    if probability >= 0.60:
+        return "bullish tilt"
+    if probability >= 0.53:
+        return "slightly bullish"
+    if probability <= 0.40:
+        return "bearish tilt"
+    if probability <= 0.47:
+        return "slightly bearish"
+    return "unclear direction"
+
+
+def aggregate_signal_quality(qualities: list[str]) -> str:
+    if not qualities:
+        return "unknown"
+    if "high" in qualities:
+        return "high"
+    if "medium" in qualities:
+        return "medium"
+    if "low_to_medium" in qualities:
+        return "low_to_medium"
+    if "low" in qualities:
+        return "low"
+    return "unknown"
+
+
+def count_signal_labels(ml_items: list[dict], target_name: str) -> dict:
+    labels = []
+    for item in ml_items:
+        target = ((item["ml_research"].get("targets") or {}).get(target_name)) or {}
+        labels.append(target.get("signal_label") or "unknown")
+    return count_values(labels)
+
+
+def count_values(values: list[str]) -> dict:
+    counts = {}
+    for value in values:
+        counts[value] = counts.get(value, 0) + 1
+    return counts
+
+
+def classify_theme_ml_freshness(freshness_values: list[str]) -> str:
+    if not freshness_values:
+        return "unknown"
+    normalized = [str(value).lower() for value in freshness_values]
+    if "missing" in normalized:
+        return "missing"
+    if "stale" in normalized:
+        return "stale"
+    if "warning" in normalized:
+        return "warning"
+    if all(value == "fresh" for value in normalized):
+        return "fresh"
+    return "unknown"
+
+
+def classify_theme_ml_signal(targets: dict, up20_counts: dict) -> str:
+    up20 = (targets.get("up_20d") or {}).get("probability")
+    drop20 = (targets.get("large_drop_20d") or {}).get("probability")
+
+    if drop20 is not None and drop20 >= 0.45:
+        return "risk_high"
+    if up20 is not None and up20 >= 0.58:
+        return "bullish"
+    if up20 is not None and up20 <= 0.45:
+        return "bearish"
+    if up20_counts.get("bullish tilt", 0) or up20_counts.get("slightly bullish", 0):
+        return "mixed"
+    return "unclear"
+
+
+def build_theme_ml_summary(targets: dict, covered_count: int, total_count: int) -> str:
+    up20 = (targets.get("up_20d") or {}).get("probability_percent")
+    drop20 = (targets.get("large_drop_20d") or {}).get("probability_percent")
+    return (
+        f"Theme ML Reference aggregates saved predictions from {covered_count}/{total_count} "
+        f"constituents. Average 20-day upside probability is {up20}%, "
+        f"and average 20-day large-drop risk is {drop20}%."
+    )
 
 
 def classify_sector_breadth(positive_breadth: float) -> str:

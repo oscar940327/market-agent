@@ -3,6 +3,7 @@ import pandas as pd
 from agent.rule_based_router import detect_intent
 from agent.exit_signal import build_exit_signal
 import agent.experts.fundamental_agent as fundamental_agent_module
+from agent.reporting import build_report
 from agent.research_profile import build_research_profile
 from backtesting.metrics import calculate_backtest_metrics
 from backtesting.evidence import build_backtest_evidence_quality
@@ -462,6 +463,7 @@ def test_run_theme_analysis_scans_matched_theme(monkeypatch):
                 "volume_surge": {"is_volume_surge": False},
                 "pullback": {"is_pullback": False},
             },
+            "ml_research": make_theme_test_ml_research(ticker),
         }
 
     monkeypatch.setattr(
@@ -482,7 +484,94 @@ def test_run_theme_analysis_scans_matched_theme(monkeypatch):
     assert captured_tickers == ["CRWD", "FTNT", "PANW", "ZS"]
     assert all(option["include_news"] is True for option in captured_options)
     assert all(option["include_fundamentals"] is True for option in captured_options)
-    assert all(option["include_ml"] is False for option in captured_options)
+    assert all(option["include_ml"] is True for option in captured_options)
+    assert result["theme_ml_reference"]["status"] == "success"
+    assert result["theme_ml_reference"]["source"]["type"] == "theme_aggregate"
+    assert result["theme_ml_reference"]["coverage"]["covered_ticker_count"] == 4
+    assert result["theme_ml_reference"]["targets"]["up_20d"]["sample_size"] == 4
+    assert result["ml_research"] == result["theme_ml_reference"]
+
+
+def make_theme_test_ml_research(ticker: str) -> dict:
+    base_probability = 0.55 if ticker in {"CRWD", "PANW"} else 0.45
+    return {
+        "status": "success",
+        "source": {
+            "type": "saved_daily_prediction",
+            "prediction_freshness": "fresh",
+        },
+        "targets": {
+            "up_5d": {
+                "probability": base_probability,
+                "probability_percent": round(base_probability * 100, 1),
+                "signal_label": "slightly bullish" if base_probability > 0.5 else "slightly bearish",
+                "signal_quality": "medium",
+            },
+            "up_10d": {
+                "probability": base_probability,
+                "probability_percent": round(base_probability * 100, 1),
+                "signal_label": "slightly bullish" if base_probability > 0.5 else "slightly bearish",
+                "signal_quality": "medium",
+            },
+            "up_20d": {
+                "probability": base_probability,
+                "probability_percent": round(base_probability * 100, 1),
+                "signal_label": "slightly bullish" if base_probability > 0.5 else "slightly bearish",
+                "signal_quality": "medium",
+            },
+            "large_drop_20d": {
+                "probability": 0.25,
+                "probability_percent": 25,
+                "signal_label": "low-to-medium large-drop risk",
+                "signal_quality": "medium",
+            },
+        },
+    }
+
+
+def test_theme_report_inserts_ml_reference_section_when_llm_omits_it():
+    data = {
+        "intent": "industry_trend",
+        "status": "success",
+        "theme_name": "記憶體 / 儲存",
+        "query": "記憶體類股現在適合進場嗎",
+        "scan_scope": {"available_ticker_count": 1, "scanned_ticker_count": 1, "scan_limit": None},
+        "sector_summary": {
+            "successful_count": 1,
+            "average_score": 0,
+            "strongest_ticker": "MU",
+            "positive_breadth": 0,
+            "breadth_label": "weak_breadth",
+        },
+        "evidence_quality": {"level": "medium"},
+        "results": [],
+        "theme_ml_reference": {
+            "status": "success",
+            "source": {"type": "theme_aggregate", "prediction_freshness": "fresh"},
+            "coverage": {"covered_ticker_count": 1, "total_ticker_count": 1},
+            "targets": {
+                "up_5d": {"probability_percent": 45.0, "signal_label": "slightly bearish"},
+                "up_10d": {"probability_percent": 46.0, "signal_label": "slightly bearish"},
+                "up_20d": {"probability_percent": 48.0, "signal_label": "unclear direction"},
+                "large_drop_20d": {"probability_percent": 55.0, "signal_label": "high large-drop risk"},
+            },
+            "theme_signal": "risk_high",
+            "constituent_signal_counts": {"unclear direction": 1},
+        },
+    }
+
+    class FakeClient:
+        provider = "fake"
+        model = "fake"
+
+        def generate(self, system_prompt, user_prompt):
+            return "主題摘要\n\n風險提醒\n- test"
+
+    result = build_report(kind="theme", data=data, analyst_mode="llm", llm_client=FakeClient())
+
+    assert "ML Reference" in result["report"]
+    assert "ML 覆蓋：1/1 檔" in result["report"]
+    assert "aggregated / fresh" in result["report"]
 
 
 def test_analyze_news_items_classifies_topic_sentiment_and_importance():

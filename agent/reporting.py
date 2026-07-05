@@ -131,6 +131,9 @@ def build_report(
 
 
 def apply_required_report_sections(*, kind: str, data: dict, report: str) -> str:
+    if kind == "theme" and data.get("status") == "success":
+        return ensure_theme_ml_reference_section(data=data, report=report)
+
     if kind != "single_stock" or data.get("status") != "success":
         return report
 
@@ -150,6 +153,70 @@ def apply_required_report_sections(*, kind: str, data: dict, report: str) -> str
 
     section = format_required_exit_signal_section(context.get("exit_signal"))
     return insert_section_before_summary(report, section)
+
+
+def ensure_theme_ml_reference_section(*, data: dict, report: str) -> str:
+    ml_reference = data.get("theme_ml_reference") or data.get("ml_research") or {}
+    if ml_reference.get("status") != "success":
+        return report
+    if "ML Reference" in report:
+        return report
+
+    section = format_theme_ml_reference_section(ml_reference)
+    return insert_theme_section_before_risk(report, section)
+
+
+def format_theme_ml_reference_section(ml_reference: dict) -> str:
+    coverage = ml_reference.get("coverage") or {}
+    source = ml_reference.get("source") or {}
+    targets = ml_reference.get("targets") or {}
+    signal_counts = ml_reference.get("constituent_signal_counts") or {}
+
+    lines = [
+        "ML Reference",
+        (
+            "本主題 ML Reference 來自主題內個股的已儲存每日預測彙總，"
+            "用來輔助判斷主題短線機率與風險。"
+        ),
+        "",
+        f"- ML 覆蓋：{coverage.get('covered_ticker_count', 0)}/{coverage.get('total_ticker_count', 0)} 檔。",
+        f"- ML 資料狀態：aggregated / {source.get('prediction_freshness', 'unknown')}。",
+        format_theme_ml_probability_line("5 個交易日平均上漲機率", targets.get("up_5d")),
+        format_theme_ml_probability_line("10 個交易日平均上漲機率", targets.get("up_10d")),
+        format_theme_ml_probability_line("20 個交易日平均上漲機率", targets.get("up_20d")),
+        format_theme_ml_probability_line("20 個交易日內平均大跌風險", targets.get("large_drop_20d")),
+        f"- 主題 ML 判斷：{ml_reference.get('theme_signal', 'unknown')}。",
+    ]
+    if signal_counts:
+        lines.append(f"- 20 日方向統計：{format_key_value_counts(signal_counts)}。")
+
+    return "\n".join(line for line in lines if line is not None)
+
+
+def format_theme_ml_probability_line(label: str, target: dict | None) -> str:
+    target = target or {}
+    probability = target.get("probability_percent")
+    signal_label = target.get("signal_label") or "unknown"
+    if probability is None:
+        return f"- {label}：資料不足。"
+    return f"- {label}：{probability:.1f}%，{signal_label}。"
+
+
+def format_key_value_counts(counts: dict) -> str:
+    return "，".join(f"{key} {value} 檔" for key, value in counts.items())
+
+
+def insert_theme_section_before_risk(report: str, section: str) -> str:
+    markers = [
+        "\n風險提醒",
+        "\n風險",
+        "\n不構成投資建議",
+    ]
+    for marker in markers:
+        if marker in report:
+            return report.replace(marker, f"\n{section}\n{marker}", 1)
+
+    return f"{report.rstrip()}\n\n{section}"
 
 
 def format_required_exit_signal_section(exit_signal: dict | None) -> str:
@@ -234,7 +301,10 @@ def build_rule_based_report(kind: str, data: dict) -> str:
         return format_backtest_analysis(data)
 
     if kind == "theme":
-        return format_theme_analysis(data)
+        return ensure_theme_ml_reference_section(
+            data=data,
+            report=format_theme_analysis(data),
+        )
 
     if kind == "portfolio":
         return format_portfolio_analysis(data)
