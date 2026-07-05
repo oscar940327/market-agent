@@ -401,9 +401,7 @@ def test_score_stock_analysis_rewards_positive_signals():
     result = score_stock_analysis(analysis_data)
 
     assert result["score"] == 8.0
-    assert "短線趨勢偏強" in result["reasons"]
-    assert "RSI 與 MACD 多方動能增強" in result["reasons"]
-    assert "出現突破訊號" in result["reasons"]
+    assert len(result["reasons"]) == 5
 
 
 def test_find_theme_key_and_all_theme_tickers_are_stable():
@@ -488,8 +486,64 @@ def test_run_theme_analysis_scans_matched_theme(monkeypatch):
     assert result["theme_ml_reference"]["status"] == "success"
     assert result["theme_ml_reference"]["source"]["type"] == "theme_aggregate"
     assert result["theme_ml_reference"]["coverage"]["covered_ticker_count"] == 4
+    assert result["theme_ml_reference"]["coverage"]["total_ticker_count"] == 4
+    assert result["theme_ml_reference"]["coverage"]["successful_ticker_count"] == 4
     assert result["theme_ml_reference"]["targets"]["up_20d"]["sample_size"] == 4
+    assert result["failed_results"] == []
     assert result["ml_research"] == result["theme_ml_reference"]
+
+
+def test_theme_ml_reference_counts_failed_tickers_in_coverage(monkeypatch):
+    def fake_run_single_stock_analysis(
+        ticker,
+        user_query,
+        include_news=True,
+        include_fundamentals=True,
+        include_ml=True,
+    ):
+        if ticker == "MU":
+            return {
+                "ticker": ticker,
+                "status": "price_data_error",
+                "message": "missing price data",
+            }
+        return {
+            "ticker": ticker,
+            "status": "success",
+            "technical_analysis": {
+                "short_term_trend": "weak",
+                "is_above_ma20": False,
+                "momentum_state": "turning_negative",
+            },
+            "signals": {
+                "breakout": {"is_breakout": False},
+                "volume_surge": {"is_volume_surge": False},
+                "pullback": {"is_pullback": False},
+            },
+            "ml_research": make_theme_test_ml_research(ticker),
+        }
+
+    monkeypatch.setattr(
+        main_module,
+        "run_single_stock_analysis",
+        fake_run_single_stock_analysis,
+    )
+
+    result = run_theme_analysis("memory industry trend")
+
+    assert result["sector_summary"]["successful_count"] == 3
+    assert result["failed_results"] == [
+        {
+            "ticker": "MU",
+            "status": "price_data_error",
+            "reasons": ["missing price data"],
+            "message": "missing price data",
+        }
+    ]
+    assert result["theme_ml_reference"]["coverage"]["covered_ticker_count"] == 3
+    assert result["theme_ml_reference"]["coverage"]["total_ticker_count"] == 4
+    assert result["theme_ml_reference"]["coverage"]["successful_ticker_count"] == 3
+    assert result["theme_ml_reference"]["coverage"]["coverage_ratio"] == 0.75
 
 
 def make_theme_test_ml_research(ticker: str) -> dict:

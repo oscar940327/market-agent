@@ -1,4 +1,4 @@
-from agent.rule_based_router import detect_intent
+﻿from agent.rule_based_router import detect_intent
 import inspect
 from agent.market_manager import (
     MarketManagerAgent,
@@ -39,7 +39,7 @@ def score_stock_analysis(analysis_data: dict) -> dict:
             "ticker": analysis_data.get("ticker", ""),
             "status": analysis_data["status"],
             "score": 0,
-            "reasons": [analysis_data["message"]],
+            "reasons": [analysis_data.get("message", analysis_data["status"])],
             "analysis": analysis_data,
         }
 
@@ -59,16 +59,16 @@ def score_stock_analysis(analysis_data: dict) -> dict:
 
     if momentum_state == "bullish_momentum":
         score += 1.5
-        reasons.append("RSI 與 MACD 多方動能增強")
+        reasons.append("RSI 與 MACD 顯示多方動能")
     elif momentum_state == "turning_positive":
         score += 0.75
-        reasons.append("MACD 動能轉正")
+        reasons.append("MACD 動能轉強")
     elif momentum_state == "bullish_but_overbought":
         score += 0.5
-        reasons.append("多方動能仍在但 RSI 偏高")
+        reasons.append("多方動能仍在但 RSI 偏熱")
     elif momentum_state == "bearish_momentum":
         score -= 1.5
-        reasons.append("RSI 與 MACD 空方動能仍在")
+        reasons.append("RSI 與 MACD 顯示空方動能")
     elif momentum_state == "turning_negative":
         score -= 0.75
         reasons.append("MACD 動能轉弱")
@@ -78,10 +78,10 @@ def score_stock_analysis(analysis_data: dict) -> dict:
 
     if technical["is_above_ma20"]:
         score += 1
-        reasons.append("站上 MA20")
+        reasons.append("股價站上 MA20")
     else:
         score -= 1
-        reasons.append("低於 MA20")
+        reasons.append("股價低於 MA20")
 
     if signals["breakout"]["is_breakout"]:
         score += 2
@@ -89,14 +89,14 @@ def score_stock_analysis(analysis_data: dict) -> dict:
 
     if signals["volume_surge"]["is_volume_surge"]:
         score += 1.5
-        reasons.append("成交量放大")
+        reasons.append("成交量明顯放大")
 
     if signals["pullback"]["is_pullback"]:
         score += 1
-        reasons.append("接近 MA20 回測區")
+        reasons.append("接近 MA20 回踩觀察區")
 
     if not reasons:
-        reasons.append("目前訊號偏中性")
+        reasons.append("沒有明確技術訊號")
 
     return {
         "ticker": analysis_data["ticker"],
@@ -117,7 +117,7 @@ def run_theme_analysis(user_query: str) -> dict:
         tickers = get_theme_scan_tickers(theme)
         scan_limit = theme.get("scan_limit")
     else:
-        theme_name = "全部支援主題"
+        theme_name = "?券?舀銝駁?"
         scan_limit = None
         tickers = get_all_theme_tickers()
         available_ticker_count = len(tickers)
@@ -125,8 +125,9 @@ def run_theme_analysis(user_query: str) -> dict:
     results = []
 
     for ticker in tickers:
-        analysis_data = run_single_stock_analysis(
-            **build_theme_single_stock_kwargs(ticker=ticker, user_query=user_query)
+        analysis_data = run_theme_single_stock_analysis(
+            ticker=ticker,
+            user_query=user_query,
         )
         results.append(score_stock_analysis(analysis_data))
 
@@ -137,7 +138,11 @@ def run_theme_analysis(user_query: str) -> dict:
     )
     sector_summary = build_sector_summary(sorted_results)
     evidence_quality = build_theme_evidence_quality(sorted_results)
-    theme_ml_reference = build_theme_ml_reference(sorted_results)
+    theme_ml_reference = build_theme_ml_reference(
+        sorted_results,
+        total_ticker_count=len(results),
+    )
+    failed_results = build_theme_failed_results(sorted_results)
 
     return {
         "intent": "industry_trend",
@@ -153,6 +158,7 @@ def run_theme_analysis(user_query: str) -> dict:
         },
         "sector_summary": sector_summary,
         "evidence_quality": evidence_quality,
+        "failed_results": failed_results,
         "theme_ml_reference": theme_ml_reference,
         "ml_research": theme_ml_reference,
         "results": sorted_results,
@@ -231,7 +237,8 @@ def build_theme_evidence_quality(results: list[dict]) -> dict:
         "successful_ticker_count": successful_count,
         "reason": (
             f"證據品質為 {level}。本次主題掃描成功分析 {successful_count}/{total_count} 檔，"
-            "新聞、基本面、同業相似案例與全市場驗證尚未納入。"
+            f"新聞覆蓋度為 {data_completeness}，基本面覆蓋度為 {data_completeness}，"
+            "但尚未納入同業相似案例與全市場驗證。"
         ),
     }
 
@@ -250,8 +257,45 @@ def build_theme_single_stock_kwargs(ticker: str, user_query: str) -> dict:
     return kwargs
 
 
-def build_theme_ml_reference(results: list[dict]) -> dict:
+def run_theme_single_stock_analysis(ticker: str, user_query: str) -> dict:
+    kwargs = build_theme_single_stock_kwargs(ticker=ticker, user_query=user_query)
+    analysis_data = run_single_stock_analysis(**kwargs)
+    if should_retry_theme_single_stock_analysis(analysis_data):
+        retry_data = run_single_stock_analysis(**kwargs)
+        if retry_data.get("status") == "success":
+            retry_data["theme_retry_used"] = True
+            return retry_data
+    return analysis_data
+
+
+def should_retry_theme_single_stock_analysis(analysis_data: dict) -> bool:
+    return analysis_data.get("status") in {
+        "price_data_error",
+        "market_data_unavailable",
+        "not_enough_price_data",
+        "invalid_price_data",
+    }
+
+
+def build_theme_failed_results(results: list[dict]) -> list[dict]:
+    failed = []
+    for result in results:
+        if result.get("status") == "success":
+            continue
+        failed.append(
+            {
+                "ticker": result.get("ticker"),
+                "status": result.get("status"),
+                "reasons": result.get("reasons") or [],
+                "message": (result.get("analysis") or {}).get("message"),
+            }
+        )
+    return failed
+
+
+def build_theme_ml_reference(results: list[dict], *, total_ticker_count: int | None = None) -> dict:
     successful_results = [result for result in results if result["status"] == "success"]
+    denominator = total_ticker_count if total_ticker_count is not None else len(results)
     ml_items = []
 
     for result in successful_results:
@@ -264,7 +308,12 @@ def build_theme_ml_reference(results: list[dict]) -> dict:
         return {
             "status": "unavailable",
             "source": {"type": "theme_aggregate", "reason": "no_successful_tickers"},
-            "coverage": {"covered_ticker_count": 0, "total_ticker_count": 0, "coverage_ratio": 0},
+            "coverage": {
+                "covered_ticker_count": 0,
+                "total_ticker_count": denominator,
+                "successful_ticker_count": 0,
+                "coverage_ratio": 0,
+            },
             "summary": "Theme ML Reference is unavailable because no tickers were analyzed successfully.",
         }
 
@@ -274,7 +323,8 @@ def build_theme_ml_reference(results: list[dict]) -> dict:
             "source": {"type": "skipped", "reason": "no_constituent_ml_reference"},
             "coverage": {
                 "covered_ticker_count": 0,
-                "total_ticker_count": len(successful_results),
+                "total_ticker_count": denominator,
+                "successful_ticker_count": len(successful_results),
                 "coverage_ratio": 0,
             },
             "summary": "Theme ML Reference was skipped because no constituent ML references were available.",
@@ -293,7 +343,7 @@ def build_theme_ml_reference(results: list[dict]) -> dict:
     ]
     freshness_values = [value for value in freshness_values if value]
 
-    coverage_ratio = len(ml_items) / len(successful_results)
+    coverage_ratio = len(ml_items) / denominator if denominator else 0
     return {
         "status": "success",
         "usage_policy": "reference_only",
@@ -304,14 +354,15 @@ def build_theme_ml_reference(results: list[dict]) -> dict:
         },
         "coverage": {
             "covered_ticker_count": len(ml_items),
-            "total_ticker_count": len(successful_results),
+            "total_ticker_count": denominator,
+            "successful_ticker_count": len(successful_results),
             "coverage_ratio": round(coverage_ratio, 4),
             "covered_tickers": [item["ticker"] for item in ml_items],
         },
         "targets": targets,
         "theme_signal": classify_theme_ml_signal(targets, up20_counts),
         "constituent_signal_counts": up20_counts,
-        "summary": build_theme_ml_summary(targets, len(ml_items), len(successful_results)),
+        "summary": build_theme_ml_summary(targets, len(ml_items), denominator),
     }
 
 
@@ -469,20 +520,20 @@ def run_portfolio_analysis(
 
 def main():
     print("Market Agent")
-    print("個人股票研究助理 CLI")
+    print("Market research CLI")
     print()
 
-    user_query = input("請輸入你的問題：")
+    user_query = input("Enter a market research question: ")
     route_result = detect_intent(user_query)
 
     print()
-    print("Router 判斷結果：")
+    print("Router result:")
     print(route_result)
 
     intent = route_result["intent"]
 
     if intent == "single_stock_analysis":
-        ticker = input("請輸入股票代號（例如：MU）：").upper()
+        ticker = input("Enter ticker, for example MU: ").upper()
         analysis_data = run_single_stock_analysis(ticker, user_query)
         report_result = build_report(
             kind="single_stock",
@@ -493,7 +544,7 @@ def main():
         print(report_result["report"])
 
     elif intent == "backtest_query":
-        ticker = input("請輸入要回測的股票代號（例如：MU）：").upper()
+        ticker = input("Enter ticker for backtest, for example MU: ").upper()
         backtest_data = run_backtest_query(ticker, user_query)
         report_result = build_report(
             kind="backtest",
@@ -514,7 +565,7 @@ def main():
         print(report_result["report"])
 
     elif intent == "portfolio_analysis":
-        raw_tickers = input("請輸入持股代號，用逗號分隔（例如：VOO, QQQM, TSLA）：")
+        raw_tickers = input("Enter holdings, for example VOO, QQQM, TSLA: ")
         holdings = [
             {"ticker": ticker.strip()}
             for ticker in raw_tickers.split(",")
@@ -531,8 +582,8 @@ def main():
 
     else:
         print()
-        print("目前這個 intent 還沒有完整 workflow")
-        print("偵測到的 intent：", intent)
+        print("Unsupported intent workflow.")
+        print("Intent:", intent)
 
 
 if __name__ == "__main__":
