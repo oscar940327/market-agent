@@ -20,6 +20,7 @@ MODEL_VERSION = CLASSIFICATION_MODEL_VERSION
 BASELINE_TARGETS = ["up_5d", "up_10d", "up_20d", "large_drop_20d"]
 CATEGORICAL_FEATURES = {
     "market_regime": ["bull", "bear", "sideways", "unknown"],
+    "volatility_regime": ["low", "normal", "high", "unknown"],
     "similar_case_evidence_quality": [
         "high",
         "medium",

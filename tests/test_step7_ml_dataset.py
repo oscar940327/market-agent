@@ -126,7 +126,18 @@ def test_build_training_dataset_joins_features_and_labels():
     assert row["split"] == "validation"
     assert row["price_vs_ma20"] == pytest.approx(8 / (320 - 8))
     assert row["return_5d"] > 0
+    assert row["relative_strength_vs_qqq_20d"] is not None
+    assert row["relative_strength_vs_qqq_60d"] is not None
+    assert row["drawdown_from_20d_high"] == 0.0
+    assert row["drawdown_from_60d_high"] == 0.0
+    assert row["ma20_slope_5d"] > 0
+    assert row["ma50_slope_10d"] > 0
+    assert row["rsi_change_5d"] == 0.0
+    assert row["macd_histogram_change_5d"] == 0.0
+    assert row["days_above_ma20"] > 0
+    assert row["days_below_ma20"] == 0
     assert row["volatility_20d"] >= 0
+    assert row["volatility_regime"] in {"low", "normal", "high"}
     assert row["qqq_above_ma200"] is True
     assert row["qqq_return_20d"] > 0
     assert row["news_count_30d"] == 2

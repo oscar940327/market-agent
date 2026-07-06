@@ -1,6 +1,7 @@
 import json
 
 import pandas as pd
+import pytest
 
 from data_store.supabase_store import fetch_daily_prices
 from technical_features.calculator import build_technical_feature_records
@@ -39,6 +40,16 @@ def test_build_technical_feature_records_outputs_supabase_shape():
     assert latest["ma50"] == 195.5
     assert latest["ma200"] == 120.5
     assert latest["rsi_14"] == 100.0
+    assert latest["drawdown_from_20d_high"] == 0.0
+    assert latest["drawdown_from_60d_high"] == 0.0
+    assert latest["ma20_slope_5d"] == pytest.approx(5 / 205.5)
+    assert latest["ma50_slope_10d"] == pytest.approx(10 / 185.5)
+    assert latest["rsi_change_5d"] == 0.0
+    assert latest["macd_histogram_change_5d"] is not None
+    assert latest["days_above_ma20"] == 201
+    assert latest["days_below_ma20"] == 0
+    assert latest["volume_trend_20d"] == 0.0
+    assert latest["volatility_regime"] == "low"
     assert latest["short_term_trend"] == "strong"
     assert latest["feature_version"] == "v1"
     assert latest["computed_at"]
@@ -57,6 +68,10 @@ def test_early_rows_keep_nullable_moving_averages():
     assert latest["ma10"] is None
     assert latest["ma20"] is None
     assert latest["ma50"] is None
+    assert latest["drawdown_from_20d_high"] is None
+    assert latest["days_above_ma20"] == 0
+    assert latest["days_below_ma20"] == 0
+    assert latest["volatility_regime"] == "unknown"
     assert latest["short_term_trend"] == "unknown"
     assert latest["is_breakout"] is False
 

@@ -31,8 +31,20 @@ FEATURE_COLUMNS = [
     "return_5d",
     "return_10d",
     "return_20d",
+    "relative_strength_vs_qqq_20d",
+    "relative_strength_vs_qqq_60d",
+    "drawdown_from_20d_high",
+    "drawdown_from_60d_high",
+    "ma20_slope_5d",
+    "ma50_slope_10d",
+    "rsi_change_5d",
+    "macd_histogram_change_5d",
+    "days_above_ma20",
+    "days_below_ma20",
     "volatility_20d",
+    "volatility_regime",
     "volume_ratio_20d",
+    "volume_trend_20d",
     "market_regime",
     "qqq_above_ma200",
     "qqq_return_20d",
@@ -115,6 +127,9 @@ def build_training_dataset(
         technical_rows = normalize_rows_by_date(
             technical_rows_by_ticker.get(ticker, [])
         )
+        technical_index = {
+            row["date"]: index for index, row in enumerate(technical_rows)
+        }
         news_rows = normalize_news_rows(news_event_rows_by_ticker.get(ticker, []))
         similar_rows = normalize_similar_case_rows(
             similar_case_rows_by_ticker.get(ticker, [])
@@ -138,11 +153,28 @@ def build_training_dataset(
 
             technical_features = build_technical_features(
                 technical_row=technical_row,
+                technical_rows=technical_rows,
+                technical_index=technical_index[row_date],
                 price_rows=price_rows,
                 price_index=price_index[row_date],
             )
             if technical_features is None:
                 excluded_reasons["missing_core_technical_features"] += 1
+                continue
+            return_60d = technical_features.pop("_return_60d")
+            technical_features["relative_strength_vs_qqq_20d"] = ratio_delta_difference(
+                technical_features["return_20d"],
+                market_features["qqq_return_20d"],
+            )
+            technical_features["relative_strength_vs_qqq_60d"] = ratio_delta_difference(
+                return_60d,
+                market_features["qqq_return_60d"],
+            )
+            if (
+                technical_features["relative_strength_vs_qqq_20d"] is None
+                or technical_features["relative_strength_vs_qqq_60d"] is None
+            ):
+                excluded_reasons["missing_relative_strength_features"] += 1
                 continue
 
             labels = build_labels(
@@ -194,6 +226,8 @@ def build_training_dataset(
 def build_technical_features(
     *,
     technical_row: dict,
+    technical_rows: list[dict],
+    technical_index: int,
     price_rows: list[dict],
     price_index: int,
 ) -> dict | None:
@@ -226,16 +260,69 @@ def build_technical_features(
     return_5d = trailing_return(price_rows, price_index, 5)
     return_10d = trailing_return(price_rows, price_index, 10)
     return_20d = trailing_return(price_rows, price_index, 20)
+    return_60d = trailing_return(price_rows, price_index, 60)
     volatility_20d = trailing_volatility(price_rows, price_index, 20)
     volume_ratio_20d = trailing_volume_ratio(price_rows, price_index, 20)
+    volume_trend_20d = first_present_float(
+        technical_row.get("volume_trend_20d"),
+        trailing_volume_trend(price_rows, price_index, 5, 20),
+    )
+    drawdown_from_20d_high = first_present_float(
+        technical_row.get("drawdown_from_20d_high"),
+        trailing_drawdown_from_high(price_rows, price_index, 20),
+    )
+    drawdown_from_60d_high = first_present_float(
+        technical_row.get("drawdown_from_60d_high"),
+        trailing_drawdown_from_high(price_rows, price_index, 60),
+    )
+    ma20_slope_5d = first_present_float(
+        technical_row.get("ma20_slope_5d"),
+        trailing_indicator_ratio_delta(technical_rows, technical_index, "ma20", 5),
+    )
+    ma50_slope_10d = first_present_float(
+        technical_row.get("ma50_slope_10d"),
+        trailing_indicator_ratio_delta(technical_rows, technical_index, "ma50", 10),
+    )
+    rsi_change_5d = first_present_float(
+        technical_row.get("rsi_change_5d"),
+        trailing_indicator_difference(technical_rows, technical_index, "rsi_14", 5),
+    )
+    macd_histogram_change_5d = first_present_float(
+        technical_row.get("macd_histogram_change_5d"),
+        trailing_indicator_difference(
+            technical_rows, technical_index, "macd_histogram", 5
+        ),
+    )
+    days_above_ma20 = first_present_int(
+        technical_row.get("days_above_ma20"),
+        consecutive_days_vs_ma20(technical_rows, technical_index, above=True),
+    )
+    days_below_ma20 = first_present_int(
+        technical_row.get("days_below_ma20"),
+        consecutive_days_vs_ma20(technical_rows, technical_index, above=False),
+    )
+    volatility_regime = (
+        technical_row.get("volatility_regime")
+        or classify_volatility_regime(volatility_20d)
+    )
     if any(
         value is None
         for value in [
             return_5d,
             return_10d,
             return_20d,
+            return_60d,
             volatility_20d,
+            volume_trend_20d,
             volume_ratio_20d,
+            drawdown_from_20d_high,
+            drawdown_from_60d_high,
+            ma20_slope_5d,
+            ma50_slope_10d,
+            rsi_change_5d,
+            macd_histogram_change_5d,
+            days_above_ma20,
+            days_below_ma20,
         ]
     ):
         return None
@@ -258,8 +345,19 @@ def build_technical_features(
         "return_5d": return_5d,
         "return_10d": return_10d,
         "return_20d": return_20d,
+        "_return_60d": return_60d,
+        "drawdown_from_20d_high": drawdown_from_20d_high,
+        "drawdown_from_60d_high": drawdown_from_60d_high,
+        "ma20_slope_5d": ma20_slope_5d,
+        "ma50_slope_10d": ma50_slope_10d,
+        "rsi_change_5d": rsi_change_5d,
+        "macd_histogram_change_5d": macd_histogram_change_5d,
+        "days_above_ma20": days_above_ma20,
+        "days_below_ma20": days_below_ma20,
         "volatility_20d": volatility_20d,
+        "volatility_regime": volatility_regime,
         "volume_ratio_20d": volume_ratio_20d,
+        "volume_trend_20d": volume_trend_20d,
     }
 
 
@@ -582,6 +680,113 @@ def trailing_volume_ratio(rows: list[dict], current_index: int, days: int) -> fl
     return current_volume / average_volume
 
 
+def trailing_volume_trend(
+    rows: list[dict],
+    current_index: int,
+    short_days: int,
+    long_days: int,
+) -> float | None:
+    if current_index < long_days - 1:
+        return None
+
+    short_average = trailing_average(rows, current_index, short_days, "volume")
+    long_average = trailing_average(rows, current_index, long_days, "volume")
+    return ratio_delta(short_average, long_average)
+
+
+def trailing_average(
+    rows: list[dict],
+    current_index: int,
+    days: int,
+    field: str,
+) -> float | None:
+    if current_index < days - 1:
+        return None
+
+    values = [
+        safe_float(rows[index].get(field))
+        for index in range(current_index - days + 1, current_index + 1)
+    ]
+    if any(value is None for value in values):
+        return None
+    return sum(values) / len(values)
+
+
+def trailing_drawdown_from_high(
+    rows: list[dict],
+    current_index: int,
+    days: int,
+) -> float | None:
+    if current_index < days - 1:
+        return None
+
+    current_close = safe_float(rows[current_index].get("close"))
+    closes = [
+        safe_float(rows[index].get("close"))
+        for index in range(current_index - days + 1, current_index + 1)
+    ]
+    if current_close is None or any(value is None for value in closes):
+        return None
+
+    highest_close = max(closes)
+    return ratio_delta(current_close, highest_close)
+
+
+def trailing_indicator_ratio_delta(
+    rows: list[dict],
+    current_index: int,
+    field: str,
+    days: int,
+) -> float | None:
+    if current_index < days:
+        return None
+
+    current_value = safe_float(rows[current_index].get(field))
+    previous_value = safe_float(rows[current_index - days].get(field))
+    return ratio_delta(current_value, previous_value)
+
+
+def trailing_indicator_difference(
+    rows: list[dict],
+    current_index: int,
+    field: str,
+    days: int,
+) -> float | None:
+    if current_index < days:
+        return None
+
+    current_value = safe_float(rows[current_index].get(field))
+    previous_value = safe_float(rows[current_index - days].get(field))
+    if current_value is None or previous_value is None:
+        return None
+    return current_value - previous_value
+
+
+def consecutive_days_vs_ma20(
+    rows: list[dict],
+    current_index: int,
+    *,
+    above: bool,
+) -> int | None:
+    if current_index < 0:
+        return None
+
+    count = 0
+    for index in range(current_index, -1, -1):
+        close = safe_float(rows[index].get("close"))
+        ma20 = safe_float(rows[index].get("ma20"))
+        if close is None or ma20 is None:
+            break
+        if above and close > ma20:
+            count += 1
+            continue
+        if not above and close < ma20:
+            count += 1
+            continue
+        break
+    return count
+
+
 def future_max_drop(rows: list[dict], current_index: int, days: int) -> float | None:
     if current_index + days >= len(rows):
         return None
@@ -609,6 +814,38 @@ def ratio_delta(numerator: float | None, denominator: float | None) -> float | N
     if numerator is None or denominator is None or denominator == 0:
         return None
     return numerator / denominator - 1
+
+
+def ratio_delta_difference(left: float | None, right: float | None) -> float | None:
+    if left is None or right is None:
+        return None
+    return left - right
+
+
+def classify_volatility_regime(volatility_20d: float | None) -> str:
+    if volatility_20d is None:
+        return "unknown"
+    if volatility_20d < 0.015:
+        return "low"
+    if volatility_20d < 0.04:
+        return "normal"
+    return "high"
+
+
+def first_present_float(*values) -> float | None:
+    for value in values:
+        result = safe_float(value)
+        if result is not None:
+            return result
+    return None
+
+
+def first_present_int(*values) -> int | None:
+    for value in values:
+        result = safe_int(value)
+        if result is not None:
+            return result
+    return None
 
 
 def count_matching(rows: list[dict], field: str, expected_value: str) -> int:

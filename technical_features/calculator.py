@@ -32,6 +32,19 @@ def build_technical_feature_records(
         data["Close"]
     )
     data["AVERAGE_VOLUME_20"] = data["Volume"].rolling(window=20).mean()
+    data["AVERAGE_VOLUME_5"] = data["Volume"].rolling(window=5).mean()
+    data["DRAWDOWN_FROM_20D_HIGH"] = data["Close"] / data["Close"].rolling(window=20).max() - 1
+    data["DRAWDOWN_FROM_60D_HIGH"] = data["Close"] / data["Close"].rolling(window=60).max() - 1
+    data["MA20_SLOPE_5D"] = data["MA20"] / data["MA20"].shift(5) - 1
+    data["MA50_SLOPE_10D"] = data["MA50"] / data["MA50"].shift(10) - 1
+    data["RSI_CHANGE_5D"] = data["RSI14"] - data["RSI14"].shift(5)
+    data["MACD_HISTOGRAM_CHANGE_5D"] = (
+        data["MACD_HISTOGRAM"] - data["MACD_HISTOGRAM"].shift(5)
+    )
+    data["VOLUME_TREND_20D"] = data["AVERAGE_VOLUME_5"] / data["AVERAGE_VOLUME_20"] - 1
+    data["VOLATILITY_20D"] = data["Close"].pct_change().rolling(window=20).std()
+    data["VOLATILITY_REGIME"] = data["VOLATILITY_20D"].apply(classify_volatility_regime)
+    data["DAYS_ABOVE_MA20"], data["DAYS_BELOW_MA20"] = build_ma20_streaks(data)
     computed_at = datetime.now(UTC).replace(microsecond=0).isoformat()
 
     records = []
@@ -54,6 +67,18 @@ def build_technical_feature_records(
                 "macd": safe_float(current["MACD"]),
                 "macd_signal": safe_float(current["MACD_SIGNAL"]),
                 "macd_histogram": safe_float(current["MACD_HISTOGRAM"]),
+                "drawdown_from_20d_high": safe_float(current["DRAWDOWN_FROM_20D_HIGH"]),
+                "drawdown_from_60d_high": safe_float(current["DRAWDOWN_FROM_60D_HIGH"]),
+                "ma20_slope_5d": safe_float(current["MA20_SLOPE_5D"]),
+                "ma50_slope_10d": safe_float(current["MA50_SLOPE_10D"]),
+                "rsi_change_5d": safe_float(current["RSI_CHANGE_5D"]),
+                "macd_histogram_change_5d": safe_float(
+                    current["MACD_HISTOGRAM_CHANGE_5D"]
+                ),
+                "days_above_ma20": safe_int(current["DAYS_ABOVE_MA20"]),
+                "days_below_ma20": safe_int(current["DAYS_BELOW_MA20"]),
+                "volume_trend_20d": safe_float(current["VOLUME_TREND_20D"]),
+                "volatility_regime": current["VOLATILITY_REGIME"],
                 "short_term_trend": classify_short_term_trend(
                     close=safe_float(current["Close"]),
                     ma10=safe_float(current["MA10"]),
@@ -177,8 +202,54 @@ def is_pullback(current: pd.Series, tolerance: float = 0.03) -> bool:
     return bool(abs(distance_from_ma20) <= tolerance and distance_from_ma20 >= -tolerance)
 
 
+def build_ma20_streaks(data: pd.DataFrame) -> tuple[list[int], list[int]]:
+    days_above = []
+    days_below = []
+    above_count = 0
+    below_count = 0
+
+    for _, current in data.iterrows():
+        close = safe_float(current["Close"])
+        ma20 = safe_float(current["MA20"])
+        if close is None or ma20 is None:
+            above_count = 0
+            below_count = 0
+        elif close > ma20:
+            above_count += 1
+            below_count = 0
+        elif close < ma20:
+            below_count += 1
+            above_count = 0
+        else:
+            above_count = 0
+            below_count = 0
+
+        days_above.append(above_count)
+        days_below.append(below_count)
+
+    return days_above, days_below
+
+
+def classify_volatility_regime(volatility_20d) -> str:
+    volatility = safe_float(volatility_20d)
+    if volatility is None:
+        return "unknown"
+    if volatility < 0.015:
+        return "low"
+    if volatility < 0.04:
+        return "normal"
+    return "high"
+
+
 def safe_float(value) -> float | None:
     if pd.isna(value):
         return None
 
     return float(value)
+
+
+def safe_int(value) -> int | None:
+    if pd.isna(value):
+        return None
+
+    return int(value)
