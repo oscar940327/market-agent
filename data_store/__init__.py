@@ -26,6 +26,7 @@ from data_store.supabase_store import (
     upsert_ml_predictions,
     upsert_news_event_summaries,
     upsert_research_outcomes,
+    upsert_similar_case_results,
     upsert_technical_features,
     upsert_tickers,
 )
@@ -58,6 +59,7 @@ __all__ = [
     "upsert_ml_predictions",
     "upsert_news_event_summaries",
     "upsert_research_outcomes",
+    "upsert_similar_case_results",
     "upsert_technical_features",
     "upsert_tickers",
 ]

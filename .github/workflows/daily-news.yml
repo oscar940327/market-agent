@@ -60,5 +60,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: daily-news-logs
-          path: data/pipeline_runs/*.json
+          path: |
+            data/pipeline_runs/*.json
+            data/news/reports/*
           if-no-files-found: ignore

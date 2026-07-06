@@ -64,6 +64,9 @@ jobs:
       - name: Build fresh ML training dataset
         run: python scripts/build_ml_training_dataset.py
 
+      - name: Build similar-case accumulation
+        run: python scripts/build_similar_case_results.py
+
       - name: Run daily ML predictions
         shell: bash
         run: |
@@ -103,4 +106,6 @@ jobs:
           path: |
             data/ml/training_dataset_v1.csv
             data/ml/training_dataset_v1_metadata.json
+            data/ml/monitoring/similar_case_accumulation_v1.json
+            data/ml/monitoring/similar_case_accumulation_summary_v1.md
           if-no-files-found: ignore

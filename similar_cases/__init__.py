@@ -5,6 +5,11 @@ from similar_cases.engine import (
     find_similar_cases,
     summarize_similar_cases,
 )
+from similar_cases.accumulation import (
+    build_similar_case_result_rows,
+    classify_news_event_type,
+    classify_technical_pattern,
+)
 from similar_cases.schema import (
     MARKET_UNIVERSE_PLAN,
     SIMILAR_CASE_SCHEMA,
@@ -19,7 +24,10 @@ __all__ = [
     "SimilarCaseQuery",
     "SimilarCaseRecord",
     "build_similar_case_query",
+    "build_similar_case_result_rows",
+    "classify_news_event_type",
     "classify_peer_market_evidence_quality",
+    "classify_technical_pattern",
     "find_similar_cases",
     "summarize_similar_cases",
 ]

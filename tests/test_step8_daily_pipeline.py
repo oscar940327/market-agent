@@ -8,7 +8,7 @@ from scripts.run_daily_pipeline import (
     parse_step_metrics,
     run_pipeline,
 )
-from scripts.summarize_news_events import build_news_summary_record
+from scripts.summarize_news_events import build_news_summary_record, write_news_summary_report
 
 
 def parse_args(values):
@@ -140,6 +140,42 @@ def test_build_news_summary_record_maps_summary_to_supabase_row():
     assert record["summary_date"] == "2026-06-30"
     assert record["window_days"] == 30
     assert record["summary_json"]["total_events"] == 2
+
+
+def test_write_news_summary_report_outputs_json_and_markdown(tmp_path):
+    output_paths = write_news_summary_report(
+        summaries=[
+            {
+                "ticker": "MU",
+                "status": "success",
+                "total_events": 2,
+                "overall_sentiment": "positive",
+                "dominant_topic": "earnings_guidance",
+            },
+            {
+                "ticker": "WDC",
+                "status": "no_recent_news",
+                "total_events": 0,
+                "overall_sentiment": "unknown",
+                "dominant_topic": "general",
+            },
+        ],
+        summary_date="2026-06-30",
+        output_dir=tmp_path,
+    )
+
+    report = json.loads(
+        (tmp_path / "news_summary_accumulation_v1.json").read_text(encoding="utf-8")
+    )
+    markdown = (tmp_path / "news_summary_accumulation_summary_v1.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert output_paths["json_path"].endswith("news_summary_accumulation_v1.json")
+    assert report["ticker_count"] == 2
+    assert report["total_news_items"] == 2
+    assert report["no_recent_news_count"] == 1
+    assert "# News Summary Accumulation" in markdown
 
 
 def test_parse_step_metrics_converts_key_value_stdout():

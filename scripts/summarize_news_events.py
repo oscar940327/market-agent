@@ -15,6 +15,8 @@ from data_store.supabase_store import (  # noqa: E402
 )
 from news_events import build_news_summary  # noqa: E402
 
+DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "data" / "news" / "reports"
+
 
 def parse_tickers(value: str | None) -> list[str]:
     if not value:
@@ -59,6 +61,7 @@ def main() -> int:
     parser.add_argument("--summary-date", default=date.today().isoformat())
     parser.add_argument("--skip-supabase", action="store_true")
     parser.add_argument("--chunk-size", type=int, default=100)
+    parser.add_argument("--output-dir", default=str(DEFAULT_OUTPUT_DIR))
     args = parser.parse_args()
 
     tickers = parse_tickers(args.tickers)
@@ -110,7 +113,68 @@ def main() -> int:
     else:
         print(f"summaries={len(summaries)}")
 
+    output_paths = write_news_summary_report(
+        summaries=summaries,
+        summary_date=args.summary_date,
+        output_dir=Path(args.output_dir),
+    )
+    print(f"json_path={output_paths['json_path']}")
+    print(f"markdown_path={output_paths['markdown_path']}")
+
     return 0
+
+
+def write_news_summary_report(
+    *,
+    summaries: list[dict],
+    summary_date: str,
+    output_dir: Path,
+) -> dict[str, str]:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    json_path = output_dir / "news_summary_accumulation_v1.json"
+    markdown_path = output_dir / "news_summary_accumulation_summary_v1.md"
+    report = {
+        "report_version": "news_summary_accumulation_v1",
+        "summary_date": summary_date,
+        "ticker_count": len(summaries),
+        "total_news_items": sum(int(summary.get("total_events", 0)) for summary in summaries),
+        "no_recent_news_count": sum(
+            1 for summary in summaries if summary.get("status") == "no_recent_news"
+        ),
+        "summaries": summaries,
+    }
+    json_path.write_text(
+        json.dumps(report, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    markdown_path.write_text(
+        build_news_summary_report_markdown(report),
+        encoding="utf-8",
+    )
+    return {"json_path": str(json_path), "markdown_path": str(markdown_path)}
+
+
+def build_news_summary_report_markdown(report: dict) -> str:
+    lines = [
+        "# News Summary Accumulation",
+        "",
+        f"- Summary date: `{report['summary_date']}`",
+        f"- Tickers summarized: `{report['ticker_count']}`",
+        f"- Total news items: `{report['total_news_items']}`",
+        f"- No recent news count: `{report['no_recent_news_count']}`",
+        "",
+        "## Sample Summaries",
+        "",
+    ]
+    for summary in report["summaries"][:10]:
+        lines.append(
+            "- "
+            f"{summary['ticker']}: status={summary['status']}, "
+            f"items={summary['total_events']}, "
+            f"sentiment={summary['overall_sentiment']}, "
+            f"topic={summary['dominant_topic']}"
+        )
+    return "\n".join(lines) + "\n"
 
 
 if __name__ == "__main__":

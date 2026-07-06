@@ -8,6 +8,7 @@ from data_store.supabase_store import (
     fetch_news_events_for_dataset,
     fetch_similar_case_results,
     fetch_technical_features,
+    upsert_similar_case_results,
 )
 from ml_dataset import build_training_dataset, write_dataset_outputs
 
@@ -261,3 +262,47 @@ def test_step7_supabase_fetchers_paginate_and_filter_urls():
         "similar_case_results" in call and "query_ticker=eq.MU" in call
         for call in calls
     )
+
+
+def test_upsert_similar_case_results_uses_query_date_conflict_key():
+    captured = {}
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return None
+
+        def read(self):
+            return b""
+
+    def fake_open_url(request, timeout):
+        captured["url"] = request.full_url
+        captured["payload"] = json.loads(request.data.decode("utf-8"))
+        return FakeResponse()
+
+    result = upsert_similar_case_results(
+        [
+            {
+                "query_ticker": "MU",
+                "query_date": "2026-06-30",
+                "scope": "peer_group",
+                "relaxation_step": "exact_peer_context",
+                "matched_fields": ["technical_pattern"],
+                "technical_pattern": "breakout",
+                "market_regime": "bull",
+                "sample_size": 50,
+                "evidence_quality": "high",
+                "source_data_as_of": "2026-06-30",
+                "result_status": "fresh",
+            }
+        ],
+        supabase_url="https://example.supabase.co",
+        supabase_key="secret",
+        open_url=fake_open_url,
+    )
+
+    assert result == {"status": "success", "upserted_count": 1}
+    assert "on_conflict=query_ticker,query_date" in captured["url"]
+    assert captured["payload"][0]["query_ticker"] == "MU"

@@ -351,6 +351,10 @@ create table if not exists public.similar_case_results (
     constraint similar_case_results_market_regime_value check (
         market_regime is null
         or market_regime in ('bull', 'bear', 'sideways', 'unknown')
+    ),
+    constraint similar_case_results_unique_query unique (
+        query_ticker,
+        query_date
     )
 );
 
