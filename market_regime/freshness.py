@@ -1,4 +1,5 @@
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime, time, timedelta
+from zoneinfo import ZoneInfo
 
 
 PRICE_WARNING_TRADING_DAYS = 1
@@ -8,6 +9,8 @@ ML_WARNING_DAYS = 7
 ML_STALE_DAYS = 14
 PIPELINE_WARNING_HOURS = 24
 PIPELINE_STALE_HOURS = 48
+MARKET_DATA_UPDATE_AFTER_ET = time(18, 0)
+NEW_YORK_TZ = ZoneInfo("America/New_York")
 
 
 def build_freshness_report(
@@ -23,10 +26,12 @@ def build_freshness_report(
 ) -> dict:
     now = now or datetime.now(UTC)
     today = today or now.date()
+    expected_latest_date = expected_latest_trading_day(now=now, today=today)
     daily_prices = classify_trading_day_freshness(
-        today=today,
+        today=expected_latest_date,
         latest_date=daily_prices_latest_date,
         label="daily_prices",
+        expected_latest_date=expected_latest_date,
     )
     technical_features = classify_dependency_freshness(
         latest_date=technical_features_latest_date,
@@ -51,6 +56,7 @@ def build_freshness_report(
     pipeline_last_run = classify_pipeline_run_freshness(
         now=now,
         last_run_at=pipeline_last_run_at,
+        before_expected_market_update=is_before_expected_market_data_update(now),
     )
     sections = {
         "daily_prices": daily_prices,
@@ -73,7 +79,9 @@ def classify_trading_day_freshness(
     today: date,
     latest_date: date | None,
     label: str,
+    expected_latest_date: date | None = None,
 ) -> dict:
+    expected_latest_date = expected_latest_date or today
     if latest_date is None:
         return {
             "status": "missing",
@@ -81,9 +89,10 @@ def classify_trading_day_freshness(
             "message": f"{label} 找不到最新日期。",
         }
 
-    lag = count_trading_days_between(latest_date, today)
+    lag = count_trading_days_between(latest_date, expected_latest_date)
     payload = {
         "latest_date": latest_date.isoformat(),
+        "expected_latest_trading_day": expected_latest_date.isoformat(),
         "business_day_lag": lag,
         "trading_day_lag": lag,
     }
@@ -244,6 +253,7 @@ def classify_pipeline_run_freshness(
     *,
     now: datetime,
     last_run_at: datetime | date | None,
+    before_expected_market_update: bool = False,
 ) -> dict:
     if last_run_at is None:
         return {
@@ -265,6 +275,14 @@ def classify_pipeline_run_freshness(
             "status": "stale",
             "reason": "pipeline_run_too_old",
             "message": "每日 pipeline 已超過 48 小時沒有成功執行紀錄。",
+        }
+
+    if before_expected_market_update and age_hours > PIPELINE_WARNING_HOURS:
+        return {
+            **payload,
+            "status": "fresh",
+            "reason": "waiting_for_expected_market_data_update",
+            "message": "尚未到今日市場資料預期更新時間，沿用前次 pipeline run。",
         }
 
     if age_hours > PIPELINE_WARNING_HOURS:
@@ -313,6 +331,31 @@ def build_warning_messages(sections: dict[str, dict]) -> list[str]:
 
 def count_business_days_between(start: date, end: date) -> int:
     return count_trading_days_between(start, end)
+
+
+def expected_latest_trading_day(*, now: datetime, today: date | None = None) -> date:
+    local_now = coerce_datetime(now).astimezone(NEW_YORK_TZ)
+    local_date = today or local_now.date()
+
+    if is_nyse_trading_day(local_date) and local_now.time() >= MARKET_DATA_UPDATE_AFTER_ET:
+        return local_date
+
+    return previous_nyse_trading_day(local_date)
+
+
+def is_before_expected_market_data_update(now: datetime) -> bool:
+    local_now = coerce_datetime(now).astimezone(NEW_YORK_TZ)
+    return (
+        is_nyse_trading_day(local_now.date())
+        and local_now.time() < MARKET_DATA_UPDATE_AFTER_ET
+    )
+
+
+def previous_nyse_trading_day(value: date) -> date:
+    current = value - timedelta(days=1)
+    while not is_nyse_trading_day(current):
+        current -= timedelta(days=1)
+    return current
 
 
 def count_trading_days_between(start: date, end: date) -> int:

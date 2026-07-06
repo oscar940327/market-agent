@@ -13,6 +13,7 @@ from market_regime.freshness import (
     classify_ml_training_freshness,
     classify_news_freshness,
     classify_trading_day_freshness,
+    expected_latest_trading_day,
     is_nyse_trading_day,
 )
 from scripts.check_freshness import apply_scope
@@ -52,6 +53,54 @@ def test_price_freshness_counts_next_nyse_trading_day_after_holiday():
     assert result["status"] == "warning"
     assert result["business_day_lag"] == 1
     assert result["trading_day_lag"] == 1
+
+
+def test_expected_latest_trading_day_waits_until_after_market_update_time():
+    before_update = expected_latest_trading_day(
+        now=datetime(2026, 7, 6, 20, 0, tzinfo=UTC),
+    )
+    after_update = expected_latest_trading_day(
+        now=datetime(2026, 7, 6, 23, 0, tzinfo=UTC),
+    )
+
+    assert before_update == date(2026, 7, 2)
+    assert after_update == date(2026, 7, 6)
+
+
+def test_freshness_report_does_not_warn_on_trading_day_before_expected_update():
+    report = build_freshness_report(
+        today=date(2026, 7, 6),
+        now=datetime(2026, 7, 6, 20, 0, tzinfo=UTC),
+        daily_prices_latest_date=date(2026, 7, 2),
+        technical_features_latest_date=date(2026, 7, 2),
+        market_regimes_latest_date=date(2026, 7, 2),
+        news_latest_at=datetime(2026, 7, 5, tzinfo=UTC),
+        ml_training_generated_at=datetime(2026, 7, 5, tzinfo=UTC),
+        pipeline_last_run_at=datetime(2026, 7, 5, 10, tzinfo=UTC),
+    )
+
+    assert report["daily_prices"]["status"] == "fresh"
+    assert report["daily_prices"]["expected_latest_trading_day"] == "2026-07-02"
+    assert report["pipeline_last_run"]["status"] == "fresh"
+    assert report["pipeline_last_run"]["reason"] == "waiting_for_expected_market_data_update"
+    assert report["overall"] == "fresh"
+
+
+def test_freshness_report_warns_after_expected_update_time():
+    report = build_freshness_report(
+        today=date(2026, 7, 6),
+        now=datetime(2026, 7, 6, 23, 0, tzinfo=UTC),
+        daily_prices_latest_date=date(2026, 7, 2),
+        technical_features_latest_date=date(2026, 7, 2),
+        market_regimes_latest_date=date(2026, 7, 2),
+        news_latest_at=datetime(2026, 7, 5, tzinfo=UTC),
+        ml_training_generated_at=datetime(2026, 7, 5, tzinfo=UTC),
+        pipeline_last_run_at=datetime(2026, 7, 5, 10, tzinfo=UTC),
+    )
+
+    assert report["daily_prices"]["status"] == "warning"
+    assert report["daily_prices"]["expected_latest_trading_day"] == "2026-07-06"
+    assert report["overall"] == "warning"
 
 
 def test_news_freshness_marks_no_recent_news_as_stale():
