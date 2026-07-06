@@ -69,6 +69,44 @@ def build_backtest_evidence_warnings(backtest_evidence: dict) -> list[str]:
     return [f"backtest_evidence_status:{status}"]
 
 
+def build_backtest_data_freshness(data_window: dict) -> dict:
+    data_as_of = data_window.get("data_as_of") or data_window.get("data_end_date")
+    return {
+        "overall": "fresh",
+        "source": "backtest_price_window",
+        "latest_date": data_as_of,
+        "data_as_of": data_as_of,
+        "message": f"回測使用截至 {data_as_of or 'unknown'} 的歷史價格資料。",
+        "warnings": [],
+    }
+
+
+def build_backtest_ml_reference() -> dict:
+    return {
+        "status": "skipped",
+        "source": {
+            "type": "not_applicable",
+            "reason": "backtest_query_uses_historical_strategy_results",
+        },
+        "message": "策略回測問題使用歷史交易結果，不使用 ML Reference。",
+        "targets": {
+            "up_5d": {},
+            "up_10d": {},
+            "up_20d": {},
+            "large_drop_20d": {},
+        },
+        "return_reference": {},
+        "return_model": {
+            "targets": {
+                "forward_return_5d": {},
+                "forward_return_10d": {},
+                "forward_return_20d": {},
+                "max_drop_20d": {},
+            }
+        },
+    }
+
+
 def map_exit_signal_status(exit_signal: dict) -> str:
     status = exit_signal.get("status", "unavailable")
     if status in {"success", "skipped", "unavailable", "failed"}:
@@ -441,6 +479,8 @@ class MarketManagerAgent:
             "data_end_date": data_window["data_end_date"],
             "data_as_of": data_window["data_as_of"],
             "data_window": data_window,
+            "data_freshness": build_backtest_data_freshness(data_window),
+            "ml_reference": build_backtest_ml_reference(),
             "evidence_quality": backtest_agent["evidence_quality"],
             "execution_plan": execution_plan,
             "agent_outputs": {

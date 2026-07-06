@@ -517,3 +517,8 @@ def test_market_manager_backtest_includes_agent_output(monkeypatch):
     assert result["data_as_of"] == result["data_window"]["data_as_of"]
     assert result["evidence_quality"]["required_history_years"] == 15
     assert result["evidence_quality"]["peer_group"] == "not_used"
+    assert result["data_freshness"]["overall"] == "fresh"
+    assert result["data_freshness"]["source"] == "backtest_price_window"
+    assert result["data_freshness"]["data_as_of"] == result["data_window"]["data_as_of"]
+    assert result["ml_reference"]["status"] == "skipped"
+    assert result["ml_reference"]["source"]["type"] == "not_applicable"
