@@ -169,6 +169,50 @@ def make_success_single_stock_data():
     }
 
 
+def make_success_backtest_data():
+    metrics = {
+        "total_trades": 584,
+        "win_rate": 0.5479,
+        "average_return": 0.0075,
+        "max_loss": -0.1961,
+    }
+    evidence_quality = {
+        "level": "medium",
+        "sample_size": 584,
+        "sample_quality": "high",
+        "history_years": 15,
+        "required_history_years": 15,
+        "market_cycle_coverage": "sufficient",
+        "peer_group_needed": False,
+        "peer_group": "not_used",
+        "reason": "最大虧損偏高，即使其他數字看起來不差，也需要保守看待。",
+    }
+    data_window = {
+        "data_start_date": "2011-07-06",
+        "data_end_date": "2026-07-06",
+        "data_as_of": "2026-07-06",
+        "history_years": 15,
+    }
+    return {
+        "status": "success",
+        "intent": "backtest_query",
+        "ticker": "MU",
+        "strategy": "breakout",
+        "user_query": "MU 突破策略以前表現怎麼樣",
+        "metrics": metrics,
+        "evidence_quality": evidence_quality,
+        "data_window": data_window,
+        "report": {
+            "ticker": "MU",
+            "strategy_name": "breakout",
+            "metrics": metrics,
+            "evidence_quality": evidence_quality,
+            "data_window": data_window,
+            "sample_trades": [],
+        },
+    }
+
+
 def test_llm_prompt_uses_structured_payload_and_safety_instructions():
     prompt = build_llm_user_prompt(
         kind="single_stock",
@@ -366,6 +410,27 @@ def test_build_report_falls_back_when_llm_is_not_configured(monkeypatch):
     assert result["analyst"]["mode_used"] == "rule_based"
     assert result["analyst"]["fallback_used"] is False
     assert "MU" in result["report"]
+
+
+def test_build_report_uses_fixed_backtest_report_even_when_llm_requested():
+    fake_client = FakeLLMClient()
+
+    result = build_report(
+        kind="backtest",
+        data=make_success_backtest_data(),
+        analyst_mode="llm",
+        llm_client=fake_client,
+    )
+
+    assert result["analyst"]["requested_mode"] == "llm"
+    assert result["analyst"]["mode_used"] == "rule_based"
+    assert result["analyst"]["fallback_used"] is False
+    assert len(fake_client.calls) == 0
+    assert "MU 策略回測摘要" in result["report"]
+    assert "策略：breakout" in result["report"]
+    assert "總交易次數：584" in result["report"]
+    assert "勝率：54.79%" in result["report"]
+    assert "最大虧損：-19.61%" in result["report"]
 
 
 def test_api_accepts_analyst_mode_and_returns_metadata(monkeypatch):

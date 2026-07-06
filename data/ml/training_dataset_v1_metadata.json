@@ -1,18 +1,18 @@
 {
-  "generated_at": "2026-06-28T18:41:03+00:00",
+  "generated_at": "2026-07-06T14:58:08+00:00",
   "data_start_date": "2012-02-09",
-  "data_end_date": "2026-05-28",
+  "data_end_date": "2026-06-03",
   "universe": "QQQ100",
   "feature_version": "ml_features_v1",
   "label_version": "ml_labels_v1",
-  "row_count": 327387,
-  "train_count": 194492,
-  "validation_count": 48050,
-  "test_count": 84845,
+  "row_count": 333232,
+  "train_count": 196728,
+  "validation_count": 48883,
+  "test_count": 87621,
   "excluded_row_reason_summary": {
-    "missing_core_technical_features": 4389,
-    "missing_forward_labels": 2020,
-    "missing_market_regime": 15920
+    "missing_core_technical_features": 5188,
+    "missing_forward_labels": 2120,
+    "missing_market_regime": 16116
   },
   "source_tables": [
     "daily_prices",

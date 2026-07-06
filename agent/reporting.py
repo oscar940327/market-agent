@@ -72,6 +72,17 @@ def build_report(
             ),
         }
 
+    if kind == "backtest":
+        return {
+            "report": fallback_report,
+            "analyst": build_analyst_metadata(
+                requested_mode=requested_mode,
+                mode_used="rule_based",
+                fallback_used=False,
+                message="使用固定格式 backtest report，避免 LLM 改變策略回測數字與版型。",
+            ),
+        }
+
     if requested_mode == "rule_based":
         return {
             "report": fallback_report,
