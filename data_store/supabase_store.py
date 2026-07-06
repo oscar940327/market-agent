@@ -416,7 +416,7 @@ def fetch_ml_predictions_for_outcomes(
         "feature_version,prediction_status,prediction_freshness,up_probability_5d,"
         "up_probability_10d,up_probability_20d,large_drop_risk_20d,"
         "predicted_return_5d,predicted_return_10d,predicted_return_20d,"
-        "feature_snapshot"
+        "feature_snapshot,ml_prediction_outcomes(horizon_trading_days,outcome_status)"
         f"&universe=eq.{universe}"
         "&prediction_status=eq.ready"
         "&order=prediction_date.asc,created_at.asc"

@@ -35,12 +35,14 @@ def build_monitoring_metrics_report(
         for horizon in HORIZONS
     }
     warnings = build_warnings(horizon_metrics, thresholds=thresholds)
+    data_status = "no_computed_outcomes" if not computed else "ready"
     return {
         "report_version": "ml_monitoring_metrics_v1",
         "generated_at": generated.replace(microsecond=0).isoformat(),
         "window_days": days,
         "universe": universe,
         "model_version": model_version,
+        "data_status": data_status,
         "thresholds": thresholds,
         "total_outcomes": len(outcomes),
         "computed_outcomes": len(computed),
@@ -49,7 +51,11 @@ def build_monitoring_metrics_report(
         "alert": {
             "should_alert": bool(warnings),
             "severity": "warning" if warnings else "info",
-            "reason": "metrics_warning" if warnings else "metrics_ok",
+            "reason": (
+                "no_computed_outcomes"
+                if data_status == "no_computed_outcomes"
+                else "metrics_warning" if warnings else "metrics_ok"
+            ),
         },
     }
 
@@ -218,6 +224,8 @@ def build_warnings(horizon_metrics: dict, *, thresholds: dict) -> list[dict]:
     warnings = []
     for horizon, metrics in horizon_metrics.items():
         sample_size = metrics["sample_size"]
+        if sample_size == 0:
+            continue
         if sample_size < thresholds["min_sample_size"]:
             warnings.append(
                 {
@@ -269,6 +277,7 @@ def build_monitoring_summary_markdown(report: dict) -> str:
         f"- Window days: `{report['window_days']}`",
         f"- Universe: `{report['universe']}`",
         f"- Model version: `{report.get('model_version') or 'all'}`",
+        f"- Data status: `{report.get('data_status', 'ready')}`",
         f"- Computed outcomes: `{report['computed_outcomes']}`",
         "",
         "## Horizon Metrics",
@@ -371,12 +380,14 @@ def build_calibration_report(
         ),
     }
     warnings = build_calibration_warnings(targets, thresholds=thresholds)
+    data_status = "no_computed_outcomes" if not computed else "ready"
     return {
         "report_version": "ml_calibration_report_v1",
         "generated_at": generated.replace(microsecond=0).isoformat(),
         "window_days": days,
         "universe": universe,
         "model_version": model_version,
+        "data_status": data_status,
         "bucket_count": bucket_count,
         "thresholds": thresholds,
         "total_outcomes": len(outcomes),
@@ -386,7 +397,11 @@ def build_calibration_report(
         "alert": {
             "should_alert": bool(warnings),
             "severity": "warning" if warnings else "info",
-            "reason": "calibration_warning" if warnings else "calibration_ok",
+            "reason": (
+                "no_computed_outcomes"
+                if data_status == "no_computed_outcomes"
+                else "calibration_warning" if warnings else "calibration_ok"
+            ),
         },
     }
 
@@ -501,7 +516,10 @@ def build_calibration_warnings(targets: dict, *, thresholds: dict) -> list[dict]
         usable_sample_size = summary["usable_sample_size"]
         mean_error = summary.get("mean_absolute_calibration_error")
         max_error = summary.get("max_calibration_error")
-        if usable_sample_size < thresholds["min_usable_sample_size"]:
+        if (
+            usable_sample_size > 0
+            and usable_sample_size < thresholds["min_usable_sample_size"]
+        ):
             warnings.append(
                 {
                     "source": target,
@@ -548,6 +566,7 @@ def build_calibration_summary_markdown(report: dict) -> str:
         f"- Window days: `{report['window_days']}`",
         f"- Universe: `{report['universe']}`",
         f"- Model version: `{report.get('model_version') or 'all'}`",
+        f"- Data status: `{report.get('data_status', 'ready')}`",
         f"- Bucket count: `{report['bucket_count']}`",
         f"- Computed outcomes: `{report['computed_outcomes']}`",
         "",

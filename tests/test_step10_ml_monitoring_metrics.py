@@ -103,6 +103,16 @@ def test_build_monitoring_metrics_report_warns_for_small_sample_and_low_accuracy
     assert "up_accuracy" in warning_metrics
 
 
+def test_build_monitoring_metrics_report_does_not_warn_without_computed_outcomes():
+    report = build_monitoring_metrics_report([], thresholds={"min_sample_size": 50})
+
+    assert report["data_status"] == "no_computed_outcomes"
+    assert report["computed_outcomes"] == 0
+    assert report["warnings"] == []
+    assert report["alert"]["should_alert"] is False
+    assert report["alert"]["reason"] == "no_computed_outcomes"
+
+
 def test_build_monitoring_summary_markdown_includes_table_and_warnings():
     report = build_monitoring_metrics_report(
         [make_outcome(horizon=5)],

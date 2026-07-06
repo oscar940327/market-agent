@@ -106,6 +106,7 @@ def test_fetch_ml_predictions_for_outcomes_queries_ready_predictions():
 
     assert rows == [{"id": "prediction-1", "ticker": "MU"}]
     assert "ml_predictions?select=" in captured["url"]
+    assert "ml_prediction_outcomes" in captured["url"]
     assert "prediction_status=eq.ready" in captured["url"]
     assert "limit=25" in captured["url"]
 
@@ -148,7 +149,7 @@ def test_upsert_ml_prediction_outcomes_uses_prediction_horizon_conflict_key():
     assert captured["payload"][0]["ticker"] == "MU"
 
 
-def test_compute_ml_prediction_outcomes_script_groups_prices_and_writes(monkeypatch, capsys):
+def test_compute_ml_prediction_outcomes_script_groups_prices_and_writes(monkeypatch, tmp_path, capsys):
     monkeypatch.setattr(script, "fetch_ml_predictions_for_outcomes", lambda universe, limit: [make_prediction()])
     monkeypatch.setattr(script, "fetch_daily_prices", lambda ticker, provider: make_price_rows())
 
@@ -160,11 +161,45 @@ def test_compute_ml_prediction_outcomes_script_groups_prices_and_writes(monkeypa
 
     monkeypatch.setattr(script, "upsert_ml_prediction_outcomes", fake_upsert)
 
-    result = script.main([])
+    result = script.main(["--output-dir", str(tmp_path)])
 
     output = capsys.readouterr().out
     assert result == 0
     assert "predictions=1" in output
     assert "computed=3" in output
+    assert "predictions_to_update=1" in output
+    assert "json_path=" in output
     assert "supabase=success" in output
     assert len(captured["updates"]) == 3
+
+
+def test_compute_ml_prediction_outcomes_skips_completed_predictions(monkeypatch, tmp_path, capsys):
+    prediction = make_prediction()
+    prediction["ml_prediction_outcomes"] = [
+        {"horizon_trading_days": 5, "outcome_status": "computed"},
+        {"horizon_trading_days": 10, "outcome_status": "computed"},
+        {"horizon_trading_days": 20, "outcome_status": "computed"},
+    ]
+    monkeypatch.setattr(
+        script,
+        "fetch_ml_predictions_for_outcomes",
+        lambda universe, limit: [prediction],
+    )
+    monkeypatch.setattr(script, "fetch_daily_prices", lambda ticker, provider: [])
+
+    captured = {}
+
+    def fake_upsert(updates):
+        captured["updates"] = updates
+        return {"status": "skipped", "upserted_count": 0}
+
+    monkeypatch.setattr(script, "upsert_ml_prediction_outcomes", fake_upsert)
+
+    result = script.main(["--skip-supabase", "--output-dir", str(tmp_path)])
+
+    output = capsys.readouterr().out
+    assert result == 0
+    assert "predictions=1" in output
+    assert "predictions_skipped_completed=1" in output
+    assert "predictions_to_update=0" in output
+    assert "updates=0" in output

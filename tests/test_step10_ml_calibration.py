@@ -107,6 +107,16 @@ def test_build_calibration_report_warns_when_error_is_high():
     assert report["alert"]["should_alert"] is True
 
 
+def test_build_calibration_report_does_not_warn_without_computed_outcomes():
+    report = build_calibration_report([], thresholds={"min_usable_sample_size": 50})
+
+    assert report["data_status"] == "no_computed_outcomes"
+    assert report["computed_outcomes"] == 0
+    assert report["warnings"] == []
+    assert report["alert"]["should_alert"] is False
+    assert report["alert"]["reason"] == "no_computed_outcomes"
+
+
 def test_build_calibration_summary_markdown_lists_targets_and_buckets():
     report = build_calibration_report(
         [make_outcome(horizon=5, probability=0.65, actual_up=True)],
