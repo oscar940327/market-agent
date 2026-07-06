@@ -1,0 +1,244 @@
+{
+  "report_version": "step15_model_comparison_v1",
+  "generated_at": "2026-07-06T10:27:14+00:00",
+  "target_comparisons": {
+    "up_5d": {
+      "target": "up_5d",
+      "baseline_best_model": "logistic_regression",
+      "candidate_best_model": "logistic_regression_calibrated_sigmoid",
+      "baseline_test_metrics": {
+        "accuracy": 0.5064175850079556,
+        "precision": 0.5630508977593115,
+        "recall": 0.411299239057385,
+        "roc_auc": 0.5240333686254579,
+        "positive_rate": 0.543661971830986,
+        "predicted_positive_rate": 0.3971359537981024,
+        "rows": 84845
+      },
+      "candidate_test_metrics": {
+        "accuracy": 0.543661971830986,
+        "precision": 0.543661971830986,
+        "recall": 1.0,
+        "roc_auc": 0.524969046278445,
+        "brier_score": 0.24890238223001626,
+        "positive_rate": 0.543661971830986,
+        "predicted_positive_rate": 1.0,
+        "rows": 84845
+      },
+      "static_delta": {
+        "accuracy_delta": 0.037244,
+        "roc_auc_delta": 0.000936,
+        "brier_score_candidate": 0.24890238223001626
+      },
+      "candidate_promotion_readiness": "not_ready",
+      "decision": "reject",
+      "blocking_reasons": [
+        "candidate did not pass static promotion floors"
+      ]
+    },
+    "up_10d": {
+      "target": "up_10d",
+      "baseline_best_model": "random_forest",
+      "candidate_best_model": "xgboost_calibrated_sigmoid",
+      "baseline_test_metrics": {
+        "accuracy": 0.49967587954505277,
+        "precision": 0.6048972724052426,
+        "recall": 0.28950156819530387,
+        "roc_auc": 0.5213409199812744,
+        "positive_rate": 0.5561671282927692,
+        "predicted_positive_rate": 0.266179503801049,
+        "rows": 84845
+      },
+      "candidate_test_metrics": {
+        "accuracy": 0.5013377335140551,
+        "precision": 0.5882629617569377,
+        "recall": 0.34455793845893024,
+        "roc_auc": 0.5254346635518192,
+        "brier_score": 0.249506348876513,
+        "positive_rate": 0.5561671282927692,
+        "predicted_positive_rate": 0.32575873651953563,
+        "rows": 84845
+      },
+      "static_delta": {
+        "accuracy_delta": 0.001662,
+        "roc_auc_delta": 0.004094,
+        "brier_score_candidate": 0.249506348876513
+      },
+      "candidate_promotion_readiness": "not_ready",
+      "decision": "reject",
+      "blocking_reasons": [
+        "candidate did not pass static promotion floors"
+      ]
+    },
+    "up_20d": {
+      "target": "up_20d",
+      "baseline_best_model": "logistic_regression",
+      "candidate_best_model": "logistic_regression",
+      "baseline_test_metrics": {
+        "accuracy": 0.49545642053155753,
+        "precision": 0.6029063626761846,
+        "recall": 0.3416083699622361,
+        "roc_auc": 0.5277259421071716,
+        "positive_rate": 0.5711473864105133,
+        "predicted_positive_rate": 0.32361364841770285,
+        "rows": 84845
+      },
+      "candidate_test_metrics": {
+        "accuracy": 0.49859154929577465,
+        "precision": 0.6031159597086194,
+        "recall": 0.3570853711384882,
+        "roc_auc": 0.5290040737495193,
+        "brier_score": 0.25170603492165167,
+        "positive_rate": 0.5711473864105133,
+        "predicted_positive_rate": 0.3381578171960634,
+        "rows": 84845
+      },
+      "static_delta": {
+        "accuracy_delta": 0.003135,
+        "roc_auc_delta": 0.001278,
+        "brier_score_candidate": 0.25170603492165167
+      },
+      "candidate_promotion_readiness": "not_ready",
+      "decision": "reject",
+      "blocking_reasons": [
+        "candidate did not pass static promotion floors"
+      ]
+    },
+    "large_drop_20d": {
+      "target": "large_drop_20d",
+      "baseline_best_model": "random_forest",
+      "candidate_best_model": "random_forest_calibrated_sigmoid",
+      "baseline_test_metrics": {
+        "accuracy": 0.5307089398314574,
+        "precision": 0.288865610943373,
+        "recall": 0.7302939038321736,
+        "roc_auc": 0.6414093049429013,
+        "positive_rate": 0.22697860804997347,
+        "predicted_positive_rate": 0.5738346396369851,
+        "rows": 84845
+      },
+      "candidate_test_metrics": {
+        "accuracy": 0.7463492250574577,
+        "precision": 0.37860744555305226,
+        "recall": 0.1832485200955447,
+        "roc_auc": 0.6381437757311733,
+        "brier_score": 0.18171815789895057,
+        "positive_rate": 0.22697860804997347,
+        "predicted_positive_rate": 0.10985915492957747,
+        "rows": 84845
+      },
+      "static_delta": {
+        "accuracy_delta": 0.21564,
+        "roc_auc_delta": -0.003266,
+        "brier_score_candidate": 0.18171815789895057
+      },
+      "candidate_promotion_readiness": "not_ready",
+      "decision": "reject",
+      "blocking_reasons": [
+        "candidate did not pass static promotion floors",
+        "large-drop target still requires outcome-based hit-rate monitoring"
+      ]
+    }
+  },
+  "risk_review": {
+    "status": "not_ready",
+    "risk_findings": [
+      {
+        "source": "return_model",
+        "target": "forward_return_5d",
+        "severity": "critical",
+        "message": "downside underestimation rate 0.996 is above ceiling 0.250"
+      },
+      {
+        "source": "return_model",
+        "target": "forward_return_10d",
+        "severity": "critical",
+        "message": "downside underestimation rate 0.978 is above ceiling 0.250"
+      },
+      {
+        "source": "return_model",
+        "target": "forward_return_20d",
+        "severity": "critical",
+        "message": "downside underestimation rate 0.980 is above ceiling 0.250"
+      },
+      {
+        "source": "return_model",
+        "target": "max_drop_20d",
+        "severity": "critical",
+        "message": "downside underestimation rate 0.422 is above ceiling 0.200"
+      },
+      {
+        "source": "candidate_large_drop",
+        "target": "large_drop_20d",
+        "severity": "critical",
+        "message": "large_drop_20d candidate is not ready for promotion."
+      },
+      {
+        "source": "data_coverage",
+        "target": "news_features",
+        "severity": "warning",
+        "message": "news features should remain low-trust for ML training until coverage improves."
+      },
+      {
+        "source": "data_coverage",
+        "target": "similar_cases",
+        "severity": "warning",
+        "message": "similar-case features should not be core model inputs yet."
+      }
+    ],
+    "policy": {
+      "ml_reference_trust": "reduced_trust",
+      "report_wording": "ML Reference may be shown, but downside and probability outputs should be described as conservative reference only.",
+      "promotion_blocked": true
+    }
+  },
+  "promotion_policy": {
+    "recommendation": "reject",
+    "checks": [
+      {
+        "name": "up_5d_static_readiness",
+        "status": "reject",
+        "message": "candidate did not pass static promotion floors"
+      },
+      {
+        "name": "up_10d_static_readiness",
+        "status": "reject",
+        "message": "candidate did not pass static promotion floors"
+      },
+      {
+        "name": "up_20d_static_readiness",
+        "status": "reject",
+        "message": "candidate did not pass static promotion floors"
+      },
+      {
+        "name": "large_drop_20d_static_readiness",
+        "status": "reject",
+        "message": "candidate did not pass static promotion floors; large-drop target still requires outcome-based hit-rate monitoring"
+      },
+      {
+        "name": "risk_review",
+        "status": "reject",
+        "message": "ML Reference may be shown, but downside and probability outputs should be described as conservative reference only."
+      }
+    ],
+    "rules": [
+      "Do not promote a model unless static metrics, monitoring outcomes, calibration, and risk review pass.",
+      "Do not use news or similar-case features as core ML inputs until coverage improves.",
+      "Do not promote a candidate that worsens downside underestimation.",
+      "Manual approval is required before replacing production ML Reference."
+    ]
+  },
+  "final_recommendation": {
+    "status": "do_not_promote",
+    "ml_reference_policy": "reduced_trust",
+    "message": "Do not promote Step 15 candidate models. Keep ML Reference visible but reduced-trust."
+  },
+  "documentation_notes": [
+    "Step 15 introduced a model improvement framework based on target specs, baseline audit, diagnostics, candidate experiments, calibration, and promotion policy.",
+    "Current candidate models should not replace production ML Reference.",
+    "Research Report should keep ML Reference visible but reduced-trust until downside risk and calibration improve.",
+    "Downside risk remains the main blocker; max-drop and large-drop monitoring should be improved before promotion.",
+    "Calibrated variants improved some static metrics, but calibration alone was not enough for promotion.",
+    "README / model policy should clearly say the current ML model is research-only and not production-grade investment advice."
+  ]
+}

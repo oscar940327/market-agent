@@ -1,0 +1,272 @@
+{
+  "report_version": "step15_baseline_audit_v1",
+  "generated_at": "2026-07-05T20:55:06+00:00",
+  "baseline_model_version": "baseline_v1",
+  "return_model_version": "return_baseline_v1",
+  "classification_targets": {
+    "up_5d": {
+      "status": "warning",
+      "best_model": "logistic_regression",
+      "test_metrics": {
+        "accuracy": 0.5064175850079556,
+        "precision": 0.5630508977593115,
+        "recall": 0.411299239057385,
+        "roc_auc": 0.5240333686254579,
+        "positive_rate": 0.543661971830986,
+        "predicted_positive_rate": 0.3971359537981024,
+        "rows": 84845
+      },
+      "positive_rate": 0.543661971830986,
+      "row_counts": {
+        "train": 194492,
+        "validation": 48050,
+        "test": 84845
+      },
+      "issues": [
+        "test ROC AUC 0.524 is below floor 0.530",
+        "test accuracy 0.506 is below floor 0.510"
+      ]
+    },
+    "up_10d": {
+      "status": "warning",
+      "best_model": "random_forest",
+      "test_metrics": {
+        "accuracy": 0.49967587954505277,
+        "precision": 0.6048972724052426,
+        "recall": 0.28950156819530387,
+        "roc_auc": 0.5213409199812744,
+        "positive_rate": 0.5561671282927692,
+        "predicted_positive_rate": 0.266179503801049,
+        "rows": 84845
+      },
+      "positive_rate": 0.5561671282927692,
+      "row_counts": {
+        "train": 194492,
+        "validation": 48050,
+        "test": 84845
+      },
+      "issues": [
+        "test ROC AUC 0.521 is below floor 0.530",
+        "test accuracy 0.500 is below floor 0.510"
+      ]
+    },
+    "up_20d": {
+      "status": "warning",
+      "best_model": "logistic_regression",
+      "test_metrics": {
+        "accuracy": 0.49545642053155753,
+        "precision": 0.6029063626761846,
+        "recall": 0.3416083699622361,
+        "roc_auc": 0.5277259421071716,
+        "positive_rate": 0.5711473864105133,
+        "predicted_positive_rate": 0.32361364841770285,
+        "rows": 84845
+      },
+      "positive_rate": 0.5711473864105133,
+      "row_counts": {
+        "train": 194492,
+        "validation": 48050,
+        "test": 84845
+      },
+      "issues": [
+        "test ROC AUC 0.528 is below floor 0.530",
+        "test accuracy 0.495 is below floor 0.510"
+      ]
+    },
+    "large_drop_20d": {
+      "status": "warning",
+      "best_model": "random_forest",
+      "test_metrics": {
+        "accuracy": 0.5307089398314574,
+        "precision": 0.288865610943373,
+        "recall": 0.7302939038321736,
+        "roc_auc": 0.6414093049429013,
+        "positive_rate": 0.22697860804997347,
+        "predicted_positive_rate": 0.5738346396369851,
+        "rows": 84845
+      },
+      "positive_rate": 0.22697860804997347,
+      "row_counts": {
+        "train": 194492,
+        "validation": 48050,
+        "test": 84845
+      },
+      "issues": [
+        "large-drop hit rate is missing"
+      ]
+    }
+  },
+  "regression_targets": {
+    "forward_return_5d": {
+      "status": "warning",
+      "best_model": "random_forest_regressor",
+      "test_metrics": {
+        "mae": 0.03719218287310989,
+        "rmse": 0.055522091085200675,
+        "directional_accuracy": 0.5335965584300784,
+        "downside_underestimation_rate": 0.9959442595673876,
+        "rows": 84845
+      },
+      "row_counts": {
+        "train": 194492,
+        "validation": 48050,
+        "test": 84845
+      },
+      "training_row_count_used": 120000,
+      "issues": [
+        "downside underestimation rate 0.996 is above ceiling 0.250"
+      ]
+    },
+    "forward_return_10d": {
+      "status": "warning",
+      "best_model": "random_forest_regressor",
+      "test_metrics": {
+        "mae": 0.05402763152773112,
+        "rmse": 0.07988300389437174,
+        "directional_accuracy": 0.5400436089339383,
+        "downside_underestimation_rate": 0.9776924922043656,
+        "rows": 84845
+      },
+      "row_counts": {
+        "train": 194492,
+        "validation": 48050,
+        "test": 84845
+      },
+      "training_row_count_used": 120000,
+      "issues": [
+        "downside underestimation rate 0.978 is above ceiling 0.250"
+      ]
+    },
+    "forward_return_20d": {
+      "status": "warning",
+      "best_model": "random_forest_regressor",
+      "test_metrics": {
+        "mae": 0.0790583676009092,
+        "rmse": 0.11763282031893725,
+        "directional_accuracy": 0.550945842418528,
+        "downside_underestimation_rate": 0.9801293518645934,
+        "rows": 84845
+      },
+      "row_counts": {
+        "train": 194492,
+        "validation": 48050,
+        "test": 84845
+      },
+      "training_row_count_used": 120000,
+      "issues": [
+        "downside underestimation rate 0.980 is above ceiling 0.250"
+      ]
+    },
+    "max_drop_20d": {
+      "status": "warning",
+      "best_model": "random_forest_regressor",
+      "test_metrics": {
+        "mae": 0.04455098218928602,
+        "rmse": 0.06182918663767813,
+        "directional_accuracy": null,
+        "downside_underestimation_rate": 0.4224644940774353,
+        "rows": 84845
+      },
+      "row_counts": {
+        "train": 194492,
+        "validation": 48050,
+        "test": 84845
+      },
+      "training_row_count_used": 120000,
+      "issues": [
+        "downside underestimation rate 0.422 is above ceiling 0.200"
+      ]
+    }
+  },
+  "monitoring": {
+    "metrics_warning_count": 0,
+    "calibration_warning_count": 0,
+    "health_status": "unknown",
+    "ml_reference_policy": "unknown",
+    "metrics_warnings": [],
+    "calibration_warnings": []
+  },
+  "finding_summary": {
+    "total": 12,
+    "critical": 5,
+    "warning": 7
+  },
+  "findings": [
+    {
+      "source": "classification",
+      "target": "up_5d",
+      "severity": "warning",
+      "message": "test ROC AUC 0.524 is below floor 0.530"
+    },
+    {
+      "source": "classification",
+      "target": "up_5d",
+      "severity": "warning",
+      "message": "test accuracy 0.506 is below floor 0.510"
+    },
+    {
+      "source": "classification",
+      "target": "up_10d",
+      "severity": "warning",
+      "message": "test ROC AUC 0.521 is below floor 0.530"
+    },
+    {
+      "source": "classification",
+      "target": "up_10d",
+      "severity": "warning",
+      "message": "test accuracy 0.500 is below floor 0.510"
+    },
+    {
+      "source": "classification",
+      "target": "up_20d",
+      "severity": "warning",
+      "message": "test ROC AUC 0.528 is below floor 0.530"
+    },
+    {
+      "source": "classification",
+      "target": "up_20d",
+      "severity": "warning",
+      "message": "test accuracy 0.495 is below floor 0.510"
+    },
+    {
+      "source": "classification",
+      "target": "large_drop_20d",
+      "severity": "critical",
+      "message": "large-drop hit rate is missing"
+    },
+    {
+      "source": "regression",
+      "target": "forward_return_5d",
+      "severity": "critical",
+      "message": "downside underestimation rate 0.996 is above ceiling 0.250"
+    },
+    {
+      "source": "regression",
+      "target": "forward_return_10d",
+      "severity": "critical",
+      "message": "downside underestimation rate 0.978 is above ceiling 0.250"
+    },
+    {
+      "source": "regression",
+      "target": "forward_return_20d",
+      "severity": "critical",
+      "message": "downside underestimation rate 0.980 is above ceiling 0.250"
+    },
+    {
+      "source": "regression",
+      "target": "max_drop_20d",
+      "severity": "critical",
+      "message": "downside underestimation rate 0.422 is above ceiling 0.200"
+    },
+    {
+      "source": "monitoring",
+      "target": "health",
+      "severity": "warning",
+      "message": "ML health status is unknown."
+    }
+  ],
+  "next_actions": [
+    "Improve classification features and candidate models before promotion.",
+    "Prioritize downside risk modeling and conservative max-drop estimates."
+  ]
+}

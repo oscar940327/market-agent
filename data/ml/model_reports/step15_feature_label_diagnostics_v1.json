@@ -1,0 +1,536 @@
+{
+  "report_version": "step15_feature_label_diagnostics_v1",
+  "generated_at": "2026-07-05T20:55:07+00:00",
+  "thresholds": {
+    "max_core_feature_missing_rate": 0.2,
+    "max_news_missing_rate": 0.7,
+    "max_similar_case_empty_rate": 0.9,
+    "min_label_positive_rate": 0.1,
+    "max_label_positive_rate": 0.9
+  },
+  "metadata": {
+    "generated_at": "2026-06-28T18:41:03+00:00",
+    "data_start_date": "2012-02-09",
+    "data_end_date": "2026-05-28",
+    "universe": "QQQ100",
+    "feature_version": "ml_features_v1",
+    "label_version": "ml_labels_v1",
+    "row_count": 327387,
+    "train_count": 194492,
+    "validation_count": 48050,
+    "test_count": 84845,
+    "excluded_row_reason_summary": {
+      "missing_core_technical_features": 4389,
+      "missing_forward_labels": 2020,
+      "missing_market_regime": 15920
+    },
+    "source_tables": [
+      "daily_prices",
+      "technical_features",
+      "market_regimes",
+      "news_events",
+      "similar_case_results"
+    ]
+  },
+  "row_count": 327387,
+  "ticker_count": 101,
+  "date_range": {
+    "start": "2012-02-09",
+    "end": "2026-05-28"
+  },
+  "split_counts": {
+    "test": 84845,
+    "train": 194492,
+    "validation": 48050
+  },
+  "label_summary": {
+    "up_5d": {
+      "status": "available",
+      "overall": {
+        "count": 327387,
+        "positive_rate": 0.550437
+      },
+      "by_split": {
+        "test": {
+          "count": 84845,
+          "positive_rate": 0.543662
+        },
+        "train": {
+          "count": 194492,
+          "positive_rate": 0.562131
+        },
+        "validation": {
+          "count": 48050,
+          "positive_rate": 0.515068
+        }
+      }
+    },
+    "up_10d": {
+      "status": "available",
+      "overall": {
+        "count": 327387,
+        "positive_rate": 0.566192
+      },
+      "by_split": {
+        "test": {
+          "count": 84845,
+          "positive_rate": 0.556167
+        },
+        "train": {
+          "count": 194492,
+          "positive_rate": 0.582708
+        },
+        "validation": {
+          "count": 48050,
+          "positive_rate": 0.517045
+        }
+      }
+    },
+    "up_20d": {
+      "status": "available",
+      "overall": {
+        "count": 327387,
+        "positive_rate": 0.586535
+      },
+      "by_split": {
+        "test": {
+          "count": 84845,
+          "positive_rate": 0.571147
+        },
+        "train": {
+          "count": 194492,
+          "positive_rate": 0.610848
+        },
+        "validation": {
+          "count": 48050,
+          "positive_rate": 0.515297
+        }
+      }
+    },
+    "large_drop_20d": {
+      "status": "available",
+      "overall": {
+        "count": 327387,
+        "positive_rate": 0.211945
+      },
+      "by_split": {
+        "test": {
+          "count": 84845,
+          "positive_rate": 0.226979
+        },
+        "train": {
+          "count": 194492,
+          "positive_rate": 0.177015
+        },
+        "validation": {
+          "count": 48050,
+          "positive_rate": 0.326785
+        }
+      }
+    },
+    "forward_return_5d": {
+      "status": "available",
+      "overall": {
+        "count": 327387,
+        "mean": 0.004918,
+        "median": 0.004243,
+        "p25": -0.018981,
+        "p75": 0.027461
+      },
+      "by_split": {
+        "test": {
+          "count": 84845,
+          "mean": 0.006501,
+          "median": 0.00394,
+          "p25": -0.021265,
+          "p75": 0.030322
+        },
+        "train": {
+          "count": 194492,
+          "mean": 0.005301,
+          "median": 0.004819,
+          "p25": -0.016162,
+          "p75": 0.025969
+        },
+        "validation": {
+          "count": 48050,
+          "mean": 0.000573,
+          "median": 0.001633,
+          "p25": -0.028115,
+          "p75": 0.029597
+        }
+      }
+    },
+    "forward_return_10d": {
+      "status": "available",
+      "overall": {
+        "count": 327387,
+        "mean": 0.009727,
+        "median": 0.007972,
+        "p25": -0.025528,
+        "p75": 0.042329
+      },
+      "by_split": {
+        "test": {
+          "count": 84845,
+          "mean": 0.012605,
+          "median": 0.007228,
+          "p25": -0.028602,
+          "p75": 0.046639
+        },
+        "train": {
+          "count": 194492,
+          "mean": 0.010576,
+          "median": 0.009163,
+          "p25": -0.021282,
+          "p75": 0.040545
+        },
+        "validation": {
+          "count": 48050,
+          "mean": 0.001212,
+          "median": 0.002551,
+          "p25": -0.040749,
+          "p75": 0.043172
+        }
+      }
+    },
+    "forward_return_20d": {
+      "status": "available",
+      "overall": {
+        "count": 327387,
+        "mean": 0.019517,
+        "median": 0.015673,
+        "p25": -0.034118,
+        "p75": 0.065727
+      },
+      "by_split": {
+        "test": {
+          "count": 84845,
+          "mean": 0.024968,
+          "median": 0.014148,
+          "p25": -0.038556,
+          "p75": 0.072003
+        },
+        "train": {
+          "count": 194492,
+          "mean": 0.021229,
+          "median": 0.01825,
+          "p25": -0.027169,
+          "p75": 0.063808
+        },
+        "validation": {
+          "count": 48050,
+          "mean": 0.002962,
+          "median": 0.003887,
+          "p25": -0.059838,
+          "p75": 0.063525
+        }
+      }
+    },
+    "max_drop_20d": {
+      "status": "available",
+      "overall": {
+        "count": 327387,
+        "mean": -0.04758,
+        "median": -0.031548,
+        "p25": -0.070728,
+        "p75": -0.007656
+      },
+      "by_split": {
+        "test": {
+          "count": 84845,
+          "mean": -0.049513,
+          "median": -0.03521,
+          "p25": -0.074741,
+          "p75": -0.009462
+        },
+        "train": {
+          "count": 194492,
+          "mean": -0.0422,
+          "median": -0.02736,
+          "p25": -0.062401,
+          "p75": -0.006083
+        },
+        "validation": {
+          "count": 48050,
+          "mean": -0.065944,
+          "median": -0.047136,
+          "p25": -0.099222,
+          "p75": -0.013466
+        }
+      }
+    }
+  },
+  "feature_missing_summary": {
+    "price_vs_ma5": {
+      "status": "available",
+      "missing_rate": 0.0
+    },
+    "price_vs_ma10": {
+      "status": "available",
+      "missing_rate": 0.0
+    },
+    "price_vs_ma20": {
+      "status": "available",
+      "missing_rate": 0.0
+    },
+    "price_vs_ma50": {
+      "status": "available",
+      "missing_rate": 0.0
+    },
+    "price_vs_ma200": {
+      "status": "available",
+      "missing_rate": 0.0
+    },
+    "ma5_vs_ma20": {
+      "status": "available",
+      "missing_rate": 0.0
+    },
+    "ma20_vs_ma50": {
+      "status": "available",
+      "missing_rate": 0.0
+    },
+    "ma50_vs_ma200": {
+      "status": "available",
+      "missing_rate": 0.0
+    },
+    "rsi_14": {
+      "status": "available",
+      "missing_rate": 0.0
+    },
+    "macd": {
+      "status": "available",
+      "missing_rate": 0.0
+    },
+    "macd_histogram": {
+      "status": "available",
+      "missing_rate": 0.0
+    },
+    "is_breakout": {
+      "status": "available",
+      "missing_rate": 0.0
+    },
+    "is_volume_surge": {
+      "status": "available",
+      "missing_rate": 0.0
+    },
+    "is_pullback": {
+      "status": "available",
+      "missing_rate": 0.0
+    },
+    "return_5d": {
+      "status": "available",
+      "missing_rate": 0.0
+    },
+    "return_10d": {
+      "status": "available",
+      "missing_rate": 0.0
+    },
+    "return_20d": {
+      "status": "available",
+      "missing_rate": 0.0
+    },
+    "volatility_20d": {
+      "status": "available",
+      "missing_rate": 0.0
+    },
+    "volume_ratio_20d": {
+      "status": "available",
+      "missing_rate": 0.0
+    },
+    "market_regime": {
+      "status": "available",
+      "missing_rate": 0.0
+    },
+    "qqq_above_ma200": {
+      "status": "available",
+      "missing_rate": 0.0
+    },
+    "qqq_return_20d": {
+      "status": "available",
+      "missing_rate": 0.0
+    },
+    "qqq_return_60d": {
+      "status": "available",
+      "missing_rate": 0.0
+    },
+    "regime_changed": {
+      "status": "available",
+      "missing_rate": 0.0
+    },
+    "news_count_30d": {
+      "status": "available",
+      "missing_rate": 0.0
+    },
+    "news_sentiment_score_30d": {
+      "status": "available",
+      "missing_rate": 0.0
+    },
+    "high_importance_news_count_30d": {
+      "status": "available",
+      "missing_rate": 0.0
+    },
+    "risk_event_count_30d": {
+      "status": "available",
+      "missing_rate": 0.0
+    },
+    "earnings_guidance_count_30d": {
+      "status": "available",
+      "missing_rate": 0.0
+    },
+    "product_demand_count_30d": {
+      "status": "available",
+      "missing_rate": 0.0
+    },
+    "days_since_last_news": {
+      "status": "available",
+      "missing_rate": 1.0
+    },
+    "news_missing": {
+      "status": "available",
+      "missing_rate": 0.0
+    },
+    "similar_case_sample_size": {
+      "status": "available",
+      "missing_rate": 0.0
+    },
+    "similar_case_win_rate_5d": {
+      "status": "available",
+      "missing_rate": 1.0
+    },
+    "similar_case_win_rate_10d": {
+      "status": "available",
+      "missing_rate": 1.0
+    },
+    "similar_case_win_rate_20d": {
+      "status": "available",
+      "missing_rate": 1.0
+    },
+    "similar_case_average_return_20d": {
+      "status": "available",
+      "missing_rate": 1.0
+    },
+    "similar_case_max_loss_20d": {
+      "status": "available",
+      "missing_rate": 1.0
+    },
+    "similar_case_evidence_quality": {
+      "status": "available",
+      "missing_rate": 0.0
+    }
+  },
+  "feature_group_summary": {
+    "technical": {
+      "status": "available",
+      "column_count": 8,
+      "average_missing_rate": 0.0
+    },
+    "market": {
+      "status": "available",
+      "column_count": 5,
+      "average_missing_rate": 0.0
+    },
+    "news": {
+      "status": "available",
+      "column_count": 8,
+      "average_missing_rate": 0.125,
+      "news_missing_rate": 1.0,
+      "average_news_count_30d": 0.0
+    },
+    "similar_cases": {
+      "status": "available",
+      "column_count": 7,
+      "average_missing_rate": 0.714286,
+      "empty_similar_case_rate": 1.0,
+      "average_sample_size": 0.0
+    }
+  },
+  "market_regime_summary": {
+    "status": "available",
+    "distribution": {
+      "bull": {
+        "count": 244522,
+        "rate": 0.74689
+      },
+      "bear": {
+        "count": 43730,
+        "rate": 0.133573
+      },
+      "sideways": {
+        "count": 39135,
+        "rate": 0.119537
+      }
+    }
+  },
+  "warnings": [
+    {
+      "source": "feature_missing",
+      "status": "warning",
+      "metric": "days_since_last_news",
+      "value": 1.0,
+      "threshold": 0.2,
+      "message": "days_since_last_news missing rate is high."
+    },
+    {
+      "source": "feature_missing",
+      "status": "warning",
+      "metric": "similar_case_win_rate_5d",
+      "value": 1.0,
+      "threshold": 0.2,
+      "message": "similar_case_win_rate_5d missing rate is high."
+    },
+    {
+      "source": "feature_missing",
+      "status": "warning",
+      "metric": "similar_case_win_rate_10d",
+      "value": 1.0,
+      "threshold": 0.2,
+      "message": "similar_case_win_rate_10d missing rate is high."
+    },
+    {
+      "source": "feature_missing",
+      "status": "warning",
+      "metric": "similar_case_win_rate_20d",
+      "value": 1.0,
+      "threshold": 0.2,
+      "message": "similar_case_win_rate_20d missing rate is high."
+    },
+    {
+      "source": "feature_missing",
+      "status": "warning",
+      "metric": "similar_case_average_return_20d",
+      "value": 1.0,
+      "threshold": 0.2,
+      "message": "similar_case_average_return_20d missing rate is high."
+    },
+    {
+      "source": "feature_missing",
+      "status": "warning",
+      "metric": "similar_case_max_loss_20d",
+      "value": 1.0,
+      "threshold": 0.2,
+      "message": "similar_case_max_loss_20d missing rate is high."
+    },
+    {
+      "source": "news_coverage",
+      "status": "warning",
+      "metric": "news_missing_rate",
+      "value": 1.0,
+      "threshold": 0.7,
+      "message": "News coverage is sparse for the training dataset."
+    },
+    {
+      "source": "similar_cases",
+      "status": "warning",
+      "metric": "empty_similar_case_rate",
+      "value": 1.0,
+      "threshold": 0.9,
+      "message": "Similar-case evidence is mostly empty."
+    }
+  ],
+  "next_actions": [
+    "Treat news features as low-trust until coverage improves.",
+    "Do not rely on similar-case features as core model inputs yet.",
+    "Review high-missing features before training candidate models."
+  ]
+}
