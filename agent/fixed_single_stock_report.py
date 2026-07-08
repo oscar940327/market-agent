@@ -196,12 +196,33 @@ def build_exit_signal_analysis(context: dict) -> str:
 
     signal = exit_signal.get("exit_signal", "unknown")
     weakening = exit_signal.get("weakening_signal_20d", "unknown")
-    reason = exit_signal.get("reason") or ""
+    reason = remove_duplicate_weakening_reason(exit_signal.get("reason") or "", weakening)
     action_note = exit_signal.get("action_note") or ""
-    return (
+    lines = [
         f"目前 exit signal 為「{signal}」，20 日轉弱風險為「{weakening}」。"
-        f"{reason} {action_note} 這是持有風險觀察，不是直接買賣指令。"
-    ).strip()
+    ]
+    if reason:
+        lines.append(f"判斷原因：{reason}")
+    if action_note:
+        lines.append(f"如果已持有：{action_note}")
+    lines.append("這是持有風險觀察，不是直接買賣指令。")
+    return "\n".join(lines)
+
+
+def remove_duplicate_weakening_reason(reason: str, weakening: str) -> str:
+    text = reason.strip()
+    if not text:
+        return ""
+
+    duplicates = [
+        f"20 日轉弱風險為 {weakening}。",
+        f"20 日轉弱風險為「{weakening}」。",
+        f"20 日轉弱風險為 {weakening}",
+        f"20 日轉弱風險為「{weakening}」",
+    ]
+    for duplicate in duplicates:
+        text = text.replace(duplicate, "")
+    return " ".join(text.split()).strip()
 
 
 def build_overall_assessment(context: dict) -> str:

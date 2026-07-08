@@ -143,7 +143,8 @@ def build_report(
 
 def apply_required_report_sections(*, kind: str, data: dict, report: str) -> str:
     if kind == "theme" and data.get("status") == "success":
-        return ensure_theme_ml_reference_section(data=data, report=report)
+        report = ensure_theme_ml_reference_section(data=data, report=report)
+        return enforce_theme_ml_reference_trust(data=data, report=report)
 
     if kind != "single_stock" or data.get("status") != "success":
         return report
@@ -175,6 +176,34 @@ def ensure_theme_ml_reference_section(*, data: dict, report: str) -> str:
 
     section = format_theme_ml_reference_section(ml_reference)
     return insert_theme_section_before_risk(report, section)
+
+
+def enforce_theme_ml_reference_trust(*, data: dict, report: str) -> str:
+    trust = data.get("theme_ml_reference_trust") or data.get("ml_reference_trust") or {}
+    if trust.get("status") != "reduced_trust":
+        return report
+
+    reduced_trust_text = "ML Reference 目前為降低信任狀態，相關數字需保守解讀"
+    replacements = [
+        "ML 參考信任度為一般",
+        "ML Reference 信任度為一般",
+        "ML 參考信任度為正常",
+        "ML Reference 信任度為正常",
+        "ML 參考信任度一般",
+        "ML Reference 信任度一般",
+    ]
+    updated_report = report
+    for phrase in replacements:
+        updated_report = updated_report.replace(phrase, reduced_trust_text)
+
+    if "ML Reference" in updated_report and "降低信任" not in updated_report:
+        updated_report = updated_report.replace(
+            "ML Reference",
+            f"ML Reference\n{reduced_trust_text}。",
+            1,
+        )
+
+    return updated_report
 
 
 def format_theme_ml_reference_section(ml_reference: dict) -> str:
@@ -244,7 +273,10 @@ def format_required_exit_signal_section(exit_signal: dict | None) -> str:
 
     signal = exit_signal.get("exit_signal", "unknown")
     weakening = exit_signal.get("weakening_signal_20d", "unknown")
-    reason = exit_signal.get("reason") or ""
+    reason = remove_duplicate_exit_weakening_reason(
+        exit_signal.get("reason") or "",
+        weakening,
+    )
     action_note = exit_signal.get("action_note") or ""
     reasons = exit_signal.get("reasons") or []
 
@@ -264,6 +296,22 @@ def format_required_exit_signal_section(exit_signal: dict | None) -> str:
 
     lines.append("這是持有風險觀察，不是直接買賣指令。")
     return "\n".join(lines)
+
+
+def remove_duplicate_exit_weakening_reason(reason: str, weakening: str) -> str:
+    text = reason.strip()
+    if not text:
+        return ""
+
+    duplicates = [
+        f"20 日轉弱風險為 {weakening}。",
+        f"20 日轉弱風險為「{weakening}」。",
+        f"20 日轉弱風險為 {weakening}",
+        f"20 日轉弱風險為「{weakening}」",
+    ]
+    for duplicate in duplicates:
+        text = text.replace(duplicate, "")
+    return " ".join(text.split()).strip()
 
 
 def insert_section_before_summary(report: str, section: str) -> str:
@@ -312,10 +360,11 @@ def build_rule_based_report(kind: str, data: dict) -> str:
         return format_backtest_analysis(data)
 
     if kind == "theme":
-        return ensure_theme_ml_reference_section(
+        report = ensure_theme_ml_reference_section(
             data=data,
             report=format_theme_analysis(data),
         )
+        return enforce_theme_ml_reference_trust(data=data, report=report)
 
     if kind == "portfolio":
         return format_portfolio_analysis(data)

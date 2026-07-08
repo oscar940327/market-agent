@@ -17,6 +17,8 @@ LLM_ANALYST_SYSTEM_PROMPT = """
 - 如果 payload 有 exit_signal，請加入「持有風險 / 出場觀察」段落；它只能是觀察訊號，不是買賣指令。
 - 如果 payload 有 ml_reference_trust，請在「ML Reference」段落開頭說明信任狀態；`reduced_trust` 請寫成「降低信任」。
 - 如果 ML Reference 是降低信任，20 日上漲機率要保守看待，20 日中途大跌風險只能作為風險控管參考，不可單獨當作出場依據。
+- 如果主題分析的 ML Reference 是降低信任，不可以寫成「信任度為一般」或「信任度正常」。
+- 如果新聞 / 基本面偏正，但技術面與 ML 偏弱，請寫「尚未形成多方共振」，不要寫成三者一致偏弱。
 
 嚴格限制：
 - 不可以自行抓資料。
@@ -326,6 +328,7 @@ def build_theme_payload(data: dict) -> dict:
         "theme_news_summary": summarize_theme_news(successful_results),
         "theme_fundamental_summary": summarize_theme_fundamentals(successful_results),
         "theme_ml_reference": data.get("theme_ml_reference") or data.get("ml_research"),
+        "ml_reference_trust": data.get("theme_ml_reference_trust") or data.get("ml_reference_trust"),
         "evidence_quality": data.get("evidence_quality", {}),
         "top_results": top_results,
     }

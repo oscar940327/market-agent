@@ -489,6 +489,8 @@ def test_run_theme_analysis_scans_matched_theme(monkeypatch):
     assert result["theme_ml_reference"]["coverage"]["total_ticker_count"] == 4
     assert result["theme_ml_reference"]["coverage"]["successful_ticker_count"] == 4
     assert result["theme_ml_reference"]["targets"]["up_20d"]["sample_size"] == 4
+    assert result["theme_ml_reference_trust"]["status"] == "reduced_trust"
+    assert result["ml_reference_trust"] == result["theme_ml_reference_trust"]
     assert result["failed_results"] == []
     assert result["ml_research"] == result["theme_ml_reference"]
 
@@ -626,6 +628,60 @@ def test_theme_report_inserts_ml_reference_section_when_llm_omits_it():
     assert "ML Reference" in result["report"]
     assert "ML 覆蓋：1/1 檔" in result["report"]
     assert "aggregated / fresh" in result["report"]
+
+
+def test_theme_report_enforces_reduced_ml_trust_when_llm_says_general():
+    data = {
+        "intent": "industry_trend",
+        "status": "success",
+        "theme_name": "記憶體 / 儲存",
+        "query": "記憶體類股現在適合進場嗎",
+        "scan_scope": {"available_ticker_count": 1, "scanned_ticker_count": 1, "scan_limit": None},
+        "sector_summary": {
+            "successful_count": 1,
+            "average_score": -1,
+            "strongest_ticker": "MU",
+            "positive_breadth": 0,
+            "breadth_label": "weak_breadth",
+        },
+        "evidence_quality": {"level": "medium"},
+        "results": [],
+        "theme_ml_reference": {
+            "status": "success",
+            "source": {"type": "theme_aggregate", "prediction_freshness": "fresh"},
+            "coverage": {"covered_ticker_count": 1, "total_ticker_count": 1},
+            "targets": {
+                "up_20d": {"probability_percent": 48.0, "signal_label": "unclear direction"},
+                "large_drop_20d": {"probability_percent": 55.0, "signal_label": "high large-drop risk"},
+            },
+        },
+        "theme_ml_reference_trust": {
+            "status": "reduced_trust",
+            "label": "降低信任",
+        },
+    }
+
+    class FakeClient:
+        provider = "fake"
+        model = "fake"
+
+        def generate(self, system_prompt, user_prompt):
+            return "\n".join(
+                [
+                    "主題摘要",
+                    "",
+                    "ML Reference",
+                    "- ML 參考信任度為一般，涵蓋率 100%。",
+                    "",
+                    "風險提醒",
+                    "- test",
+                ]
+            )
+
+    result = build_report(kind="theme", data=data, analyst_mode="llm", llm_client=FakeClient())
+
+    assert "降低信任" in result["report"]
+    assert "信任度為一般" not in result["report"]
 
 
 def test_analyze_news_items_classifies_topic_sentiment_and_importance():

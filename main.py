@@ -5,6 +5,7 @@ from agent.market_manager import (
     fetch_price_data,
     validate_price_data,
 )
+from agent.ml_reference_trust import build_ml_reference_trust
 from agent.reporting import build_report, get_default_analyst_mode
 from data.themes import (
     find_theme_key,
@@ -142,6 +143,7 @@ def run_theme_analysis(user_query: str) -> dict:
         sorted_results,
         total_ticker_count=len(results),
     )
+    theme_ml_reference_trust = build_ml_reference_trust(theme_ml_reference)
     failed_results = build_theme_failed_results(sorted_results)
 
     return {
@@ -160,6 +162,8 @@ def run_theme_analysis(user_query: str) -> dict:
         "evidence_quality": evidence_quality,
         "failed_results": failed_results,
         "theme_ml_reference": theme_ml_reference,
+        "theme_ml_reference_trust": theme_ml_reference_trust,
+        "ml_reference_trust": theme_ml_reference_trust,
         "ml_research": theme_ml_reference,
         "results": sorted_results,
     }
