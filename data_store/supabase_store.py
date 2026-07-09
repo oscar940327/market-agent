@@ -514,7 +514,7 @@ def fetch_ml_prediction_outcomes_for_metrics(
         "predicted_large_drop_risk,up_prediction_correct,"
         "large_drop_prediction_correct,return_error,outcome_status,price_provider,"
         "computed_at,ml_predictions!inner(model_version,feature_version,universe,"
-        "prediction_status,prediction_freshness,predicted_max_drop_20d)"
+        "prediction_status,prediction_freshness,predicted_max_drop_20d,feature_snapshot)"
     )
     query = {
         "select": select,
