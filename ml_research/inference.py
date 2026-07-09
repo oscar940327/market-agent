@@ -5,6 +5,7 @@ from pathlib import Path
 import pandas as pd
 
 from ml_baseline.trainer import BASELINE_TARGETS, MODEL_VERSION, build_raw_feature_frame
+from ml_model_improvement.downside_overlay import apply_downside_risk_overlay
 
 
 DEFAULT_MODEL_NAME = "random_forest"
@@ -56,7 +57,7 @@ def build_ml_research_output(
         "risk_note": build_risk_note(large_drop_probability),
         "summary": build_summary(targets),
     }
-    return output
+    return apply_downside_risk_overlay(output, feature_row)
 
 
 def predict_probability(*, feature_row: dict, payload: dict) -> float:

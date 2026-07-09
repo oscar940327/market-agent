@@ -1,0 +1,1014 @@
+{
+  "report_version": "step20_calibration_action_v1",
+  "generated_at": "2026-07-09T09:13:53+00:00",
+  "window_days": 90,
+  "universe": "QQQ100",
+  "model_version": null,
+  "thresholds": {
+    "min_bucket_sample_size": 20,
+    "large_adjustment_threshold": 0.1
+  },
+  "source_calibration_report": {
+    "report_version": "ml_calibration_report_v1",
+    "generated_at": "2026-07-09T09:13:53+00:00",
+    "window_days": 90,
+    "universe": "QQQ100",
+    "model_version": null,
+    "data_status": "ready",
+    "bucket_count": 10,
+    "thresholds": {
+      "min_usable_sample_size": 50,
+      "max_mean_absolute_calibration_error": 0.1,
+      "max_calibration_error": 0.2
+    },
+    "total_outcomes": 1000,
+    "computed_outcomes": 1000,
+    "targets": {
+      "up_5d": {
+        "target": "up_5d",
+        "horizon_trading_days": 5,
+        "usable_sample_size": 334,
+        "bucket_count": 3,
+        "mean_absolute_calibration_error": 0.255765,
+        "max_calibration_error": 0.609222,
+        "buckets": [
+          {
+            "bucket": "0.0-0.1",
+            "bucket_low": 0.0,
+            "bucket_high": 0.1,
+            "sample_size": 0,
+            "avg_predicted_probability": null,
+            "actual_rate": null,
+            "calibration_error": null
+          },
+          {
+            "bucket": "0.1-0.2",
+            "bucket_low": 0.1,
+            "bucket_high": 0.2,
+            "sample_size": 0,
+            "avg_predicted_probability": null,
+            "actual_rate": null,
+            "calibration_error": null
+          },
+          {
+            "bucket": "0.2-0.3",
+            "bucket_low": 0.2,
+            "bucket_high": 0.3,
+            "sample_size": 0,
+            "avg_predicted_probability": null,
+            "actual_rate": null,
+            "calibration_error": null
+          },
+          {
+            "bucket": "0.3-0.4",
+            "bucket_low": 0.3,
+            "bucket_high": 0.4,
+            "sample_size": 1,
+            "avg_predicted_probability": 0.390778,
+            "actual_rate": 1.0,
+            "calibration_error": 0.609222
+          },
+          {
+            "bucket": "0.4-0.5",
+            "bucket_low": 0.4,
+            "bucket_high": 0.5,
+            "sample_size": 273,
+            "avg_predicted_probability": 0.474807,
+            "actual_rate": 0.468864,
+            "calibration_error": -0.005943
+          },
+          {
+            "bucket": "0.5-0.6",
+            "bucket_low": 0.5,
+            "bucket_high": 0.6,
+            "sample_size": 60,
+            "avg_predicted_probability": 0.514536,
+            "actual_rate": 0.666667,
+            "calibration_error": 0.152131
+          },
+          {
+            "bucket": "0.6-0.7",
+            "bucket_low": 0.6,
+            "bucket_high": 0.7,
+            "sample_size": 0,
+            "avg_predicted_probability": null,
+            "actual_rate": null,
+            "calibration_error": null
+          },
+          {
+            "bucket": "0.7-0.8",
+            "bucket_low": 0.7,
+            "bucket_high": 0.8,
+            "sample_size": 0,
+            "avg_predicted_probability": null,
+            "actual_rate": null,
+            "calibration_error": null
+          },
+          {
+            "bucket": "0.8-0.9",
+            "bucket_low": 0.8,
+            "bucket_high": 0.9,
+            "sample_size": 0,
+            "avg_predicted_probability": null,
+            "actual_rate": null,
+            "calibration_error": null
+          },
+          {
+            "bucket": "0.9-1.0",
+            "bucket_low": 0.9,
+            "bucket_high": 1.0,
+            "sample_size": 0,
+            "avg_predicted_probability": null,
+            "actual_rate": null,
+            "calibration_error": null
+          }
+        ]
+      },
+      "up_10d": {
+        "target": "up_10d",
+        "horizon_trading_days": 10,
+        "usable_sample_size": 332,
+        "bucket_count": 3,
+        "mean_absolute_calibration_error": 0.103513,
+        "max_calibration_error": 0.158775,
+        "buckets": [
+          {
+            "bucket": "0.0-0.1",
+            "bucket_low": 0.0,
+            "bucket_high": 0.1,
+            "sample_size": 0,
+            "avg_predicted_probability": null,
+            "actual_rate": null,
+            "calibration_error": null
+          },
+          {
+            "bucket": "0.1-0.2",
+            "bucket_low": 0.1,
+            "bucket_high": 0.2,
+            "sample_size": 0,
+            "avg_predicted_probability": null,
+            "actual_rate": null,
+            "calibration_error": null
+          },
+          {
+            "bucket": "0.2-0.3",
+            "bucket_low": 0.2,
+            "bucket_high": 0.3,
+            "sample_size": 0,
+            "avg_predicted_probability": null,
+            "actual_rate": null,
+            "calibration_error": null
+          },
+          {
+            "bucket": "0.3-0.4",
+            "bucket_low": 0.3,
+            "bucket_high": 0.4,
+            "sample_size": 2,
+            "avg_predicted_probability": 0.39788,
+            "actual_rate": 0.5,
+            "calibration_error": 0.10212
+          },
+          {
+            "bucket": "0.4-0.5",
+            "bucket_low": 0.4,
+            "bucket_high": 0.5,
+            "sample_size": 312,
+            "avg_predicted_probability": 0.463105,
+            "actual_rate": 0.413462,
+            "calibration_error": -0.049644
+          },
+          {
+            "bucket": "0.5-0.6",
+            "bucket_low": 0.5,
+            "bucket_high": 0.6,
+            "sample_size": 18,
+            "avg_predicted_probability": 0.507892,
+            "actual_rate": 0.666667,
+            "calibration_error": 0.158775
+          },
+          {
+            "bucket": "0.6-0.7",
+            "bucket_low": 0.6,
+            "bucket_high": 0.7,
+            "sample_size": 0,
+            "avg_predicted_probability": null,
+            "actual_rate": null,
+            "calibration_error": null
+          },
+          {
+            "bucket": "0.7-0.8",
+            "bucket_low": 0.7,
+            "bucket_high": 0.8,
+            "sample_size": 0,
+            "avg_predicted_probability": null,
+            "actual_rate": null,
+            "calibration_error": null
+          },
+          {
+            "bucket": "0.8-0.9",
+            "bucket_low": 0.8,
+            "bucket_high": 0.9,
+            "sample_size": 0,
+            "avg_predicted_probability": null,
+            "actual_rate": null,
+            "calibration_error": null
+          },
+          {
+            "bucket": "0.9-1.0",
+            "bucket_low": 0.9,
+            "bucket_high": 1.0,
+            "sample_size": 0,
+            "avg_predicted_probability": null,
+            "actual_rate": null,
+            "calibration_error": null
+          }
+        ]
+      },
+      "up_20d": {
+        "target": "up_20d",
+        "horizon_trading_days": 20,
+        "usable_sample_size": 334,
+        "bucket_count": 3,
+        "mean_absolute_calibration_error": 0.114605,
+        "max_calibration_error": 0.132314,
+        "buckets": [
+          {
+            "bucket": "0.0-0.1",
+            "bucket_low": 0.0,
+            "bucket_high": 0.1,
+            "sample_size": 0,
+            "avg_predicted_probability": null,
+            "actual_rate": null,
+            "calibration_error": null
+          },
+          {
+            "bucket": "0.1-0.2",
+            "bucket_low": 0.1,
+            "bucket_high": 0.2,
+            "sample_size": 0,
+            "avg_predicted_probability": null,
+            "actual_rate": null,
+            "calibration_error": null
+          },
+          {
+            "bucket": "0.2-0.3",
+            "bucket_low": 0.2,
+            "bucket_high": 0.3,
+            "sample_size": 0,
+            "avg_predicted_probability": null,
+            "actual_rate": null,
+            "calibration_error": null
+          },
+          {
+            "bucket": "0.3-0.4",
+            "bucket_low": 0.3,
+            "bucket_high": 0.4,
+            "sample_size": 4,
+            "avg_predicted_probability": 0.382314,
+            "actual_rate": 0.25,
+            "calibration_error": -0.132314
+          },
+          {
+            "bucket": "0.4-0.5",
+            "bucket_low": 0.4,
+            "bucket_high": 0.5,
+            "sample_size": 309,
+            "avg_predicted_probability": 0.459451,
+            "actual_rate": 0.540453,
+            "calibration_error": 0.081002
+          },
+          {
+            "bucket": "0.5-0.6",
+            "bucket_low": 0.5,
+            "bucket_high": 0.6,
+            "sample_size": 21,
+            "avg_predicted_probability": 0.511452,
+            "actual_rate": 0.380952,
+            "calibration_error": -0.1305
+          },
+          {
+            "bucket": "0.6-0.7",
+            "bucket_low": 0.6,
+            "bucket_high": 0.7,
+            "sample_size": 0,
+            "avg_predicted_probability": null,
+            "actual_rate": null,
+            "calibration_error": null
+          },
+          {
+            "bucket": "0.7-0.8",
+            "bucket_low": 0.7,
+            "bucket_high": 0.8,
+            "sample_size": 0,
+            "avg_predicted_probability": null,
+            "actual_rate": null,
+            "calibration_error": null
+          },
+          {
+            "bucket": "0.8-0.9",
+            "bucket_low": 0.8,
+            "bucket_high": 0.9,
+            "sample_size": 0,
+            "avg_predicted_probability": null,
+            "actual_rate": null,
+            "calibration_error": null
+          },
+          {
+            "bucket": "0.9-1.0",
+            "bucket_low": 0.9,
+            "bucket_high": 1.0,
+            "sample_size": 0,
+            "avg_predicted_probability": null,
+            "actual_rate": null,
+            "calibration_error": null
+          }
+        ]
+      },
+      "large_drop_20d": {
+        "target": "large_drop_20d",
+        "horizon_trading_days": 20,
+        "usable_sample_size": 334,
+        "bucket_count": 6,
+        "mean_absolute_calibration_error": 0.231413,
+        "max_calibration_error": 0.36084,
+        "buckets": [
+          {
+            "bucket": "0.0-0.1",
+            "bucket_low": 0.0,
+            "bucket_high": 0.1,
+            "sample_size": 0,
+            "avg_predicted_probability": null,
+            "actual_rate": null,
+            "calibration_error": null
+          },
+          {
+            "bucket": "0.1-0.2",
+            "bucket_low": 0.1,
+            "bucket_high": 0.2,
+            "sample_size": 0,
+            "avg_predicted_probability": null,
+            "actual_rate": null,
+            "calibration_error": null
+          },
+          {
+            "bucket": "0.2-0.3",
+            "bucket_low": 0.2,
+            "bucket_high": 0.3,
+            "sample_size": 0,
+            "avg_predicted_probability": null,
+            "actual_rate": null,
+            "calibration_error": null
+          },
+          {
+            "bucket": "0.3-0.4",
+            "bucket_low": 0.3,
+            "bucket_high": 0.4,
+            "sample_size": 6,
+            "avg_predicted_probability": 0.36084,
+            "actual_rate": 0.0,
+            "calibration_error": -0.36084
+          },
+          {
+            "bucket": "0.4-0.5",
+            "bucket_low": 0.4,
+            "bucket_high": 0.5,
+            "sample_size": 22,
+            "avg_predicted_probability": 0.458516,
+            "actual_rate": 0.181818,
+            "calibration_error": -0.276698
+          },
+          {
+            "bucket": "0.5-0.6",
+            "bucket_low": 0.5,
+            "bucket_high": 0.6,
+            "sample_size": 109,
+            "avg_predicted_probability": 0.551962,
+            "actual_rate": 0.192661,
+            "calibration_error": -0.359302
+          },
+          {
+            "bucket": "0.6-0.7",
+            "bucket_low": 0.6,
+            "bucket_high": 0.7,
+            "sample_size": 151,
+            "avg_predicted_probability": 0.6462,
+            "actual_rate": 0.509934,
+            "calibration_error": -0.136266
+          },
+          {
+            "bucket": "0.7-0.8",
+            "bucket_low": 0.7,
+            "bucket_high": 0.8,
+            "sample_size": 45,
+            "avg_predicted_probability": 0.733648,
+            "actual_rate": 0.8,
+            "calibration_error": 0.066352
+          },
+          {
+            "bucket": "0.8-0.9",
+            "bucket_low": 0.8,
+            "bucket_high": 0.9,
+            "sample_size": 1,
+            "avg_predicted_probability": 0.810982,
+            "actual_rate": 1.0,
+            "calibration_error": 0.189018
+          },
+          {
+            "bucket": "0.9-1.0",
+            "bucket_low": 0.9,
+            "bucket_high": 1.0,
+            "sample_size": 0,
+            "avg_predicted_probability": null,
+            "actual_rate": null,
+            "calibration_error": null
+          }
+        ]
+      }
+    },
+    "warnings": [
+      {
+        "source": "up_5d",
+        "status": "warning",
+        "metric": "mean_absolute_calibration_error",
+        "value": 0.255765,
+        "threshold": 0.1,
+        "message": "up_5d mean absolute calibration error is above threshold."
+      },
+      {
+        "source": "up_5d",
+        "status": "warning",
+        "metric": "max_calibration_error",
+        "value": 0.609222,
+        "threshold": 0.2,
+        "message": "up_5d max calibration error is above threshold."
+      },
+      {
+        "source": "up_10d",
+        "status": "warning",
+        "metric": "mean_absolute_calibration_error",
+        "value": 0.103513,
+        "threshold": 0.1,
+        "message": "up_10d mean absolute calibration error is above threshold."
+      },
+      {
+        "source": "up_20d",
+        "status": "warning",
+        "metric": "mean_absolute_calibration_error",
+        "value": 0.114605,
+        "threshold": 0.1,
+        "message": "up_20d mean absolute calibration error is above threshold."
+      },
+      {
+        "source": "large_drop_20d",
+        "status": "warning",
+        "metric": "mean_absolute_calibration_error",
+        "value": 0.231413,
+        "threshold": 0.1,
+        "message": "large_drop_20d mean absolute calibration error is above threshold."
+      },
+      {
+        "source": "large_drop_20d",
+        "status": "warning",
+        "metric": "max_calibration_error",
+        "value": 0.36084,
+        "threshold": 0.2,
+        "message": "large_drop_20d max calibration error is above threshold."
+      }
+    ],
+    "alert": {
+      "should_alert": true,
+      "severity": "warning",
+      "reason": "calibration_warning"
+    }
+  },
+  "target_actions": {
+    "up_5d": {
+      "target": "up_5d",
+      "horizon_trading_days": 5,
+      "usable_sample_size": 334,
+      "mean_absolute_calibration_error": 0.255765,
+      "max_calibration_error": 0.609222,
+      "usable_bucket_count": 2,
+      "large_adjustment_count": 1,
+      "recommendation": "calibration_table_usable_but_large_adjustments",
+      "bucket_actions": [
+        {
+          "bucket": "0.0-0.1",
+          "sample_size": 0,
+          "status": "insufficient_sample",
+          "avg_predicted_probability": null,
+          "actual_rate": null,
+          "suggested_probability": null,
+          "adjustment": null,
+          "adjustment_size": null,
+          "display_policy": "do_not_use_bucket_adjustment"
+        },
+        {
+          "bucket": "0.1-0.2",
+          "sample_size": 0,
+          "status": "insufficient_sample",
+          "avg_predicted_probability": null,
+          "actual_rate": null,
+          "suggested_probability": null,
+          "adjustment": null,
+          "adjustment_size": null,
+          "display_policy": "do_not_use_bucket_adjustment"
+        },
+        {
+          "bucket": "0.2-0.3",
+          "sample_size": 0,
+          "status": "insufficient_sample",
+          "avg_predicted_probability": null,
+          "actual_rate": null,
+          "suggested_probability": null,
+          "adjustment": null,
+          "adjustment_size": null,
+          "display_policy": "do_not_use_bucket_adjustment"
+        },
+        {
+          "bucket": "0.3-0.4",
+          "sample_size": 1,
+          "status": "insufficient_sample",
+          "avg_predicted_probability": 0.390778,
+          "actual_rate": 1.0,
+          "suggested_probability": null,
+          "adjustment": null,
+          "adjustment_size": null,
+          "display_policy": "do_not_use_bucket_adjustment"
+        },
+        {
+          "bucket": "0.4-0.5",
+          "sample_size": 273,
+          "status": "usable",
+          "avg_predicted_probability": 0.474807,
+          "actual_rate": 0.468864,
+          "suggested_probability": 0.468864,
+          "adjustment": -0.005943,
+          "adjustment_size": 0.005943,
+          "calibration_error": -0.005943,
+          "display_policy": "use_calibrated_probability"
+        },
+        {
+          "bucket": "0.5-0.6",
+          "sample_size": 60,
+          "status": "usable",
+          "avg_predicted_probability": 0.514536,
+          "actual_rate": 0.666667,
+          "suggested_probability": 0.666667,
+          "adjustment": 0.152131,
+          "adjustment_size": 0.152131,
+          "calibration_error": 0.152131,
+          "display_policy": "use_calibrated_probability_with_reduced_trust"
+        },
+        {
+          "bucket": "0.6-0.7",
+          "sample_size": 0,
+          "status": "insufficient_sample",
+          "avg_predicted_probability": null,
+          "actual_rate": null,
+          "suggested_probability": null,
+          "adjustment": null,
+          "adjustment_size": null,
+          "display_policy": "do_not_use_bucket_adjustment"
+        },
+        {
+          "bucket": "0.7-0.8",
+          "sample_size": 0,
+          "status": "insufficient_sample",
+          "avg_predicted_probability": null,
+          "actual_rate": null,
+          "suggested_probability": null,
+          "adjustment": null,
+          "adjustment_size": null,
+          "display_policy": "do_not_use_bucket_adjustment"
+        },
+        {
+          "bucket": "0.8-0.9",
+          "sample_size": 0,
+          "status": "insufficient_sample",
+          "avg_predicted_probability": null,
+          "actual_rate": null,
+          "suggested_probability": null,
+          "adjustment": null,
+          "adjustment_size": null,
+          "display_policy": "do_not_use_bucket_adjustment"
+        },
+        {
+          "bucket": "0.9-1.0",
+          "sample_size": 0,
+          "status": "insufficient_sample",
+          "avg_predicted_probability": null,
+          "actual_rate": null,
+          "suggested_probability": null,
+          "adjustment": null,
+          "adjustment_size": null,
+          "display_policy": "do_not_use_bucket_adjustment"
+        }
+      ]
+    },
+    "up_10d": {
+      "target": "up_10d",
+      "horizon_trading_days": 10,
+      "usable_sample_size": 332,
+      "mean_absolute_calibration_error": 0.103513,
+      "max_calibration_error": 0.158775,
+      "usable_bucket_count": 1,
+      "large_adjustment_count": 0,
+      "recommendation": "insufficient_bucket_coverage",
+      "bucket_actions": [
+        {
+          "bucket": "0.0-0.1",
+          "sample_size": 0,
+          "status": "insufficient_sample",
+          "avg_predicted_probability": null,
+          "actual_rate": null,
+          "suggested_probability": null,
+          "adjustment": null,
+          "adjustment_size": null,
+          "display_policy": "do_not_use_bucket_adjustment"
+        },
+        {
+          "bucket": "0.1-0.2",
+          "sample_size": 0,
+          "status": "insufficient_sample",
+          "avg_predicted_probability": null,
+          "actual_rate": null,
+          "suggested_probability": null,
+          "adjustment": null,
+          "adjustment_size": null,
+          "display_policy": "do_not_use_bucket_adjustment"
+        },
+        {
+          "bucket": "0.2-0.3",
+          "sample_size": 0,
+          "status": "insufficient_sample",
+          "avg_predicted_probability": null,
+          "actual_rate": null,
+          "suggested_probability": null,
+          "adjustment": null,
+          "adjustment_size": null,
+          "display_policy": "do_not_use_bucket_adjustment"
+        },
+        {
+          "bucket": "0.3-0.4",
+          "sample_size": 2,
+          "status": "insufficient_sample",
+          "avg_predicted_probability": 0.39788,
+          "actual_rate": 0.5,
+          "suggested_probability": null,
+          "adjustment": null,
+          "adjustment_size": null,
+          "display_policy": "do_not_use_bucket_adjustment"
+        },
+        {
+          "bucket": "0.4-0.5",
+          "sample_size": 312,
+          "status": "usable",
+          "avg_predicted_probability": 0.463105,
+          "actual_rate": 0.413462,
+          "suggested_probability": 0.413462,
+          "adjustment": -0.049643,
+          "adjustment_size": 0.049643,
+          "calibration_error": -0.049644,
+          "display_policy": "use_calibrated_probability"
+        },
+        {
+          "bucket": "0.5-0.6",
+          "sample_size": 18,
+          "status": "insufficient_sample",
+          "avg_predicted_probability": 0.507892,
+          "actual_rate": 0.666667,
+          "suggested_probability": null,
+          "adjustment": null,
+          "adjustment_size": null,
+          "display_policy": "do_not_use_bucket_adjustment"
+        },
+        {
+          "bucket": "0.6-0.7",
+          "sample_size": 0,
+          "status": "insufficient_sample",
+          "avg_predicted_probability": null,
+          "actual_rate": null,
+          "suggested_probability": null,
+          "adjustment": null,
+          "adjustment_size": null,
+          "display_policy": "do_not_use_bucket_adjustment"
+        },
+        {
+          "bucket": "0.7-0.8",
+          "sample_size": 0,
+          "status": "insufficient_sample",
+          "avg_predicted_probability": null,
+          "actual_rate": null,
+          "suggested_probability": null,
+          "adjustment": null,
+          "adjustment_size": null,
+          "display_policy": "do_not_use_bucket_adjustment"
+        },
+        {
+          "bucket": "0.8-0.9",
+          "sample_size": 0,
+          "status": "insufficient_sample",
+          "avg_predicted_probability": null,
+          "actual_rate": null,
+          "suggested_probability": null,
+          "adjustment": null,
+          "adjustment_size": null,
+          "display_policy": "do_not_use_bucket_adjustment"
+        },
+        {
+          "bucket": "0.9-1.0",
+          "sample_size": 0,
+          "status": "insufficient_sample",
+          "avg_predicted_probability": null,
+          "actual_rate": null,
+          "suggested_probability": null,
+          "adjustment": null,
+          "adjustment_size": null,
+          "display_policy": "do_not_use_bucket_adjustment"
+        }
+      ]
+    },
+    "up_20d": {
+      "target": "up_20d",
+      "horizon_trading_days": 20,
+      "usable_sample_size": 334,
+      "mean_absolute_calibration_error": 0.114605,
+      "max_calibration_error": 0.132314,
+      "usable_bucket_count": 2,
+      "large_adjustment_count": 1,
+      "recommendation": "calibration_table_usable_but_large_adjustments",
+      "bucket_actions": [
+        {
+          "bucket": "0.0-0.1",
+          "sample_size": 0,
+          "status": "insufficient_sample",
+          "avg_predicted_probability": null,
+          "actual_rate": null,
+          "suggested_probability": null,
+          "adjustment": null,
+          "adjustment_size": null,
+          "display_policy": "do_not_use_bucket_adjustment"
+        },
+        {
+          "bucket": "0.1-0.2",
+          "sample_size": 0,
+          "status": "insufficient_sample",
+          "avg_predicted_probability": null,
+          "actual_rate": null,
+          "suggested_probability": null,
+          "adjustment": null,
+          "adjustment_size": null,
+          "display_policy": "do_not_use_bucket_adjustment"
+        },
+        {
+          "bucket": "0.2-0.3",
+          "sample_size": 0,
+          "status": "insufficient_sample",
+          "avg_predicted_probability": null,
+          "actual_rate": null,
+          "suggested_probability": null,
+          "adjustment": null,
+          "adjustment_size": null,
+          "display_policy": "do_not_use_bucket_adjustment"
+        },
+        {
+          "bucket": "0.3-0.4",
+          "sample_size": 4,
+          "status": "insufficient_sample",
+          "avg_predicted_probability": 0.382314,
+          "actual_rate": 0.25,
+          "suggested_probability": null,
+          "adjustment": null,
+          "adjustment_size": null,
+          "display_policy": "do_not_use_bucket_adjustment"
+        },
+        {
+          "bucket": "0.4-0.5",
+          "sample_size": 309,
+          "status": "usable",
+          "avg_predicted_probability": 0.459451,
+          "actual_rate": 0.540453,
+          "suggested_probability": 0.540453,
+          "adjustment": 0.081002,
+          "adjustment_size": 0.081002,
+          "calibration_error": 0.081002,
+          "display_policy": "use_calibrated_probability"
+        },
+        {
+          "bucket": "0.5-0.6",
+          "sample_size": 21,
+          "status": "usable",
+          "avg_predicted_probability": 0.511452,
+          "actual_rate": 0.380952,
+          "suggested_probability": 0.380952,
+          "adjustment": -0.1305,
+          "adjustment_size": 0.1305,
+          "calibration_error": -0.1305,
+          "display_policy": "use_calibrated_probability_with_reduced_trust"
+        },
+        {
+          "bucket": "0.6-0.7",
+          "sample_size": 0,
+          "status": "insufficient_sample",
+          "avg_predicted_probability": null,
+          "actual_rate": null,
+          "suggested_probability": null,
+          "adjustment": null,
+          "adjustment_size": null,
+          "display_policy": "do_not_use_bucket_adjustment"
+        },
+        {
+          "bucket": "0.7-0.8",
+          "sample_size": 0,
+          "status": "insufficient_sample",
+          "avg_predicted_probability": null,
+          "actual_rate": null,
+          "suggested_probability": null,
+          "adjustment": null,
+          "adjustment_size": null,
+          "display_policy": "do_not_use_bucket_adjustment"
+        },
+        {
+          "bucket": "0.8-0.9",
+          "sample_size": 0,
+          "status": "insufficient_sample",
+          "avg_predicted_probability": null,
+          "actual_rate": null,
+          "suggested_probability": null,
+          "adjustment": null,
+          "adjustment_size": null,
+          "display_policy": "do_not_use_bucket_adjustment"
+        },
+        {
+          "bucket": "0.9-1.0",
+          "sample_size": 0,
+          "status": "insufficient_sample",
+          "avg_predicted_probability": null,
+          "actual_rate": null,
+          "suggested_probability": null,
+          "adjustment": null,
+          "adjustment_size": null,
+          "display_policy": "do_not_use_bucket_adjustment"
+        }
+      ]
+    },
+    "large_drop_20d": {
+      "target": "large_drop_20d",
+      "horizon_trading_days": 20,
+      "usable_sample_size": 334,
+      "mean_absolute_calibration_error": 0.231413,
+      "max_calibration_error": 0.36084,
+      "usable_bucket_count": 4,
+      "large_adjustment_count": 3,
+      "recommendation": "calibration_table_usable_but_large_adjustments",
+      "bucket_actions": [
+        {
+          "bucket": "0.0-0.1",
+          "sample_size": 0,
+          "status": "insufficient_sample",
+          "avg_predicted_probability": null,
+          "actual_rate": null,
+          "suggested_probability": null,
+          "adjustment": null,
+          "adjustment_size": null,
+          "display_policy": "do_not_use_bucket_adjustment"
+        },
+        {
+          "bucket": "0.1-0.2",
+          "sample_size": 0,
+          "status": "insufficient_sample",
+          "avg_predicted_probability": null,
+          "actual_rate": null,
+          "suggested_probability": null,
+          "adjustment": null,
+          "adjustment_size": null,
+          "display_policy": "do_not_use_bucket_adjustment"
+        },
+        {
+          "bucket": "0.2-0.3",
+          "sample_size": 0,
+          "status": "insufficient_sample",
+          "avg_predicted_probability": null,
+          "actual_rate": null,
+          "suggested_probability": null,
+          "adjustment": null,
+          "adjustment_size": null,
+          "display_policy": "do_not_use_bucket_adjustment"
+        },
+        {
+          "bucket": "0.3-0.4",
+          "sample_size": 6,
+          "status": "insufficient_sample",
+          "avg_predicted_probability": 0.36084,
+          "actual_rate": 0.0,
+          "suggested_probability": null,
+          "adjustment": null,
+          "adjustment_size": null,
+          "display_policy": "do_not_use_bucket_adjustment"
+        },
+        {
+          "bucket": "0.4-0.5",
+          "sample_size": 22,
+          "status": "usable",
+          "avg_predicted_probability": 0.458516,
+          "actual_rate": 0.181818,
+          "suggested_probability": 0.181818,
+          "adjustment": -0.276698,
+          "adjustment_size": 0.276698,
+          "calibration_error": -0.276698,
+          "display_policy": "use_calibrated_probability_with_reduced_trust"
+        },
+        {
+          "bucket": "0.5-0.6",
+          "sample_size": 109,
+          "status": "usable",
+          "avg_predicted_probability": 0.551962,
+          "actual_rate": 0.192661,
+          "suggested_probability": 0.192661,
+          "adjustment": -0.359301,
+          "adjustment_size": 0.359301,
+          "calibration_error": -0.359302,
+          "display_policy": "use_calibrated_probability_with_reduced_trust"
+        },
+        {
+          "bucket": "0.6-0.7",
+          "sample_size": 151,
+          "status": "usable",
+          "avg_predicted_probability": 0.6462,
+          "actual_rate": 0.509934,
+          "suggested_probability": 0.509934,
+          "adjustment": -0.136266,
+          "adjustment_size": 0.136266,
+          "calibration_error": -0.136266,
+          "display_policy": "use_calibrated_probability_with_reduced_trust"
+        },
+        {
+          "bucket": "0.7-0.8",
+          "sample_size": 45,
+          "status": "usable",
+          "avg_predicted_probability": 0.733648,
+          "actual_rate": 0.8,
+          "suggested_probability": 0.8,
+          "adjustment": 0.066352,
+          "adjustment_size": 0.066352,
+          "calibration_error": 0.066352,
+          "display_policy": "use_calibrated_probability"
+        },
+        {
+          "bucket": "0.8-0.9",
+          "sample_size": 1,
+          "status": "insufficient_sample",
+          "avg_predicted_probability": 0.810982,
+          "actual_rate": 1.0,
+          "suggested_probability": null,
+          "adjustment": null,
+          "adjustment_size": null,
+          "display_policy": "do_not_use_bucket_adjustment"
+        },
+        {
+          "bucket": "0.9-1.0",
+          "sample_size": 0,
+          "status": "insufficient_sample",
+          "avg_predicted_probability": null,
+          "actual_rate": null,
+          "suggested_probability": null,
+          "adjustment": null,
+          "adjustment_size": null,
+          "display_policy": "do_not_use_bucket_adjustment"
+        }
+      ]
+    }
+  },
+  "findings": [
+    {
+      "source": "large_calibration_adjustment",
+      "severity": "warning",
+      "target": "up_5d",
+      "message": "up_5d has 1 large calibration adjustment(s)."
+    },
+    {
+      "source": "bucket_coverage",
+      "severity": "warning",
+      "target": "up_10d",
+      "message": "up_10d has too few usable calibration buckets."
+    },
+    {
+      "source": "large_calibration_adjustment",
+      "severity": "warning",
+      "target": "up_20d",
+      "message": "up_20d has 1 large calibration adjustment(s)."
+    },
+    {
+      "source": "large_calibration_adjustment",
+      "severity": "warning",
+      "target": "large_drop_20d",
+      "message": "large_drop_20d has 3 large calibration adjustment(s)."
+    }
+  ],
+  "next_actions": [
+    "Show calibrated probabilities as reduced-trust until more outcomes accumulate.",
+    "Keep raw probability wording conservative for sparse calibration buckets.",
+    "Do not replace raw model probabilities until calibrated output is tested in reports."
+  ]
+}

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from ml_model_improvement.downside_overlay import apply_downside_risk_overlay
+
 
 USABLE_PREDICTION_STATUSES = {"ready"}
 USABLE_FRESHNESS_STATUSES = {"fresh", "warning"}
@@ -26,7 +28,10 @@ def convert_saved_prediction_to_ml_research(prediction: dict) -> dict:
         source_type="saved_daily_prediction",
         prediction=prediction,
     )
-    return converted
+    return apply_downside_risk_overlay(
+        converted,
+        prediction.get("feature_snapshot") or {},
+    )
 
 
 def build_runtime_fallback_source(

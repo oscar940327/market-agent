@@ -181,6 +181,17 @@ def build_ml_reference(context: dict) -> str:
         lines.append("- 這是第一版實驗模型，仍以歷史區間作為主要參考。")
         lines.extend(build_return_model_lines(return_model))
 
+    overlay = ml_research.get("downside_risk_overlay") or {}
+    if overlay.get("active"):
+        lines.extend(["", "Downside risk overlay:"])
+        lines.append(
+            "- "
+            f"保守風險層級為 {overlay.get('risk_level')}，"
+            f"20 個交易日內中途最大跌幅保守參考約 {format_percent(overlay.get('conservative_max_drop'))}。"
+        )
+        if overlay.get("reasons"):
+            lines.append(f"- 觸發原因：{', '.join(overlay['reasons'])}。")
+
     trust = context.get("ml_reference_trust") or {}
     if trust.get("status") == "reduced_trust":
         lines.append("")
