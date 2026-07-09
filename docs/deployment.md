@@ -49,6 +49,7 @@ GitHub Actions 負責排程資料更新。
 - `daily-news.yml`
 - `daily-outcomes.yml`
 - `daily-ml-predictions.yml`
+- `daily-research-fixtures.yml`
 - `weekly-ml-dataset.yml`
 - `monthly-universe.yml`
 
@@ -74,6 +75,8 @@ Supabase 是主要資料庫。
 - news events
 - ML predictions
 - prediction outcomes
+- research logs
+- research outcomes
 - pipeline runs
 
 ## 必要環境變數

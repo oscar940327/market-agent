@@ -1,0 +1,64 @@
+name: Daily Research Fixtures
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Runs after daily prices/news have had time to update.
+    # UTC does not adjust for US daylight saving time.
+    - cron: "45 1 * * 2-6"
+
+jobs:
+  daily-research-fixtures:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      PYTHONUNBUFFERED: "1"
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+      MARKET_AGENT_ANALYST_MODE: llm
+      MARKET_AGENT_LLM_PROVIDER: openrouter
+      MARKET_AGENT_LLM_MODEL: openai/gpt-4.1
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      OPENROUTER_APP_NAME: market-agent
+      ALERT_EMAIL_ENABLED: ${{ secrets.ALERT_EMAIL_ENABLED }}
+      ALERT_EMAIL_PROVIDER: gmail
+      ALERT_EMAIL_FROM: ${{ secrets.ALERT_EMAIL_FROM }}
+      ALERT_EMAIL_TO: ${{ secrets.ALERT_EMAIL_TO }}
+      GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Log daily research fixtures and send report
+        run: >
+          python scripts/log_daily_research_fixtures.py
+          --analyst-mode llm
+          --send-email
+
+      - name: Send failure alert
+        if: failure()
+        run: >
+          python scripts/send_pipeline_alert.py
+          --pipeline daily-research-fixtures
+          --status failed
+          --message "Daily research fixtures workflow failed."
+
+      - name: Upload daily research reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: daily-research-fixture-report
+          path: data/research_reports/*
+          if-no-files-found: ignore

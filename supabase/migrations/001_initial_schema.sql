@@ -263,13 +263,27 @@ create table if not exists public.research_logs (
     intent text not null,
     ticker text,
     theme text,
+    workflow_kind text,
     decision text,
+    conclusion text,
+    valuation_label text,
+    technical_label text,
+    news_sentiment text,
+    ml_reference_status text,
+    ml_reference_trust_status text,
+    data_freshness_status text,
+    exit_signal text,
+    research_signal_score numeric,
     evidence_quality text,
     price_at_query numeric,
     data_as_of date,
     report_summary text,
     request_options jsonb,
     output_snapshot jsonb,
+    price_plan jsonb not null default '{}',
+    tracking_status text not null default 'not_configured',
+    tracked_tickers text[] not null default '{}',
+    tracking_notes text,
     created_at timestamptz not null default now(),
     constraint research_logs_ticker_uppercase check (
         ticker is null or ticker = upper(ticker)
@@ -298,6 +312,9 @@ create index if not exists idx_research_logs_intent_created
 
 create index if not exists idx_research_logs_evidence_created
     on public.research_logs (evidence_quality, created_at);
+
+create index if not exists idx_research_logs_tracking_status_created
+    on public.research_logs (tracking_status, created_at);
 
 create table if not exists public.similar_case_results (
     id uuid primary key default gen_random_uuid(),

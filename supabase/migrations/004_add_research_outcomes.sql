@@ -5,6 +5,10 @@ create table if not exists public.research_outcomes (
     research_log_id uuid not null references public.research_logs(id) on delete cascade,
     ticker text not null,
     query_date date not null,
+    intent text,
+    theme text,
+    conclusion text,
+    exit_signal text,
     horizon_trading_days integer not null,
     target_date date,
     actual_date date,
@@ -13,8 +17,13 @@ create table if not exists public.research_outcomes (
     return_pct numeric,
     max_drawdown_pct numeric,
     max_runup_pct numeric,
+    entry_touched boolean,
+    exit_touched boolean,
+    stop_loss_touched boolean,
     outcome_status text not null default 'pending',
     price_provider text not null default 'yfinance',
+    price_plan jsonb not null default '{}',
+    tracking_notes text,
     used_for_calibration boolean not null default false,
     calibration_notes text,
     computed_at timestamptz,
@@ -25,10 +34,11 @@ create table if not exists public.research_outcomes (
         horizon_trading_days in (5, 10, 20)
     ),
     constraint research_outcomes_status_value check (
-        outcome_status in ('pending', 'ready', 'missing_price', 'computed')
+        outcome_status in ('pending', 'ready', 'missing_price', 'computed', 'skipped')
     ),
     constraint research_outcomes_unique_key unique (
         research_log_id,
+        ticker,
         horizon_trading_days
     )
 );
@@ -41,3 +51,6 @@ create index if not exists idx_research_outcomes_status_target
 
 create index if not exists idx_research_outcomes_calibration
     on public.research_outcomes (used_for_calibration, horizon_trading_days);
+
+create index if not exists idx_research_outcomes_intent_status
+    on public.research_outcomes (intent, outcome_status);

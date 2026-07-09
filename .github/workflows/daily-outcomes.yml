@@ -38,6 +38,9 @@ jobs:
       - name: Update matured research outcomes
         run: python scripts/compute_research_outcomes.py --limit 100
 
+      - name: Build research outcome summary
+        run: python scripts/build_research_outcome_summary.py --limit 1000
+
       - name: Update matured ML prediction outcomes
         run: python scripts/compute_ml_prediction_outcomes.py --limit 500
 
@@ -66,5 +69,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: daily-ml-monitoring-reports
-          path: data/ml/monitoring/*
+          path: |
+            data/ml/monitoring/*
+            data/research_reports/*
           if-no-files-found: ignore

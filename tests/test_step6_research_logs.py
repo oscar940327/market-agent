@@ -3,6 +3,7 @@ import pandas as pd
 from research_logging import (
     build_outcome_updates,
     build_pending_outcome_rows,
+    build_research_outcome_rows_for_data,
     build_research_log_row,
 )
 
@@ -50,6 +51,7 @@ def test_build_pending_outcome_rows_creates_5_10_20_trading_day_placeholders():
     assert {row["outcome_status"] for row in rows} == {"pending"}
     assert {row["used_for_calibration"] for row in rows} == {False}
     assert rows[0]["ticker"] == "MU"
+    assert {row["outcome_status"] for row in rows} == {"pending"}
 
 
 def test_build_outcome_updates_uses_trading_day_offsets_and_risk_path():
@@ -61,6 +63,11 @@ def test_build_outcome_updates_uses_trading_day_offsets_and_risk_path():
             "horizon_trading_days": 5,
             "price_at_query": 100.0,
             "price_provider": "yfinance",
+            "price_plan": {
+                "entry_range": {"low": 97.0, "high": 99.0},
+                "exit_range": {"low": 104.0, "high": 106.0},
+                "stop_loss": 96.0,
+            },
         }
     ]
     prices = pd.DataFrame(
@@ -79,6 +86,9 @@ def test_build_outcome_updates_uses_trading_day_offsets_and_risk_path():
     assert update["return_pct"] == 0.05
     assert update["max_drawdown_pct"] == -0.02
     assert update["max_runup_pct"] == 0.05
+    assert update["entry_touched"] is True
+    assert update["exit_touched"] is True
+    assert update["stop_loss_touched"] is False
     assert update["used_for_calibration"] is False
 
 
@@ -157,3 +167,71 @@ def test_build_outcome_updates_marks_missing_price_when_no_prices():
 
     assert updates[0]["outcome_status"] == "missing_price"
     assert updates[0]["used_for_calibration"] is False
+
+
+def test_build_research_outcome_rows_for_theme_tracks_successful_constituents():
+    data = {
+        "status": "success",
+        "theme_key": "memory",
+        "sector_summary": {"breadth_label": "weak_breadth", "average_score": -1.5},
+        "results": [
+            {
+                "ticker": "MU",
+                "status": "success",
+                "analysis": {
+                    "technical_analysis": {
+                        "current_price": 100.0,
+                        "data_as_of": "2026-07-01",
+                    },
+                    "research_profile": {},
+                },
+            },
+            {
+                "ticker": "WDC",
+                "status": "success",
+                "analysis": {
+                    "technical_analysis": {
+                        "current_price": 50.0,
+                        "data_as_of": "2026-07-01",
+                    },
+                    "research_profile": {},
+                },
+            },
+            {"ticker": "STX", "status": "failed", "analysis": {}},
+        ],
+    }
+
+    rows = build_research_outcome_rows_for_data(
+        research_log_id="log-1",
+        data=data,
+        query_date=pd.Timestamp("2026-07-01").date(),
+        intent="industry_trend",
+    )
+
+    assert len(rows) == 6
+    assert {row["ticker"] for row in rows} == {"MU", "WDC"}
+    assert {row["intent"] for row in rows} == {"industry_trend"}
+    assert {row["theme"] for row in rows} == {"memory"}
+    assert {row["outcome_status"] for row in rows} == {"pending"}
+
+
+def test_build_research_outcome_rows_for_backtest_marks_skipped():
+    data = {
+        "status": "success",
+        "ticker": "MU",
+        "strategy": "breakout",
+        "evidence_quality": {"level": "medium"},
+    }
+
+    rows = build_research_outcome_rows_for_data(
+        research_log_id="log-1",
+        data=data,
+        query_date=pd.Timestamp("2026-07-01").date(),
+        intent="backtest_query",
+    )
+
+    assert len(rows) == 3
+    assert {row["outcome_status"] for row in rows} == {"skipped"}
+    assert {row["tracking_notes"] for row in rows} == {
+        "backtest_query_is_historical_and_not_forward_tracked"
+    }

@@ -86,7 +86,23 @@ MU 現在適合進場嗎
 - 期間內最大下跌
 - 期間內最大上漲
 
-目前這是基礎版，已經可以追蹤價格結果。
+目前 Step 21 已開始把 Research Outcomes 升級成 research-level tracking。
+
+除了價格結果外，現在也會記錄：
+
+- 當時的 workflow / intent
+- 單股或主題成分股 ticker
+- 研究結論
+- 估值 / 技術 / 新聞狀態
+- ML Reference 狀態與信任狀態
+- exit signal
+- Research Signal 分數
+- price plan
+- data freshness / evidence quality
+
+主題問題會拆成 constituent ticker 追蹤，例如「記憶體類股」會追蹤 MU、WDC、STX、SNDK 等成功分析的成分股。
+
+Backtest 問題是歷史查詢，不是 forward-looking research signal，所以會記錄 research log，但 outcome 會標記為 `skipped`。
 
 ## Outcome 狀態怎麼看
 
@@ -128,29 +144,110 @@ Outcome tracking 讓 Market Agent 不只是「LLM 包裝過的股票問答」。
 
 這也是這個專案和一般聊天式回答最大的差別之一。
 
+## 每日測資怎麼累積
+
+目前有一個 daily fixture script，可以一次記錄我每天常測的四個問題：
+
+```bash
+python scripts/log_daily_research_fixtures.py
+```
+
+預設會記錄：
+
+```text
+MU 現在適合進場嗎
+記憶體類股現在適合進場觀察嗎
+MU 突破策略以前表現怎麼樣
+MU 如果我已經持有，現在要不要減碼
+```
+
+也可以只記錄指定問題：
+
+```bash
+python scripts/log_daily_research_fixtures.py --query "MU 現在適合進場嗎"
+```
+
+這個 script 會：
+
+```text
+執行研究 workflow
+建立 research_logs
+建立 research_outcomes
+single stock / holding-risk -> pending outcomes
+theme -> constituent-level pending outcomes
+backtest -> skipped outcomes
+```
+
+GitHub Actions 也有一個每日 workflow：
+
+```text
+.github/workflows/daily-research-fixtures.yml
+```
+
+它會在每天資料更新後：
+
+```text
+跑四個固定測資
+寫入 Supabase
+產生 daily_research_fixture_report_v1.md
+寄 email 給我
+上傳 artifact
+```
+
+之後每日 outcome pipeline 會跑：
+
+```bash
+python scripts/compute_research_outcomes.py --limit 100
+```
+
+成熟的 outcomes 會被更新成 `computed`。
+
+Daily outcomes workflow 也會產生：
+
+```text
+data/research_reports/research_outcome_summary_v1.md
+```
+
+這份 summary 會整理已成熟 outcomes，並根據 Step 21.7 的規則判斷當初研究結論後來是偏好、偏差，還是中性。
+
+## 好壞怎麼判斷
+
+Research outcome 的好壞不是看 report 寫得漂不漂亮，而是看成熟後的實際市場結果。
+
+第一版規則大致如下：
+
+- `可列入觀察`、`觀察回踩是否有效`：後續上漲或風險可控，偏好；後續大跌或碰到停損，偏差。
+- `暫不進場`、`等待更好價格`：後續下跌或震盪，代表有避開風險；後續大漲，代表可能太保守。
+- `reduce` / `exit`：後續下跌或最大跌幅擴大，代表警示有幫助；後續快速上漲，代表可能太保守。
+- `backtest`：歷史查詢，不做 forward outcome，標記為 `skipped`。
+
 ## 目前限制
 
 目前已經有：
 
 - ML prediction outcome tracking
-- 基礎版 research outcome tracking
+- Research outcome tracking
+- Theme constituent-level outcome tracking
+- Backtest skipped tracking
+- Price plan touch tracking 欄位
 
 還沒有完整完成：
 
 - Research Signal 分數和後續表現的統計
-- 價格計畫是否命中的追蹤
 - exit signal 是否有效的統計
 - 各種研究結論的長期表現比較
+- 前端顯示 research outcome 成熟狀態
+- 長期 research outcome dashboard
 
-這些會在後續 `Research Signal Outcome Tracking` 裡補強。
+daily fixture logging 已經接到 GitHub Actions，第一版會每天產生四題報告、寫入 Supabase，並寄出 email。
 
 ## 接下來要補強什麼
 
-下一階段是 `Research Signal Outcome Tracking`。
+Step 21 已完成第一版 Research Signal Outcome Tracking。
 
 它不是只看價格漲跌，而是要驗證整份 Research Report 的判斷。
 
-未來會追蹤：
+目前已開始追蹤：
 
 - 當時的 Research Signal 分數
 - 當時結論是「可列入觀察」、「暫不進場」還是「等待更好價格」
@@ -159,6 +256,8 @@ Outcome tracking 讓 Market Agent 不只是「LLM 包裝過的股票問答」。
 - 止損區間後來有沒有被觸及
 - exit signal 是 `hold`、`watch`、`reduce` 還是 `exit`
 - 後續 5 / 10 / 20 個交易日表現是否支持當時判斷
+
+後續要做的是把這些結果累積成更長期的 dashboard / 統計頁面，讓我可以看出哪些結論真的比較可靠。
 
 這會讓系統能回答更高層的問題：
 
@@ -173,4 +272,4 @@ Outcome tracking 讓 Market Agent 不只是「LLM 包裝過的股票問答」。
 - 5 / 10 / 20 天指的是交易日，不是日曆日。
 - `pending` 是正常狀態，不是錯誤。
 - ML monitoring 需要成熟 outcomes 才能判斷模型健康。
-- 未來 Research Signal Outcome Tracking 會讓整份 Research Report 也能被回測與評估。
+- Research Signal Outcome Tracking 讓整份 Research Report 也能被回測與評估。

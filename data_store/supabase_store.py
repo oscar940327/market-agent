@@ -1023,7 +1023,7 @@ def upsert_research_outcomes(
     for chunk in chunk_records(records, chunk_size):
         endpoint = (
             f"{base_url}/rest/v1/research_outcomes?"
-            "on_conflict=research_log_id,horizon_trading_days"
+            "on_conflict=research_log_id,ticker,horizon_trading_days"
         )
         payload = json.dumps(chunk, allow_nan=False).encode("utf-8")
         request = Request(
@@ -1306,8 +1306,44 @@ def fetch_pending_research_outcomes(
     endpoint = (
         f"{base_url}/rest/v1/research_outcomes?"
         "select=research_log_id,ticker,query_date,horizon_trading_days,"
-        "price_at_query,price_provider"
+        "intent,theme,conclusion,exit_signal,price_at_query,price_provider,"
+        "price_plan,tracking_notes"
         f"&outcome_status=eq.pending&order=query_date.asc&limit={limit}"
+    )
+    request = Request(
+        endpoint,
+        method="GET",
+        headers={
+            "apikey": api_key,
+            "Authorization": f"Bearer {api_key}",
+            "Accept": "application/json",
+        },
+    )
+
+    with open_url(request, timeout=30) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+def fetch_research_outcomes_for_summary(
+    *,
+    supabase_url: str | None = None,
+    supabase_key: str | None = None,
+    open_url=urlopen,
+    limit: int = 1000,
+    status: str | None = None,
+) -> list[dict]:
+    base_url, api_key = resolve_supabase_credentials(
+        supabase_url=supabase_url,
+        supabase_key=supabase_key,
+    )
+    status_filter = f"&outcome_status=eq.{status}" if status else ""
+    endpoint = (
+        f"{base_url}/rest/v1/research_outcomes?"
+        "select=research_log_id,ticker,query_date,intent,theme,conclusion,exit_signal,"
+        "horizon_trading_days,target_date,actual_date,price_at_query,price_at_horizon,"
+        "return_pct,max_drawdown_pct,max_runup_pct,entry_touched,exit_touched,"
+        "stop_loss_touched,outcome_status,price_provider,tracking_notes,computed_at"
+        f"{status_filter}&order=actual_date.desc.nullslast,query_date.desc&limit={limit}"
     )
     request = Request(
         endpoint,
