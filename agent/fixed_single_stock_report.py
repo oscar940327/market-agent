@@ -183,14 +183,18 @@ def build_ml_reference(context: dict) -> str:
 
     overlay = ml_research.get("downside_risk_overlay") or {}
     if overlay.get("active"):
-        lines.extend(["", "Downside risk overlay:"])
+        lines.extend(["", "保守風險修正:"])
         lines.append(
             "- "
             f"保守風險層級為 {overlay.get('risk_level')}，"
             f"20 個交易日內中途最大跌幅保守參考約 {format_percent(overlay.get('conservative_max_drop'))}。"
         )
         if overlay.get("reasons"):
-            lines.append(f"- 觸發原因：{', '.join(overlay['reasons'])}。")
+            reason_text = "、".join(
+                translate_downside_overlay_reason(reason)
+                for reason in overlay["reasons"]
+            )
+            lines.append(f"- 觸發原因：{reason_text}。")
 
     trust = context.get("ml_reference_trust") or {}
     if trust.get("status") == "reduced_trust":
@@ -215,7 +219,7 @@ def build_exit_signal_analysis(context: dict) -> str:
     if reason:
         lines.append(f"判斷原因：{reason}")
     if action_note:
-        lines.append(f"如果已持有：{action_note}")
+        lines.append(f"操作觀察：{remove_holding_prefix(action_note)}")
     lines.append("這是持有風險觀察，不是直接買賣指令。")
     return "\n".join(lines)
 
@@ -234,6 +238,32 @@ def remove_duplicate_weakening_reason(reason: str, weakening: str) -> str:
     for duplicate in duplicates:
         text = text.replace(duplicate, "")
     return " ".join(text.split()).strip()
+
+
+def remove_holding_prefix(text: str) -> str:
+    cleaned = text.strip()
+    prefixes = ("若已持有，", "如果已持有，", "若已持有，應", "如果已持有，應")
+    for prefix in prefixes:
+        if cleaned.startswith(prefix):
+            return cleaned[len(prefix) :]
+    return cleaned
+
+
+def translate_downside_overlay_reason(reason: str) -> str:
+    labels = {
+        "price_below_ma20": "價格低於 MA20",
+        "macd_histogram_negative": "MACD 動能轉弱",
+        "high_20d_volatility": "20 日波動偏高",
+        "market_regime_bearish": "市場環境偏弱",
+        "market_regime_transition_or_volatile": "市場環境轉換或波動偏高",
+        "technical_state_bearish": "技術狀態偏弱",
+        "technical_state_volume_surge": "量能異動需要觀察",
+        "technical_state_breakout_or_pullback_with_negative_macd": "技術型態仍需搭配動能確認",
+        "risk_state_high": "風險狀態偏高",
+        "risk_state_elevated": "風險狀態升高",
+        "recent_risk_news": "近期有風險類新聞",
+    }
+    return labels.get(reason, reason)
 
 
 def build_overall_assessment(context: dict) -> str:
@@ -315,7 +345,7 @@ def get_conclusion_label(valuation: str, technical: str, news_sentiment: str) ->
     if valuation == "明顯偏貴":
         return "等待更好價格"
     if technical == "接近支撐觀察區":
-        return "觀察回踩有效"
+        return "觀察回踩是否有效"
     if technical == "多方比較有力" and news_sentiment != "negative":
         return "可列入觀察"
     if news_sentiment == "negative":
