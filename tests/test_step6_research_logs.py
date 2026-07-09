@@ -106,6 +106,38 @@ def test_build_outcome_updates_keeps_pending_when_horizon_not_reached():
     assert updates[0]["computed_at"] is None
 
 
+def test_build_outcome_updates_uses_same_keys_for_mixed_statuses():
+    pending = [
+        {
+            "research_log_id": "log-1",
+            "ticker": "MU",
+            "query_date": "2026-01-01",
+            "horizon_trading_days": 5,
+            "price_at_query": 100.0,
+            "price_provider": "yfinance",
+        },
+        {
+            "research_log_id": "log-1",
+            "ticker": "MU",
+            "query_date": "2026-01-01",
+            "horizon_trading_days": 20,
+            "price_at_query": 100.0,
+            "price_provider": "yfinance",
+        },
+    ]
+    prices = pd.DataFrame(
+        {
+            "date": pd.bdate_range("2026-01-01", periods=6),
+            "close": [100.0, 98.0, 102.0, 99.0, 103.0, 105.0],
+        }
+    )
+
+    updates = build_outcome_updates(pending_outcomes=pending, price_data=prices)
+
+    assert [update["outcome_status"] for update in updates] == ["computed", "pending"]
+    assert len({tuple(update.keys()) for update in updates}) == 1
+
+
 def test_build_outcome_updates_marks_missing_price_when_no_prices():
     pending = [
         {

@@ -3,6 +3,26 @@ from datetime import UTC, datetime
 import pandas as pd
 
 
+RESEARCH_OUTCOME_UPDATE_FIELDS = (
+    "research_log_id",
+    "ticker",
+    "query_date",
+    "horizon_trading_days",
+    "target_date",
+    "actual_date",
+    "price_at_query",
+    "price_at_horizon",
+    "return_pct",
+    "max_drawdown_pct",
+    "max_runup_pct",
+    "outcome_status",
+    "price_provider",
+    "used_for_calibration",
+    "calibration_notes",
+    "computed_at",
+)
+
+
 def build_outcome_updates(
     *,
     pending_outcomes: list[dict],
@@ -45,18 +65,21 @@ def build_single_outcome_update(
     future_prices = price_data[price_data.index >= query_date]
 
     if len(future_prices) <= horizon:
-        return {
-            "research_log_id": research_log_id,
-            "ticker": ticker,
-            "query_date": query_date.date().isoformat(),
-            "horizon_trading_days": horizon,
-            "outcome_status": "pending",
-            "price_provider": price_provider,
-            "used_for_calibration": False,
-            "target_date": None,
-            "actual_date": None,
-            "computed_at": None,
-        }
+        return normalize_research_outcome_update(
+            {
+                "research_log_id": research_log_id,
+                "ticker": ticker,
+                "query_date": query_date.date().isoformat(),
+                "horizon_trading_days": horizon,
+                "price_at_query": outcome.get("price_at_query"),
+                "outcome_status": "pending",
+                "price_provider": price_provider,
+                "used_for_calibration": False,
+                "target_date": None,
+                "actual_date": None,
+                "computed_at": None,
+            }
+        )
 
     query_row = future_prices.iloc[0]
     horizon_window = future_prices.iloc[: horizon + 1]
@@ -65,24 +88,26 @@ def build_single_outcome_update(
     price_at_horizon = float(horizon_row["close"])
     returns = (horizon_window["close"] - price_at_query) / price_at_query
 
-    return {
-        "research_log_id": research_log_id,
-        "ticker": ticker,
-        "query_date": query_date.date().isoformat(),
-        "horizon_trading_days": horizon,
-        "target_date": horizon_row.name.date().isoformat(),
-        "actual_date": horizon_row.name.date().isoformat(),
-        "price_at_query": price_at_query,
-        "price_at_horizon": price_at_horizon,
-        "return_pct": round(float((price_at_horizon - price_at_query) / price_at_query), 6),
-        "max_drawdown_pct": round(float(returns.min()), 6),
-        "max_runup_pct": round(float(returns.max()), 6),
-        "outcome_status": "computed",
-        "price_provider": price_provider,
-        "used_for_calibration": False,
-        "calibration_notes": None,
-        "computed_at": datetime.now(UTC).replace(microsecond=0).isoformat(),
-    }
+    return normalize_research_outcome_update(
+        {
+            "research_log_id": research_log_id,
+            "ticker": ticker,
+            "query_date": query_date.date().isoformat(),
+            "horizon_trading_days": horizon,
+            "target_date": horizon_row.name.date().isoformat(),
+            "actual_date": horizon_row.name.date().isoformat(),
+            "price_at_query": price_at_query,
+            "price_at_horizon": price_at_horizon,
+            "return_pct": round(float((price_at_horizon - price_at_query) / price_at_query), 6),
+            "max_drawdown_pct": round(float(returns.min()), 6),
+            "max_runup_pct": round(float(returns.max()), 6),
+            "outcome_status": "computed",
+            "price_provider": price_provider,
+            "used_for_calibration": False,
+            "calibration_notes": None,
+            "computed_at": datetime.now(UTC).replace(microsecond=0).isoformat(),
+        }
+    )
 
 
 def build_missing_price_update(
@@ -93,16 +118,22 @@ def build_missing_price_update(
     query_date: pd.Timestamp,
     price_provider: str,
 ) -> dict:
-    return {
-        "research_log_id": research_log_id,
-        "ticker": ticker,
-        "query_date": query_date.date().isoformat(),
-        "horizon_trading_days": horizon,
-        "outcome_status": "missing_price",
-        "price_provider": price_provider,
-        "used_for_calibration": False,
-        "computed_at": datetime.now(UTC).replace(microsecond=0).isoformat(),
-    }
+    return normalize_research_outcome_update(
+        {
+            "research_log_id": research_log_id,
+            "ticker": ticker,
+            "query_date": query_date.date().isoformat(),
+            "horizon_trading_days": horizon,
+            "outcome_status": "missing_price",
+            "price_provider": price_provider,
+            "used_for_calibration": False,
+            "computed_at": datetime.now(UTC).replace(microsecond=0).isoformat(),
+        }
+    )
+
+
+def normalize_research_outcome_update(row: dict) -> dict:
+    return {field: row.get(field) for field in RESEARCH_OUTCOME_UPDATE_FIELDS}
 
 
 def normalize_price_data(price_data: pd.DataFrame) -> pd.DataFrame:
