@@ -683,7 +683,7 @@ def format_backtest_analysis(backtest_data: dict) -> str:
         f"- data as of：{data_window.get('data_as_of', 'unknown')}",
         f"- 歷史年限：約 {evidence_quality.get('history_years', 0)} 年",
         "",
-        "績效摘要",
+        "訊號歷史統計",
         f"- 總交易次數：{metrics['total_trades']}",
         f"- 勝率：{format_percent(metrics['win_rate'])}",
         f"- 平均報酬：{format_percent(metrics['average_return'])}",
@@ -719,9 +719,10 @@ def format_backtest_analysis(backtest_data: dict) -> str:
             build_backtest_takeaway(metrics),
             "",
             "風險提醒",
+            "- 這份結果是訊號出現後的歷史統計，不等同於可直接交易的完整策略績效。",
             "- 回測只代表歷史資料中的規則表現，不代表未來結果。",
             "- 目前回測尚未納入交易成本、滑價、稅費與完整風控。",
-            "- 樣本數太少時，勝率和平均報酬的參考價值會下降。",
+            build_backtest_validation_note(evidence_quality),
         ]
     )
 
@@ -869,12 +870,22 @@ def build_backtest_takeaway(metrics: dict) -> str:
         return "- 交易樣本數偏少，這份回測只能當作初步參考。"
 
     if metrics["win_rate"] >= 0.5 and metrics["average_return"] > 0:
-        return "- 歷史結果偏正向，但仍需要搭配風控與更多樣本確認。"
+        return "- 歷史結果偏正向，但仍需通過樣本外期間、交易成本與不同市場環境驗證。"
 
     if metrics["average_return"] <= 0:
         return "- 歷史平均報酬不佳，這個策略在目前資料區間需要謹慎看待。"
 
     return "- 歷史結果有一定參考價值，但訊號品質仍需要搭配其他條件判斷。"
+
+
+def build_backtest_validation_note(evidence_quality: dict) -> str:
+    sample_quality = evidence_quality.get("sample_quality", "unknown")
+    sample_size = int(evidence_quality.get("sample_size") or 0)
+    if sample_quality == "high" or sample_size >= 50:
+        return "- 本次樣本數充足；下一步重點是樣本外驗證、基準比較與不同市場環境下的穩定性。"
+    if sample_size >= 10:
+        return "- 本次樣本數可作初步參考，但仍需累積更多樣本並進行樣本外驗證。"
+    return "- 本次樣本數偏少，勝率與平均報酬只能作為初步參考。"
 
 
 def format_portfolio_analysis(portfolio_data: dict) -> str:

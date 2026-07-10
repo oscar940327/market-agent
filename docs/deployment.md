@@ -50,6 +50,7 @@ GitHub Actions 負責排程資料更新。
 - `daily-outcomes.yml`
 - `daily-ml-predictions.yml`
 - `daily-research-fixtures.yml`
+- `weekly-research-fixtures.yml`
 - `weekly-ml-dataset.yml`
 - `monthly-universe.yml`
 

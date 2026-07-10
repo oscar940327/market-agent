@@ -51,6 +51,7 @@ def build_fundamental_analysis(context: dict) -> str:
     parts = [f"目前估值判斷為「{valuation}」。"]
     forward_pe = to_float(metrics.get("forward_pe"))
     trailing_pe = to_float(metrics.get("trailing_pe"))
+    price_to_sales = to_float(metrics.get("price_to_sales"))
     revenue_growth = to_float(metrics.get("revenue_growth"))
     earnings_growth = to_float(metrics.get("earnings_growth"))
     gross_margins = to_float(metrics.get("gross_margins"))
@@ -59,6 +60,15 @@ def build_fundamental_analysis(context: dict) -> str:
         parts.append(f"Forward P/E 約 {forward_pe:.1f}。")
     elif trailing_pe is not None:
         parts.append(f"Trailing P/E 約 {trailing_pe:.1f}。")
+    if price_to_sales is not None:
+        parts.append(f"Price/Sales 約 {price_to_sales:.1f}。")
+    if (
+        valuation in {"合理偏貴", "明顯偏貴"}
+        and price_to_sales is not None
+        and price_to_sales >= 12
+        and (forward_pe is None or forward_pe < 35)
+    ):
+        parts.append("本益比不高，但營收倍數偏高，因此估值仍需要保守看待。")
     if revenue_growth is not None:
         parts.append(f"營收成長約 {revenue_growth * 100:.1f}% 。")
     if earnings_growth is not None:
@@ -128,7 +138,7 @@ def build_news_analysis(context: dict) -> str:
     impact_type = get_news_impact_type(summary.get("top_topics") or {}, sentiment)
     impact_level = "高" if high_importance_count >= 2 else "中" if high_importance_count == 1 or sentiment != "neutral" else "低"
     sentiment_label = {"positive": "偏利多", "negative": "偏利空"}.get(sentiment, "中立")
-    explanation = describe_news_impact_type(impact_type)
+    explanation = describe_news_impact_type(impact_type, sentiment=sentiment)
 
     if sentiment == "negative":
         ending = "如果技術面仍未轉強，新聞面會降低立即進場的信心，較適合等待價格與量能重新確認。"
@@ -180,6 +190,10 @@ def build_ml_reference(context: dict) -> str:
         lines.extend(["", "報酬模型估算:"])
         lines.append("- 這是第一版實驗模型，仍以歷史區間作為主要參考。")
         lines.extend(build_return_model_lines(return_model))
+
+    consistency_note = build_ml_consistency_note(ml_research)
+    if consistency_note:
+        lines.extend(["", "模型訊號解讀:", f"- {consistency_note}"])
 
     overlay = ml_research.get("downside_risk_overlay") or {}
     if overlay.get("active"):
@@ -385,16 +399,45 @@ def get_news_impact_type(top_topics: dict, sentiment: str) -> str:
     return "只是市場在關注" if sentiment == "neutral" else "影響短線情緒"
 
 
-def describe_news_impact_type(impact_type: str) -> str:
+def describe_news_impact_type(impact_type: str, *, sentiment: str = "neutral") -> str:
+    if impact_type == "影響短線情緒":
+        if sentiment == "positive":
+            return "這代表新聞目前偏正面，主要提高短線市場關注與買盤情緒，但還不一定直接改變公司的基本面。"
+        if sentiment == "negative":
+            return "這代表新聞目前偏負面，主要壓抑短線市場情緒，但還需要確認是否進一步影響公司的基本面。"
+        return "這代表新聞主要影響短線市場情緒，目前方向不明確，也還沒有明顯改變公司的基本面。"
+
     descriptions = {
         "影響財報預期": "這代表新聞跟營收、獲利、財測或產業需求有關，可能會改變市場對公司未來賺多少錢的預期。",
         "有風險消息": "這代表新聞帶來不確定性，例如官司、監管、總經政策或景氣壓力，市場可能會因此變得比較保守。",
         "分析師看法改變": "這代表新聞主要來自分析師升評、降評或目標價調整，通常會影響短線股價情緒，但不一定代表公司體質已經改變。",
         "有產品或需求題材": "這代表新聞和新產品、AI、晶片、server、訂單或需求題材有關，可能提高市場想像空間，但仍要看能不能轉成營收和獲利。",
-        "影響短線情緒": "這代表新聞偏正面或負面，但目前比較像短線市場情緒變化，還不一定直接改變公司的基本面。",
         "只是市場在關注": "這代表新聞本身偏中性，表示市場正在討論這檔股票，但方向還不明確。",
     }
     return descriptions.get(impact_type, "這代表新聞有影響，但目前還需要搭配基本面與技術面一起判斷。")
+
+
+def build_ml_consistency_note(ml_research: dict) -> str:
+    targets = ml_research.get("targets") or {}
+    up_20d = to_float((targets.get("up_20d") or {}).get("probability"))
+    drop_20d = to_float((targets.get("large_drop_20d") or {}).get("probability"))
+    return_targets = ((ml_research.get("return_model") or {}).get("targets") or {})
+    predicted_return = to_float(
+        (return_targets.get("forward_return_20d") or {}).get("predicted_value")
+    )
+    if (
+        predicted_return is not None
+        and predicted_return > 0
+        and up_20d is not None
+        and up_20d < 0.55
+        and drop_20d is not None
+        and drop_20d >= 0.60
+    ):
+        return (
+            "報酬模型雖估計期末報酬可能為正，但上漲方向仍不明確，且期間內大跌風險偏高。"
+            "這代表價格路徑可能高度波動，不能把正報酬估算解讀成穩定上漲或目標價。"
+        )
+    return ""
 
 
 def describe_rsi(rsi14: float) -> str:

@@ -6,6 +6,11 @@ from agent.llm_analyst import (
 )
 from agent.report_context import build_single_stock_report_context
 from agent.reporting import build_report, get_llm_client_from_env
+from agent.fixed_single_stock_report import (
+    build_fundamental_analysis,
+    build_ml_consistency_note,
+    describe_news_impact_type,
+)
 import api
 
 
@@ -431,6 +436,58 @@ def test_build_report_uses_fixed_backtest_report_even_when_llm_requested():
     assert "總交易次數：584" in result["report"]
     assert "勝率：54.79%" in result["report"]
     assert "最大虧損：-19.61%" in result["report"]
+    assert "訊號歷史統計" in result["report"]
+    assert "本次樣本數充足" in result["report"]
+    assert "樣本數太少時" not in result["report"]
+    assert "更多樣本確認" not in result["report"]
+
+
+def test_fundamental_report_explains_price_to_sales_driven_valuation():
+    report = build_fundamental_analysis(
+        {
+            "fundamentals": {
+                "status": "success",
+                "metrics": {
+                    "forward_pe": 6.6,
+                    "price_to_sales": 12.2,
+                    "revenue_growth": 3.457,
+                },
+                "summary": {"risks": []},
+            }
+        }
+    )
+
+    assert "合理偏貴" in report
+    assert "Price/Sales 約 12.2" in report
+    assert "本益比不高，但營收倍數偏高" in report
+
+
+def test_short_term_news_explanation_matches_sentiment():
+    positive = describe_news_impact_type("影響短線情緒", sentiment="positive")
+    negative = describe_news_impact_type("影響短線情緒", sentiment="negative")
+
+    assert "目前偏正面" in positive
+    assert "目前偏負面" in negative
+    assert "偏正面或負面" not in positive
+
+
+def test_ml_consistency_note_explains_positive_return_with_high_path_risk():
+    note = build_ml_consistency_note(
+        {
+            "targets": {
+                "up_20d": {"probability": 0.504},
+                "large_drop_20d": {"probability": 0.692},
+            },
+            "return_model": {
+                "targets": {
+                    "forward_return_20d": {"predicted_value": 0.11},
+                }
+            },
+        }
+    )
+
+    assert "價格路徑可能高度波動" in note
+    assert "不能把正報酬估算解讀成穩定上漲或目標價" in note
 
 
 def test_api_accepts_analyst_mode_and_returns_metadata(monkeypatch):

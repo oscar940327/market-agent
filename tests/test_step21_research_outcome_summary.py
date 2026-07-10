@@ -1,4 +1,5 @@
 from research_logging import classify_research_outcome_quality
+from pathlib import Path
 from scripts.build_research_outcome_summary import (
     build_research_outcome_summary_markdown,
     build_research_outcome_summary_report,
@@ -102,3 +103,19 @@ def test_daily_research_fixture_markdown_combines_reports_with_separators():
     assert "MU 現在適合進場嗎" in markdown
     assert "記憶體類股現在適合進場觀察嗎" in markdown
     assert "\n---\n" in markdown
+
+
+def test_weekly_research_fixture_workflow_contains_all_extended_questions():
+    workflow = (
+        Path(__file__).resolve().parents[1]
+        / ".github"
+        / "workflows"
+        / "weekly-research-fixtures.yml"
+    ).read_text(encoding="utf-8")
+
+    assert 'cron: "30 2 * * 6"' in workflow
+    assert "NVDA 現在適合進場嗎" in workflow
+    assert "AAPL 現在適合進場嗎" in workflow
+    assert "半導體類股現在適合進場觀察嗎" in workflow
+    assert "MU 放量策略以前表現怎麼樣" in workflow
+    assert "MU 拉回策略以前表現怎麼樣" in workflow

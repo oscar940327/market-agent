@@ -53,6 +53,11 @@ def main() -> int:
     parser.add_argument("--send-email", action="store_true")
     parser.add_argument("--dry-run-email", action="store_true")
     parser.add_argument(
+        "--report-frequency",
+        choices=("daily", "weekly"),
+        default="daily",
+    )
+    parser.add_argument(
         "--output-dir",
         default=str(PROJECT_ROOT / "data" / "research_reports"),
     )
@@ -75,7 +80,10 @@ def main() -> int:
             failures += 1
             print(f"message={result.get('message')}")
 
-    report = build_daily_research_fixture_report(fixture_results)
+    report = build_daily_research_fixture_report(
+        fixture_results,
+        frequency=args.report_frequency,
+    )
     output_paths = write_daily_research_fixture_report(
         report,
         output_dir=Path(args.output_dir),
@@ -182,7 +190,11 @@ def log_one_fixture(*, query: str, args: argparse.Namespace) -> dict:
     }
 
 
-def build_daily_research_fixture_report(results: list[dict]) -> dict:
+def build_daily_research_fixture_report(
+    results: list[dict],
+    *,
+    frequency: str = "daily",
+) -> dict:
     generated_at = datetime.now(UTC).replace(microsecond=0).isoformat()
     status_counts = {}
     for result in results:
@@ -190,7 +202,8 @@ def build_daily_research_fixture_report(results: list[dict]) -> dict:
         status_counts[status] = status_counts.get(status, 0) + 1
 
     return {
-        "report_version": "daily_research_fixture_report_v1",
+        "report_version": f"{frequency}_research_fixture_report_v1",
+        "frequency": frequency,
         "generated_at": generated_at,
         "fixture_count": len(results),
         "status": "success" if status_counts.get("error", 0) == 0 else "partial_success",
@@ -205,8 +218,9 @@ def write_daily_research_fixture_report(
     output_dir: Path,
 ) -> dict[str, str]:
     output_dir.mkdir(parents=True, exist_ok=True)
-    json_path = output_dir / "daily_research_fixture_report_v1.json"
-    markdown_path = output_dir / "daily_research_fixture_report_v1.md"
+    frequency = report.get("frequency", "daily")
+    json_path = output_dir / f"{frequency}_research_fixture_report_v1.json"
+    markdown_path = output_dir / f"{frequency}_research_fixture_report_v1.md"
     json_path.write_text(
         json.dumps(report, ensure_ascii=False, indent=2),
         encoding="utf-8",
@@ -219,8 +233,10 @@ def write_daily_research_fixture_report(
 
 
 def build_daily_research_fixture_markdown(report: dict) -> str:
+    frequency = report.get("frequency", "daily")
+    frequency_title = "Weekly" if frequency == "weekly" else "Daily"
     lines = [
-        "# Market Agent Daily Research Report",
+        f"# Market Agent {frequency_title} Research Report",
         "",
         f"- Generated at: `{report['generated_at']}`",
         f"- Status: `{report['status']}`",
@@ -256,15 +272,18 @@ def send_daily_research_fixture_email(
 
 
 def build_daily_research_fixture_alert(report: dict, *, output_paths: dict[str, str]) -> dict:
-    subject = f"[Market Agent] Daily research report: {report['status']}"
+    frequency = report.get("frequency", "daily")
+    frequency_title = "Weekly" if frequency == "weekly" else "Daily"
+    pipeline = f"{frequency}-research-fixtures"
+    subject = f"[Market Agent] {frequency_title} research report: {report['status']}"
     markdown = build_daily_research_fixture_markdown(report)
     html_body = html.escape(markdown).replace("\n", "<br>")
     return {
         "subject": subject,
         "severity": "info" if report["status"] == "success" else "warning",
-        "pipeline": "daily-research-fixtures",
+        "pipeline": pipeline,
         "status": report["status"],
-        "summary": f"Daily research fixture report generated with status={report['status']}.",
+        "summary": f"{frequency_title} research fixture report generated with status={report['status']}.",
         "warnings": [],
         "errors": [],
         "failed_steps": [],
@@ -273,7 +292,7 @@ def build_daily_research_fixture_alert(report: dict, *, output_paths: dict[str, 
         "text": markdown,
         "html": (
             "<html><body style=\"font-family:Arial,sans-serif;line-height:1.45;\">"
-            f"<h2>Market Agent Daily Research Report</h2><p>{html_body}</p>"
+            f"<h2>Market Agent {frequency_title} Research Report</h2><p>{html_body}</p>"
             "</body></html>"
         ),
     }
