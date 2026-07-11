@@ -22,6 +22,10 @@ from agent.ml_reference_trust import build_ml_reference_trust
 from agent.orchestration_policy import build_single_stock_orchestration_summary
 from backtesting.signal_evidence import build_signal_backtest_evidence
 from data_freshness import build_current_data_freshness
+from ml_model_improvement import (
+    apply_downside_risk_overlay,
+    build_current_downside_feature_snapshot,
+)
 from ml_research import build_single_stock_ml_research
 
 
@@ -318,6 +322,23 @@ class MarketManagerAgent:
             ticker=ticker,
             include_ml=include_ml,
         )
+        if ml_research.get("status") == "success":
+            ml_research = apply_downside_risk_overlay(
+                ml_research,
+                build_current_downside_feature_snapshot(
+                    price_data=price_data,
+                    technical=technical_agent["technical_analysis"],
+                    signals=technical_agent["signals"],
+                    ml_research=ml_research,
+                    base_snapshot=(ml_prediction or {}).get("feature_snapshot") or {},
+                    risk_event_count=(
+                        (news_agent.get("news_analysis") or {})
+                        .get("summary", {})
+                        .get("top_topics", {})
+                        .get("risk_event", 0)
+                    ),
+                ),
+            )
         ml_reference_trust = build_ml_reference_trust(ml_research, ml_prediction)
         exit_signal = build_exit_signal(
             technical=technical_agent["technical_analysis"],

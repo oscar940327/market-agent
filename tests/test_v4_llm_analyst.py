@@ -433,7 +433,7 @@ def test_build_report_uses_fixed_backtest_report_even_when_llm_requested():
     assert len(fake_client.calls) == 0
     assert "MU 策略回測摘要" in result["report"]
     assert "策略：breakout" in result["report"]
-    assert "總交易次數：584" in result["report"]
+    assert "非重疊交易次數：584" in result["report"]
     assert "勝率：54.79%" in result["report"]
     assert "最大虧損：-19.61%" in result["report"]
     assert "訊號歷史統計" in result["report"]

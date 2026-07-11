@@ -77,6 +77,12 @@ ML Reference 是機器學習參考訊號。
 這是第一版實驗模型。  
 如果 model quality 是 `low` 或 `low_to_medium`，Research Report 會提醒要保守解讀。
 
+### 保守風險修正
+
+Downside overlay 會在使用者查詢時重新使用本次最新技術資料，包括價格相對 MA20、MACD histogram、20 日波動與當前技術訊號。市場環境仍沿用 saved prediction 的市場 context。
+
+Research Report 會標示 overlay 技術資料的 `data_as_of`。這可避免 saved prediction 的舊技術 snapshot 與報告最新技術面互相矛盾；如果最新技術面已改善，先前套用的保守跌幅也能被撤銷並重新計算。
+
 ## ML Reference 來源狀態
 
 前端的 `ML Reference` badge 會顯示來源與可用狀態。

@@ -16,11 +16,12 @@ def apply_downside_risk_overlay(ml_research: dict, feature_snapshot: dict | None
     if not ml_research or ml_research.get("status") != "success":
         return ml_research
 
+    output = deepcopy(ml_research)
+    restore_raw_max_drop_target(output)
     overlay = build_downside_risk_overlay(
         feature_snapshot=feature_snapshot or {},
-        ml_research=ml_research,
+        ml_research=output,
     )
-    output = deepcopy(ml_research)
     output["downside_risk_overlay"] = overlay
 
     if not overlay["active"]:
@@ -107,7 +108,139 @@ def build_downside_risk_overlay(*, feature_snapshot: dict, ml_research: dict) ->
         "reasons": reasons,
         "summary": build_overlay_summary(risk_level, conservative_max_drop, reasons),
         "usage_policy": "conservative_reference_only",
+        "feature_source": feature_snapshot.get("feature_source", "saved_prediction_snapshot"),
+        "data_as_of": feature_snapshot.get("data_as_of") or feature_snapshot.get("date"),
     }
+
+
+def build_current_downside_feature_snapshot(
+    *,
+    price_data,
+    technical: dict,
+    signals: dict,
+    ml_research: dict,
+    base_snapshot: dict | None = None,
+    risk_event_count: int | float | None = None,
+) -> dict:
+    snapshot = deepcopy(base_snapshot or {})
+    market_snapshot = deepcopy(snapshot.get("market_snapshot") or {})
+    current_price = safe_float(technical.get("current_price"))
+    ma20 = safe_float(technical.get("ma20"))
+    macd_histogram = safe_float(technical.get("macd_histogram"))
+
+    snapshot.update(
+        {
+            "feature_source": "current_query_technical_with_saved_market_context",
+            "price_vs_ma20": (
+                None
+                if current_price is None or ma20 in {None, 0}
+                else (current_price - ma20) / ma20
+            ),
+            "macd_histogram": macd_histogram,
+            "volatility_20d": calculate_recent_volatility(price_data),
+            "is_breakout": bool((signals.get("breakout") or {}).get("is_breakout")),
+            "is_volume_surge": bool(
+                (signals.get("volume_surge") or {}).get("is_volume_surge")
+            ),
+            "is_pullback": bool((signals.get("pullback") or {}).get("is_pullback")),
+            "data_as_of": extract_latest_date(price_data),
+        }
+    )
+    if risk_event_count is not None:
+        snapshot["risk_event_count_30d"] = risk_event_count
+
+    market_snapshot["technical_state"] = classify_current_technical_state(
+        snapshot
+    )
+    market_snapshot["risk_state"] = classify_current_risk_state(
+        ml_research=ml_research,
+        risk_event_count=safe_float(snapshot.get("risk_event_count_30d")),
+    )
+    market_snapshot["data_as_of"] = snapshot["data_as_of"]
+    snapshot["market_snapshot"] = market_snapshot
+    return snapshot
+
+
+def restore_raw_max_drop_target(ml_research: dict) -> None:
+    target = (
+        (ml_research.get("return_model") or {})
+        .get("targets", {})
+        .get("max_drop_20d")
+    )
+    if not isinstance(target, dict) or not target.get("overlay_applied"):
+        return
+
+    if "raw_predicted_value" in target:
+        target["predicted_value"] = target.pop("raw_predicted_value")
+    if "raw_predicted_percent" in target:
+        target["predicted_percent"] = target.pop("raw_predicted_percent")
+    predicted_range = target.get("predicted_range")
+    if isinstance(predicted_range, dict) and "raw_low" in predicted_range:
+        predicted_range["low"] = predicted_range.pop("raw_low")
+        predicted_range["low_percent"] = predicted_range.pop(
+            "raw_low_percent",
+            None,
+        )
+        predicted_range.pop("method", None)
+    target.pop("overlay_applied", None)
+    target.pop("overlay_reason", None)
+
+
+def calculate_recent_volatility(price_data) -> float | None:
+    if price_data is None or "Close" not in price_data or len(price_data) < 2:
+        return None
+    returns = price_data["Close"].pct_change().dropna().tail(20)
+    if returns.empty:
+        return None
+    return float(returns.std())
+
+
+def extract_latest_date(price_data) -> str | None:
+    if price_data is None or len(price_data) == 0:
+        return None
+    latest = price_data.index[-1]
+    return str(latest.date()) if hasattr(latest, "date") else str(latest)
+
+
+def classify_current_technical_state(snapshot: dict) -> str:
+    if snapshot.get("is_breakout"):
+        return "breakout"
+    if snapshot.get("is_pullback"):
+        return "pullback"
+    if snapshot.get("is_volume_surge"):
+        return "volume_surge"
+    price_vs_ma20 = safe_float(snapshot.get("price_vs_ma20"))
+    macd_histogram = safe_float(snapshot.get("macd_histogram"))
+    if price_vs_ma20 is None or macd_histogram is None:
+        return "unknown"
+    if price_vs_ma20 > 0 and macd_histogram > 0:
+        return "bullish"
+    if price_vs_ma20 < 0 and macd_histogram < 0:
+        return "bearish"
+    return "neutral"
+
+
+def classify_current_risk_state(
+    *,
+    ml_research: dict,
+    risk_event_count: float | None,
+) -> str:
+    if risk_event_count and risk_event_count > 0:
+        return "elevated"
+    probability = safe_float(
+        ((ml_research.get("targets") or {}).get("large_drop_20d") or {}).get(
+            "probability"
+        )
+    )
+    if probability is None:
+        return "unknown"
+    if probability >= 0.45:
+        return "high"
+    if probability >= 0.30:
+        return "medium"
+    if probability >= 0.18:
+        return "low_to_medium"
+    return "low"
 
 
 def classify_overlay_risk(points: int) -> str:

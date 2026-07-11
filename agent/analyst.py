@@ -676,6 +676,7 @@ def format_backtest_analysis(backtest_data: dict) -> str:
         ),
     )
     data_window = report.get("data_window") or backtest_data.get("data_window") or {}
+    sampling_policy = report.get("sampling_policy") or backtest_data.get("sampling_policy") or {}
     sample_trades = report["sample_trades"]
 
     lines = [
@@ -691,7 +692,8 @@ def format_backtest_analysis(backtest_data: dict) -> str:
         f"- 歷史年限：約 {evidence_quality.get('history_years', 0)} 年",
         "",
         "訊號歷史統計",
-        f"- 總交易次數：{metrics['total_trades']}",
+        f"- 非重疊交易次數：{metrics['total_trades']}",
+        f"- 樣本規則：{sampling_policy.get('description', '未提供')}",
         f"- 勝率：{format_percent(metrics['win_rate'])}",
         f"- 平均報酬：{format_percent(metrics['average_return'])}",
         f"- 最大虧損：{format_percent(metrics['max_loss'])}",

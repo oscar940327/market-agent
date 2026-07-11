@@ -7,6 +7,7 @@ def build_backtest_report(
     metrics: dict,
     evidence_quality: dict | None = None,
     data_window: dict | None = None,
+    sampling_policy: dict | None = None,
 ) -> dict:
     return{
         "ticker": ticker,
@@ -14,6 +15,7 @@ def build_backtest_report(
         "metrics": metrics,
         "evidence_quality": evidence_quality,
         "data_window": data_window,
+        "sampling_policy": sampling_policy or {},
         "sample_trades": backtest_results[:5],
     }
 

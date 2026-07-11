@@ -32,8 +32,11 @@ def run_breakout_backtest(
     lookback_days: int = 20,
 ) -> list[dict]:
     results = []
+    next_eligible_index = lookback_days
 
     for current_index in range(lookback_days, len(price_data) - holding_days):
+        if current_index < next_eligible_index:
+            continue
         historical_data = price_data.iloc[: current_index + 1]
 
         signal = check_breakout(
@@ -49,6 +52,7 @@ def run_breakout_backtest(
                     holding_days=holding_days,
                 )
             )
+            next_eligible_index = current_index + holding_days
 
     return results
 
@@ -58,8 +62,11 @@ def run_pullback_backtest(
     holding_days: int = 5,
 ) -> list[dict]:
     results = []
+    next_eligible_index = 50
 
     for current_index in range(50, len(price_data) - holding_days):
+        if current_index < next_eligible_index:
+            continue
         historical_data = price_data.iloc[: current_index + 1]
 
         signal = check_pullback_to_ma20(historical_data)
@@ -72,6 +79,7 @@ def run_pullback_backtest(
                     holding_days=holding_days,
                 )
             )
+            next_eligible_index = current_index + holding_days
 
     return results
 
@@ -83,8 +91,11 @@ def run_volume_surge_backtest(
     surge_multiplier: float = 1.5,
 ) -> list[dict]:
     results = []
+    next_eligible_index = lookback_days
 
     for current_index in range(lookback_days, len(price_data) - holding_days):
+        if current_index < next_eligible_index:
+            continue
         historical_data = price_data.iloc[: current_index + 1]
 
         signal = check_volume_surge(
@@ -101,5 +112,6 @@ def run_volume_surge_backtest(
                     holding_days=holding_days,
                 )
             )
+            next_eligible_index = current_index + holding_days
 
     return results

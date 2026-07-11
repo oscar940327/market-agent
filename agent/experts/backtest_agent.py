@@ -51,10 +51,16 @@ def run_backtest_agent(
     else:
         backtest_results = run_pullback_backtest(price_data)
 
+    sampling_policy = {
+        "allow_overlapping": False,
+        "cooldown_trading_days": 5,
+        "description": "訊號觸發後持有 5 個交易日，持有期間不重複建立新樣本。",
+    }
     metrics = calculate_backtest_metrics(backtest_results)
     evidence_quality = build_backtest_evidence_quality(
         metrics=metrics,
         data_window=data_window or {},
+        sampling_policy=sampling_policy,
     )
     report = build_backtest_report(
         ticker=ticker,
@@ -63,6 +69,7 @@ def run_backtest_agent(
         metrics=metrics,
         evidence_quality=evidence_quality,
         data_window=data_window,
+        sampling_policy=sampling_policy,
     )
 
     return {
@@ -72,6 +79,7 @@ def run_backtest_agent(
         "metrics": metrics,
         "evidence_quality": evidence_quality,
         "data_window": data_window,
+        "sampling_policy": sampling_policy,
         "report": report,
         "summary": {
             "total_trades": metrics["total_trades"],

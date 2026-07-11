@@ -20,6 +20,7 @@ from ml_model_improvement.diagnostics import (
 )
 from ml_model_improvement.downside_overlay import (
     apply_downside_risk_overlay,
+    build_current_downside_feature_snapshot,
     build_downside_risk_overlay,
 )
 from ml_model_improvement.error_analysis import (
@@ -49,6 +50,7 @@ __all__ = [
     "build_feature_label_diagnostics_report",
     "build_feature_label_diagnostics_summary_markdown",
     "apply_downside_risk_overlay",
+    "build_current_downside_feature_snapshot",
     "build_downside_risk_overlay",
     "build_step20_error_analysis_report",
     "build_step20_error_analysis_summary_markdown",

@@ -201,7 +201,9 @@ def build_ml_reference(context: dict) -> str:
 
     overlay = ml_research.get("downside_risk_overlay") or {}
     if overlay.get("active"):
-        lines.extend(["", "保守風險修正:"])
+        overlay_date = overlay.get("data_as_of")
+        date_note = f"（技術資料截至 {overlay_date}）" if overlay_date else ""
+        lines.extend(["", f"保守風險修正{date_note}:"])
         lines.append(
             "- "
             f"保守風險層級為 {overlay.get('risk_level')}，"
@@ -456,10 +458,13 @@ def describe_rsi(rsi14: float) -> str:
 
 def describe_momentum_state(momentum_state: str) -> str:
     descriptions = {
-        "bullish": "RSI 與 MACD 顯示多方動能增強，短線買盤相對占優。",
+        "bullish_momentum": "RSI 與 MACD 顯示多方動能增強，短線買盤相對占優。",
+        "bullish_but_overbought": "多方動能仍強，但 RSI 已偏熱，追高需要更謹慎。",
         "turning_positive": "動能正在改善，但仍需要確認能否延續。",
         "turning_negative": "MACD 動能正在轉弱，短線需要留意上漲力道不足。",
-        "bearish": "RSI 與 MACD 顯示空方壓力較明顯，短線需要更保守。",
+        "bearish_momentum": "RSI 與 MACD 顯示空方壓力較明顯，短線需要更保守。",
+        "bearish_but_oversold": "空方動能仍強，但 RSI 已接近超賣，需留意波動與可能反彈。",
+        "neutral": "RSI 與 MACD 目前大致中性，方向仍需要價格與量能確認。",
     }
     return descriptions.get(momentum_state, "目前動能訊號不明確，仍需要搭配價格與量能確認。")
 

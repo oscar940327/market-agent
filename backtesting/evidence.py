@@ -7,6 +7,7 @@ def build_backtest_evidence_quality(
     *,
     metrics: dict,
     data_window: dict,
+    sampling_policy: dict | None = None,
 ) -> dict:
     sample_size = int(metrics.get("total_trades", 0))
     win_rate = float(metrics.get("win_rate", 0))
@@ -56,6 +57,10 @@ def build_backtest_evidence_quality(
         "data_end_date": data_window.get("data_end_date"),
         "data_as_of": data_window.get("data_as_of"),
         "loss_risk": loss_risk,
+        "sampling_policy": sampling_policy or {
+            "allow_overlapping": True,
+            "cooldown_trading_days": 0,
+        },
         "reason": build_evidence_reason(
             level=level,
             sample_size=sample_size,

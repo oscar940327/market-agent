@@ -105,9 +105,15 @@ def build_strategy_signal_evidence(
     }
 
     primary_metrics = build_primary_metrics(horizons)
+    sampling_policy = {
+        "allow_overlapping": False,
+        "cooldown_trading_days": max(HORIZONS),
+        "description": "每次訊號後間隔 20 個交易日，再計入下一個歷史樣本。",
+    }
     evidence_quality = build_backtest_evidence_quality(
         metrics=primary_metrics,
         data_window=data_window,
+        sampling_policy=sampling_policy,
     )
 
     return {
@@ -120,6 +126,7 @@ def build_strategy_signal_evidence(
         "average_return": primary_metrics["average_return"],
         "max_loss": primary_metrics["max_loss"],
         "primary_horizon_days": 20,
+        "sampling_policy": sampling_policy,
         "evidence_quality": evidence_quality,
     }
 
@@ -129,13 +136,17 @@ def collect_signal_event_indices(*, price_data, strategy: str) -> list[int]:
     event_indices = []
     min_index = definition["min_index"]
     max_horizon = max(HORIZONS)
+    next_eligible_index = min_index
 
     for current_index in range(min_index, len(price_data) - max_horizon):
+        if current_index < next_eligible_index:
+            continue
         historical_data = price_data.iloc[: current_index + 1]
         signal = definition["checker"](historical_data)
 
         if signal.get(definition["trigger_key"]):
             event_indices.append(current_index)
+            next_eligible_index = current_index + max_horizon
 
     return event_indices
 
