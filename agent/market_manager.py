@@ -389,6 +389,7 @@ class MarketManagerAgent:
             "ml_research": ml_research,
             "ml_prediction": ml_prediction,
             "ml_reference_trust": ml_reference_trust,
+            "ml_trust_explanation": ml_reference_trust.get("explanation"),
             "exit_signal": exit_signal,
             "data_freshness": data_freshness,
         }

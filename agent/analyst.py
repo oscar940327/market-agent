@@ -1,4 +1,5 @@
 from agent.report_context import build_single_stock_report_context
+from agent.ml_trust_explanation import format_ml_trust_explanation_lines
 
 
 def format_bool(value: bool) -> str:
@@ -250,6 +251,12 @@ def format_ml_reference_lines(
 def format_ml_trust_lines(ml_reference_trust: dict | None) -> list[str]:
     if not ml_reference_trust:
         return []
+
+    explanation_lines = format_ml_trust_explanation_lines(
+        ml_reference_trust.get("explanation")
+    )
+    if explanation_lines:
+        return explanation_lines
 
     label = ml_reference_trust.get("label") or ml_reference_trust.get("status", "unknown")
     display_note = ml_reference_trust.get("display_note") or ""

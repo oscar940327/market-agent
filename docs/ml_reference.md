@@ -153,25 +153,39 @@ Theme ML Reference 會顯示：
 這類問題不需要 ML Reference。  
 所以前端顯示 `ML Reference: not used` 是正常狀態。
 
-## 降低信任狀態
+## ML 信任說明
 
-Research Report 可能會出現：
+Research Report 會在 ML Reference 後面顯示精簡的信任說明：
 
 ```text
-ML Reference 目前為降低信任狀態，相關數字應保守解讀。
+ML 信任說明:
+- 信任狀態：降低信任。
+- 狀態說明：本次 ML Reference 為降低信任，主要受到模型品質、校準或風險估計限制。
+- 主要原因：版本化模型政策記錄校準仍有待改善；20 日上漲方向的訊號品質偏低。
+- 支持證據：prediction freshness 為 fresh；歷史相似情境樣本充足。
+- 使用方式：保留數字作風險與情境參考，但不可單獨改變結論、價格計畫或出場決策。
 ```
 
-這不是說 ML Reference 完全不能看。
+目前支援五種說明狀態：
 
-它的意思是：ML 可以提供參考，但目前不應把它看成高可信度訊號。
+| 狀態 | 解讀方式 |
+| --- | --- |
+| `normal` | 沒有觸發信任降級，可作為輔助參考。 |
+| `reduced_trust` | 可以看，但模型品質、校準或風險估計仍有限。 |
+| `fallback` | 使用 runtime fallback，穩定性低於 saved prediction。 |
+| `unavailable` | 沒有可用 ML Reference，本次應忽略 ML 數字。 |
+| `skipped` | 這個 workflow 不使用 ML，例如回測查詢。 |
 
-常見原因：
+Structured Data 的 `ml_trust_explanation` 會保留完整內容：
 
-- 20 日上漲 signal quality 是 `low` 或 `unknown`。
-- 20 日大跌風險 signal quality 不夠高。
-- 報酬模型品質是 `low`、`low_to_medium` 或 `unknown`。
-- saved prediction freshness 是 `warning`。
-- ML health report 顯示 model quality、calibration 或 drift 有問題。
+- `reason_codes`
+- 完整 `reasons`
+- `supports`
+- `affected_outputs`
+- prediction 來源、freshness、model version
+- 版本化 model policy 來源
+
+目前版本化政策讀取 `step20_improvement_summary_v1.json`。它記錄 baseline_v1 維持 `reduced_trust`、calibration 尚待改善、candidate v2 尚未 promote，以及 downside overlay 仍需保留。
 
 ## ML Health
 

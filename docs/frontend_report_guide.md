@@ -232,17 +232,20 @@ ML Reference 是機器學習參考訊號。
 
 目前這段仍是實驗參考，歷史相似情境仍然是更主要的參考來源。
 
-### ML Reference 降低信任狀態
+### ML 信任說明
 
-如果 report 顯示：
+ML Reference 後面會顯示：
 
 ```text
-ML Reference 目前為降低信任狀態，相關數字應保守解讀。
+ML 信任說明:
+- 信任狀態
+- 狀態說明
+- 主要原因
+- 支持證據
+- 使用方式
 ```
 
-代表模型健康度、校準、資料品質或訊號品質有需要保守看待的地方。
-
-這不是說 ML Reference 完全不能看，而是提醒它只能作為輔助參考。
+這段會把模型健康度、校準、資料品質、訊號品質、prediction freshness、歷史樣本與 downside overlay 整理成自然語言。完整原因仍保留在 Structured Data 的 `ml_trust_explanation`。
 
 ### 持有風險 / 出場觀察
 

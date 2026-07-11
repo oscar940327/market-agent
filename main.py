@@ -164,6 +164,7 @@ def run_theme_analysis(user_query: str) -> dict:
         "theme_ml_reference": theme_ml_reference,
         "theme_ml_reference_trust": theme_ml_reference_trust,
         "ml_reference_trust": theme_ml_reference_trust,
+        "ml_trust_explanation": theme_ml_reference_trust.get("explanation"),
         "ml_research": theme_ml_reference,
         "results": sorted_results,
     }

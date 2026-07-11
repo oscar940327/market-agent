@@ -10,6 +10,7 @@ from agent.analyst import (
 from agent.fixed_single_stock_report import build_fixed_single_stock_report
 from agent.llm_analyst import OpenAIResponsesClient, generate_llm_report
 from agent.llm_analyst import OpenRouterChatClient
+from agent.ml_trust_explanation import format_ml_trust_explanation_lines
 from agent.report_context import build_single_stock_report_context
 
 
@@ -180,26 +181,31 @@ def ensure_theme_ml_reference_section(*, data: dict, report: str) -> str:
 
 def enforce_theme_ml_reference_trust(*, data: dict, report: str) -> str:
     trust = data.get("theme_ml_reference_trust") or data.get("ml_reference_trust") or {}
-    if trust.get("status") != "reduced_trust":
-        return report
-
-    reduced_trust_text = "ML Reference 目前為降低信任狀態，相關數字需保守解讀"
-    replacements = [
-        "ML 參考信任度為一般",
-        "ML Reference 信任度為一般",
-        "ML 參考信任度為正常",
-        "ML Reference 信任度為正常",
-        "ML 參考信任度一般",
-        "ML Reference 信任度一般",
-    ]
     updated_report = report
-    for phrase in replacements:
-        updated_report = updated_report.replace(phrase, reduced_trust_text)
 
-    if "ML Reference" in updated_report and "降低信任" not in updated_report:
+    if trust.get("status") == "reduced_trust":
+        reduced_trust_text = "ML Reference 目前為降低信任狀態，相關數字需保守解讀"
+        replacements = [
+            "ML 參考信任度為一般",
+            "ML Reference 信任度為一般",
+            "ML 參考信任度為正常",
+            "ML Reference 信任度為正常",
+            "ML 參考信任度一般",
+            "ML Reference 信任度一般",
+        ]
+        for phrase in replacements:
+            updated_report = updated_report.replace(phrase, reduced_trust_text)
+
+    explanation_lines = format_ml_trust_explanation_lines(trust.get("explanation"))
+    if (
+        "ML Reference" in updated_report
+        and explanation_lines
+        and "ML 信任說明:" not in updated_report
+    ):
+        explanation_block = "ML 信任說明:\n" + "\n".join(explanation_lines)
         updated_report = updated_report.replace(
             "ML Reference",
-            f"ML Reference\n{reduced_trust_text}。",
+            f"ML Reference\n{explanation_block}",
             1,
         )
 

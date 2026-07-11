@@ -1,4 +1,5 @@
 from agent.report_context import build_single_stock_report_context
+from agent.ml_trust_explanation import format_ml_trust_explanation_lines
 
 
 def build_fixed_single_stock_report(data: dict) -> str:
@@ -155,9 +156,12 @@ def build_news_analysis(context: dict) -> str:
 
 def build_ml_reference(context: dict) -> str:
     ml_research = context.get("ml_research") or {}
+    trust = context.get("ml_reference_trust") or {}
+    explanation_lines = format_ml_trust_explanation_lines(trust.get("explanation"))
     if ml_research.get("status") != "success":
         reason = ml_research.get("reason") or ml_research.get("status") or "missing ml_research output"
-        return f"這次沒有可用的機器學習參考。原因：{reason}。"
+        lines = explanation_lines or [f"- 這次沒有可用的機器學習參考。原因：{reason}。"]
+        return "ML 信任說明:\n" + "\n".join(lines)
 
     lines = [
         "以下是模型根據歷史資料、技術特徵、市場環境與新聞摘要產生的參考，不會直接改變本次結論或價格計畫。",
@@ -210,10 +214,8 @@ def build_ml_reference(context: dict) -> str:
             )
             lines.append(f"- 觸發原因：{reason_text}。")
 
-    trust = context.get("ml_reference_trust") or {}
-    if trust.get("status") == "reduced_trust":
-        lines.append("")
-        lines.append("ML Reference 目前為降低信任狀態，相關數字應保守解讀。")
+    if explanation_lines:
+        lines.extend(["", "ML 信任說明:", *explanation_lines])
 
     return "\n".join(lines)
 
