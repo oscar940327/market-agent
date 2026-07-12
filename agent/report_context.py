@@ -39,7 +39,8 @@ def build_single_stock_report_context(data: dict) -> dict:
         "status": data.get("status"),
         "ticker": data.get("ticker"),
         "query": data.get("query"),
-        "question_type": classify_single_stock_question_type(data.get("query")),
+        "question_type": data.get("question_type")
+        or classify_single_stock_question_type(data.get("query")),
         "execution_plan": data.get("execution_plan", []),
         "price_source": data.get("price_source"),
         "technical_analysis": data.get("technical_analysis"),

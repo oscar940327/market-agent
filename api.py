@@ -1,3 +1,4 @@
+import inspect
 import re
 
 from fastapi import FastAPI
@@ -5,11 +6,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from agent.analyst import format_error_message
+from agent.hybrid_router import route_market_query
 from agent.reporting import apply_required_report_sections, build_report
 from agent.rule_based_router import (
     HISTORICAL_BACKTEST_TERMS,
     STRATEGY_TERMS,
-    detect_intent,
     query_contains_any,
 )
 from data.themes import get_all_theme_tickers
@@ -148,6 +149,12 @@ def get_explicit_request_fields(request: BaseModel) -> set[str]:
     return set(getattr(request, "__fields_set__", set()))
 
 
+def call_with_optional_hint(function, *, hint_name: str, hint_value, **kwargs):
+    if hint_value is not None and hint_name in inspect.signature(function).parameters:
+        kwargs[hint_name] = hint_value
+    return function(**kwargs)
+
+
 def should_use_research_workflow_for_backtest_query(request: QueryRequest) -> bool:
     query = request.user_query.lower()
     if query_contains_any(request.user_query, query, STRATEGY_TERMS) and query_contains_any(
@@ -242,12 +249,12 @@ def health_check() -> dict:
 
 @app.post("/route")
 def route_query(request: RouteRequest) -> dict:
-    return detect_intent(request.user_query)
+    return route_market_query(request.user_query)
 
 
 @app.post("/query")
 def query_market_agent(request: QueryRequest) -> dict:
-    route_result = detect_intent(request.user_query)
+    route_result = route_market_query(request.user_query)
     intent = route_result["intent"]
 
     if (
@@ -263,7 +270,7 @@ def query_market_agent(request: QueryRequest) -> dict:
         intent = "single_stock_analysis"
 
     if intent == "single_stock_analysis":
-        ticker = request.ticker or extract_ticker_from_query(request.user_query)
+        ticker = request.ticker or route_result.get("ticker") or extract_ticker_from_query(request.user_query)
 
         if not ticker:
             result = build_needs_ticker_result(intent, request.user_query)
@@ -280,6 +287,7 @@ def query_market_agent(request: QueryRequest) -> dict:
             include_news=request.include_news,
             include_fundamentals=request.include_fundamentals,
         )
+        analysis_data["question_type"] = route_result.get("question_type", "entry_or_research")
         report_result = build_report(
             kind="single_stock",
             data=analysis_data,
@@ -300,7 +308,7 @@ def query_market_agent(request: QueryRequest) -> dict:
         )
 
     if intent == "backtest_query":
-        ticker = request.ticker or extract_ticker_from_query(request.user_query)
+        ticker = request.ticker or route_result.get("ticker") or extract_ticker_from_query(request.user_query)
 
         if not ticker:
             result = build_needs_ticker_result(intent, request.user_query)
@@ -311,9 +319,12 @@ def query_market_agent(request: QueryRequest) -> dict:
                 report=format_error_message(result),
             )
 
-        backtest_data = run_backtest_query(
+        backtest_data = call_with_optional_hint(
+            run_backtest_query,
             ticker=normalize_ticker(ticker),
             user_query=request.user_query,
+            hint_name="strategy_hint",
+            hint_value=route_result.get("strategy"),
         )
         report_result = build_report(
             kind="backtest",
@@ -330,7 +341,12 @@ def query_market_agent(request: QueryRequest) -> dict:
         )
 
     if intent == "industry_trend":
-        theme_data = run_theme_analysis(request.user_query)
+        theme_data = call_with_optional_hint(
+            run_theme_analysis,
+            user_query=request.user_query,
+            hint_name="theme_hint",
+            hint_value=route_result.get("theme"),
+        )
         report_result = build_report(
             kind="theme",
             data=theme_data,
@@ -373,6 +389,20 @@ def query_market_agent(request: QueryRequest) -> dict:
             data=portfolio_data,
             report=report_result["report"],
             analyst=report_result["analyst"],
+        )
+
+    if intent == "clarification_needed":
+        result = {
+            "intent": intent,
+            "status": "clarification_needed",
+            "query": request.user_query,
+            "message": route_result.get("reason") or "Please clarify the intended research target.",
+        }
+        return build_api_response(
+            intent=intent,
+            route=route_result,
+            data=result,
+            report=format_error_message(result),
         )
 
     result = {

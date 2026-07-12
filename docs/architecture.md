@@ -67,7 +67,11 @@ Router 負責判斷使用者問題屬於哪一種 intent。
 | `backtest_query` | `MU 突破策略以前表現怎麼樣` |
 | `portfolio_analysis` | 投資組合或多檔持股問題 |
 
-Router 主要使用 rule-based 判斷，例如 ticker、產業關鍵字、回測關鍵字、持有風險關鍵字。
+Router 採用 hybrid routing。第一層先用 rule-based 判斷 ticker、產業、回測與持有風險等明確問題，並計算 routing confidence。高信心問題直接進入 workflow，不呼叫 LLM；只有低信心、自然語句或混合意圖才透過 OpenRouter 分類。
+
+LLM Router 只回傳經過驗證的 structured JSON，包括 `intent`、`ticker`、`theme`、`strategy`、`question_type`、`confidence` 與 `reason`。它不產生 Research Report，也不能直接改變投資結論。LLM 回傳格式錯誤、未知 ticker/theme 或 provider 暫時失敗時，系統會退回 rule-based 結果或要求使用者補充問題。
+
+Route metadata 會保留 `router_used`、`llm_used`、`fallback_used`、規則信心與判斷原因，方便確認這次問題由哪一層 Router 處理。
 
 ### MarketManagerAgent
 

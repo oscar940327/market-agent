@@ -415,8 +415,13 @@ class MarketManagerAgent:
             "data_freshness": data_freshness,
         }
 
-    def run_backtest_query(self, ticker: str, user_query: str) -> dict:
-        strategy = select_backtest_strategy(user_query)
+    def run_backtest_query(
+        self,
+        ticker: str,
+        user_query: str,
+        strategy_hint: str | None = None,
+    ) -> dict:
+        strategy = strategy_hint or select_backtest_strategy(user_query)
         execution_plan = self.build_backtest_plan(user_query)
 
         if strategy == "unknown":
@@ -487,6 +492,7 @@ class MarketManagerAgent:
             user_query=user_query,
             price_data=backtest_price_data,
             data_window=data_window,
+            strategy_hint=strategy,
         )
         _ = market_data_agent
 

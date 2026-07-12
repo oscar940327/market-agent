@@ -33,8 +33,9 @@ def run_backtest_agent(
     user_query: str,
     price_data,
     data_window: dict | None = None,
+    strategy_hint: str | None = None,
 ) -> dict:
-    strategy = select_backtest_strategy(user_query)
+    strategy = strategy_hint or select_backtest_strategy(user_query)
 
     if strategy == "unknown":
         return {

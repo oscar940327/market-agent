@@ -108,8 +108,8 @@ def score_stock_analysis(analysis_data: dict) -> dict:
     }
 
 
-def run_theme_analysis(user_query: str) -> dict:
-    theme_key = find_theme_key(user_query)
+def run_theme_analysis(user_query: str, theme_hint: str | None = None) -> dict:
+    theme_key = theme_hint or find_theme_key(user_query)
 
     if theme_key:
         theme = get_theme(theme_key)
@@ -505,8 +505,16 @@ def classify_sector_breadth(positive_breadth: float) -> str:
     return "weak_breadth"
 
 
-def run_backtest_query(ticker: str, user_query: str) -> dict:
-    return market_manager.run_backtest_query(ticker=ticker, user_query=user_query)
+def run_backtest_query(
+    ticker: str,
+    user_query: str,
+    strategy_hint: str | None = None,
+) -> dict:
+    return market_manager.run_backtest_query(
+        ticker=ticker,
+        user_query=user_query,
+        strategy_hint=strategy_hint,
+    )
 
 
 def run_portfolio_analysis(
