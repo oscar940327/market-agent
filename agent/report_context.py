@@ -60,6 +60,8 @@ def build_single_stock_report_context(data: dict) -> dict:
         "exit_signal": data.get("exit_signal"),
         "data_freshness": data.get("data_freshness"),
         "agent_outputs": data.get("agent_outputs", {}),
+        "analyst_outputs": data.get("analyst_outputs", {}),
+        "analyst_consensus": data.get("analyst_consensus", {}),
         "agent_summaries": {
             name: output.get("summary", {})
             for name, output in data.get("agent_outputs", {}).items()

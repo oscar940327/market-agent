@@ -1,4 +1,5 @@
 from agent.agent_output import build_agent_output, wrap_legacy_agent_output
+from agent.analyst_outputs import build_analyst_consensus, build_single_stock_analyst_outputs
 from agent.experts.backtest_agent import run_backtest_agent, select_backtest_strategy
 from agent.experts.fundamental_agent import run_fundamental_agent
 from agent.experts.news_agent import run_news_agent
@@ -346,6 +347,18 @@ class MarketManagerAgent:
             ml_research=ml_research,
         )
         data_freshness = build_current_data_freshness(ticker=ticker)
+        analyst_outputs = build_single_stock_analyst_outputs(
+            technical=technical_agent["technical_analysis"],
+            signals=technical_agent["signals"],
+            fundamentals=fundamental_agent["fundamentals"],
+            news_analysis=news_agent["news_analysis"],
+            ml_research=ml_research,
+            ml_reference_trust=ml_reference_trust,
+            evidence_quality=research_profile["evidence_quality"],
+            exit_signal=exit_signal,
+            data_freshness=data_freshness,
+        )
+        analyst_consensus = build_analyst_consensus(analyst_outputs)
         agent_outputs = {
             "technical": wrap_legacy_agent_output(technical_agent),
             "news": wrap_legacy_agent_output(
@@ -399,6 +412,8 @@ class MarketManagerAgent:
             "execution_plan": execution_plan,
             "orchestration": orchestration,
             "agent_outputs": agent_outputs,
+            "analyst_outputs": analyst_outputs,
+            "analyst_consensus": analyst_consensus,
             "technical_analysis": technical_agent["technical_analysis"],
             "signals": technical_agent["signals"],
             "backtest_evidence": backtest_evidence,

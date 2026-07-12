@@ -1,5 +1,6 @@
 ﻿from agent.rule_based_router import detect_intent
 import inspect
+from agent.analyst_outputs import aggregate_theme_analyst_outputs, build_analyst_consensus
 from agent.market_manager import (
     MarketManagerAgent,
     fetch_price_data,
@@ -145,6 +146,8 @@ def run_theme_analysis(user_query: str, theme_hint: str | None = None) -> dict:
     )
     theme_ml_reference_trust = build_ml_reference_trust(theme_ml_reference)
     failed_results = build_theme_failed_results(sorted_results)
+    analyst_outputs = aggregate_theme_analyst_outputs(sorted_results)
+    analyst_consensus = build_analyst_consensus(analyst_outputs)
 
     return {
         "intent": "industry_trend",
@@ -166,6 +169,8 @@ def run_theme_analysis(user_query: str, theme_hint: str | None = None) -> dict:
         "ml_reference_trust": theme_ml_reference_trust,
         "ml_trust_explanation": theme_ml_reference_trust.get("explanation"),
         "ml_research": theme_ml_reference,
+        "analyst_outputs": analyst_outputs,
+        "analyst_consensus": analyst_consensus,
         "results": sorted_results,
     }
 
