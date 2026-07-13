@@ -223,6 +223,9 @@ def build_api_response(
     if route is not None:
         response["route"] = route
 
+    if data.get("report_review") is not None:
+        response["review"] = data["report_review"]
+
     return response
 
 

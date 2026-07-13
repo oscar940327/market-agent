@@ -108,8 +108,9 @@ Market Agent 目前是一個後端 API，加上一個個人網站上的前端頁
 3. MarketManagerAgent 選擇對應 workflow。
 4. 各分析模組產生 structured data。
 5. 系統補上資料新鮮度、證據品質與 ML Reference 狀態。
-6. Research Report 被產生並回傳前端。
-7. 前端顯示報告、摘要卡、資料狀態、ML Reference 狀態與 structured data。
+6. Research Report 產生後，Review Layer 檢查數字、風險揭露、ML trust 與段落是否一致。
+7. 未通過且已開啟 hybrid review 時，系統最多進行三輪受控修正。
+8. 前端顯示報告、摘要卡、資料狀態、ML Reference 狀態與 structured data。
 
 詳細說明：[Architecture](docs/architecture.md)
 

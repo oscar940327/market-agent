@@ -123,6 +123,23 @@ Single-stock 與 theme workflow 會把既有分析結果轉成統一的 `analyst
 
 `key_evidence` 的每筆資料都有 `field`、`value` 與 `source`，可以追溯到原始 Structured Data。`analyst_consensus` 只整理各 Analyst 的 stance 與衝突，不重新產生投資判斷。第一版由既有 deterministic analysis 建立，不增加 LLM token；Step 25 Reviewer 將以這些輸出作為檢查輸入。
 
+### Report Review Layer
+
+Research Report 產生後會先經過 deterministic reviewer，檢查必要段落、問題類型、ML trust、資料 freshness、關鍵機率、風險聲明與過度自信語句。結果會寫入 `report_review`，並包含 checks、risk notes、suggested fixes、iteration history 與 fallback 狀態。
+
+當 `MARKET_AGENT_REPORT_REVIEW_MODE=hybrid` 且 deterministic review 未通過時，才會啟動 OpenRouter reviewer/reviser：
+
+```text
+Draft Report
+  -> Deterministic Review
+  -> LLM Semantic Review
+  -> LLM Revision
+  -> Deterministic Recheck
+  -> Final LLM Review
+```
+
+通過就立即停止，最多三輪；最壞情況為每輪 reviewer + reviser，共六次 LLM 呼叫。Reviser 只能根據 Structured Data 與 review findings 修正文句，不得修改 structured values 或新增投資判斷。LLM 不可用或達到上限仍未通過時，系統保留目前報告並輸出 review warning。
+
 ## Query Flow
 
 主要入口是：
@@ -138,7 +155,8 @@ POST /query
 3. API 根據 intent 呼叫對應 workflow。
 4. Workflow 回傳 structured data。
 5. Report Builder 產生 Research Report。
-6. API 回傳 report、structured data 與 analyst metadata。
+6. Review Layer 檢查報告，必要時進行受控修正。
+7. API 回傳 report、structured data、analyst metadata 與 review metadata。
 
 ## Single Stock Workflow
 

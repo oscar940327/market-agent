@@ -12,6 +12,7 @@ from agent.llm_analyst import OpenAIResponsesClient, generate_llm_report
 from agent.llm_analyst import OpenRouterChatClient
 from agent.ml_trust_explanation import format_ml_trust_explanation_lines
 from agent.report_context import build_single_stock_report_context
+from agent.report_review import review_and_revise_report
 
 
 try:
@@ -41,6 +42,36 @@ def normalize_analyst_mode(analyst_mode: str | None) -> str:
 
 
 def build_report(
+    *,
+    kind: str,
+    data: dict,
+    analyst_mode: str | None = None,
+    llm_client=None,
+    review_mode: str | None = None,
+    review_llm_client=None,
+) -> dict:
+    draft = _build_report_draft(
+        kind=kind,
+        data=data,
+        analyst_mode=analyst_mode,
+        llm_client=llm_client,
+    )
+    reviewed = review_and_revise_report(
+        kind=kind,
+        data=data,
+        report=draft["report"],
+        mode=review_mode,
+        llm_client=review_llm_client,
+    )
+    data["report_review"] = reviewed["review"]
+    return {
+        **draft,
+        "report": reviewed["report"],
+        "review": reviewed["review"],
+    }
+
+
+def _build_report_draft(
     *,
     kind: str,
     data: dict,
