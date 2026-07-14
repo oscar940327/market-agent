@@ -31,8 +31,11 @@ def build_research_summary(context: dict) -> str:
     evidence_quality = context.get("evidence_quality") or {}
     confidence = profile.get("research_confidence", "unknown")
     evidence_level = evidence_quality.get("level", confidence)
+    conclusion_prefix = (
+        "目前持有風險判斷" if context.get("question_type") == "holding_exit" else "目前結論"
+    )
     return (
-        f"{ticker}目前結論為「{decision['conclusion']}」。"
+        f"{ticker}{conclusion_prefix}為「{decision['conclusion']}」。"
         f"估值判斷是「{decision['valuation']}」，"
         f"技術面是「{decision['technical']}」，"
         f"研究信心為 {confidence}，證據品質為 {evidence_level}。"
@@ -66,7 +69,7 @@ def build_fundamental_analysis(context: dict) -> str:
     if (
         valuation in {"合理偏貴", "明顯偏貴"}
         and price_to_sales is not None
-        and price_to_sales >= 12
+        and price_to_sales >= 10
         and (forward_pe is None or forward_pe < 35)
     ):
         parts.append("本益比不高，但營收倍數偏高，因此估值仍需要保守看待。")
@@ -206,7 +209,7 @@ def build_ml_reference(context: dict) -> str:
         lines.extend(["", f"保守風險修正{date_note}:"])
         lines.append(
             "- "
-            f"保守風險層級為 {overlay.get('risk_level')}，"
+            f"保守風險層級為 {translate_downside_risk_level(overlay.get('risk_level'))}，"
             f"20 個交易日內中途最大跌幅保守參考約 {format_percent(overlay.get('conservative_max_drop'))}。"
         )
         if overlay.get("reasons"):
@@ -280,22 +283,50 @@ def translate_downside_overlay_reason(reason: str) -> str:
         "risk_state_high": "風險狀態偏高",
         "risk_state_elevated": "風險狀態升高",
         "recent_risk_news": "近期有風險類新聞",
+        "recent_risk_event_news": "近期有風險類新聞",
     }
     return labels.get(reason, reason)
+
+
+def translate_downside_risk_level(level: str | None) -> str:
+    return {
+        "low": "低",
+        "medium": "中",
+        "high": "高",
+        "severe": "極高",
+    }.get(level, level or "未知")
+
+
+def get_effective_risk_level(context: dict) -> str:
+    profile_risk = ((context.get("research_profile") or {}).get("risk_level")) or "unknown"
+    overlay = ((context.get("ml_research") or {}).get("downside_risk_overlay")) or {}
+    if not overlay.get("active"):
+        return profile_risk
+
+    overlay_risk = overlay.get("risk_level")
+    if overlay_risk in {"high", "severe"}:
+        return "high"
+    if overlay_risk == "medium" and profile_risk in {"low", "unknown"}:
+        return "medium"
+    return profile_risk
 
 
 def build_overall_assessment(context: dict) -> str:
     decision = build_decision(context)
     profile = context.get("research_profile") or {}
     evidence_quality = context.get("evidence_quality") or {}
-    risk_level = profile.get("risk_level", "unknown")
+    risk_level = get_effective_risk_level(context)
     combined_score = to_float(profile.get("combined_score"))
     score_text = f"綜合分數為 {combined_score:.2f}。" if combined_score is not None else "綜合分數目前不足。"
     evidence_text = build_evidence_quality_text(evidence_quality)
+    if context.get("question_type") == "holding_exit":
+        closing_note = "持有風險判斷應搭配原本的部位、停損與出場計畫，不是直接買賣指令。"
+    else:
+        closing_note = "價格計畫可作為後續觀察區間，但不代表現在一定適合進場。"
     return (
         f"{score_text} 基本面、技術面與新聞面合併後，目前結論為「{decision['conclusion']}」，"
         f"風險等級為 {risk_level}。{evidence_text} "
-        "價格計畫可作為後續觀察區間，但不代表現在一定適合進場。"
+        f"{closing_note}"
     )
 
 
@@ -316,7 +347,10 @@ def build_decision(context: dict) -> dict:
     valuation = get_valuation_label(context.get("fundamentals") or {})
     technical = get_technical_label(context)
     news_sentiment = ((context.get("news_summary") or {}).get("sentiment")) or "neutral"
-    conclusion = get_conclusion_label(valuation, technical, news_sentiment)
+    if context.get("question_type") == "holding_exit":
+        conclusion = get_holding_conclusion_label(context.get("exit_signal") or {})
+    else:
+        conclusion = get_conclusion_label(valuation, technical, news_sentiment)
     return {"valuation": valuation, "technical": technical, "conclusion": conclusion}
 
 
@@ -336,7 +370,7 @@ def get_valuation_label(fundamentals: dict) -> str:
 
     if (pe is not None and pe >= 60) or (price_to_sales is not None and price_to_sales >= 20):
         return "明顯偏貴"
-    if (pe is not None and pe >= 35) or (price_to_sales is not None and price_to_sales >= 12):
+    if (pe is not None and pe >= 35) or (price_to_sales is not None and price_to_sales >= 10):
         return "合理偏貴"
     if pe is not None and pe <= 20 and revenue_growth is not None and revenue_growth > 0:
         return "合理偏便宜"
@@ -369,6 +403,17 @@ def get_conclusion_label(valuation: str, technical: str, news_sentiment: str) ->
     if news_sentiment == "negative":
         return "降低進場信心"
     return "還需要觀察"
+
+
+def get_holding_conclusion_label(exit_signal: dict) -> str:
+    if exit_signal.get("status") != "success":
+        return "持有風險待確認"
+    return {
+        "hold": "續抱觀察",
+        "watch": "提高觀察",
+        "reduce": "評估減碼",
+        "exit": "出場風險偏高",
+    }.get(exit_signal.get("exit_signal"), "持有風險待確認")
 
 
 def build_historical_signal_text(backtest_evidence: dict) -> str:

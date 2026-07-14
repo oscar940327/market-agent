@@ -155,6 +155,35 @@ def test_holding_question_is_detected_from_query_when_question_type_is_absent():
     assert "holding_section_matches_question" in failed
 
 
+def test_holding_review_rejects_entry_only_conclusion():
+    data = {"status": "success", "question_type": "holding_exit"}
+    report = "\n".join(
+        [
+            "研究摘要",
+            "MU目前結論為「暫不進場」。",
+            "基本面分析",
+            "test",
+            "技術面分析",
+            "test",
+            "新聞面分析",
+            "test",
+            "ML Reference",
+            "test",
+            "持有風險 / 出場觀察",
+            "目前 exit signal 為「reduce」。",
+            "綜合評估",
+            "test",
+            "風險提醒",
+            "不構成投資建議。",
+        ]
+    )
+
+    result = run_deterministic_review(kind="single_stock", data=data, report=report)
+    failed = {item["code"] for item in result["checks"] if item["status"] == "fail"}
+
+    assert "holding_conclusion_matches_exit_signal" in failed
+
+
 def test_build_report_exposes_review_in_result_and_structured_data():
     data = {"status": "no_price_data", "message": "price data unavailable"}
     result = build_report(kind="single_stock", data=data, analyst_mode="rule_based")

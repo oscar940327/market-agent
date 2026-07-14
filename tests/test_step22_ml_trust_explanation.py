@@ -141,6 +141,9 @@ def test_single_stock_report_renders_concise_trust_explanation():
     assert "信任狀態：降低信任" in report
     assert "版本化模型政策記錄 4 項校準改善事項" in report
     assert "不可單獨改變結論、價格計畫或出場決策" in report
+    assert "訊號品質為 低" in report
+    assert "訊號品質為 low" not in report
+    assert "。；" not in report
 
 
 def test_theme_report_inserts_structured_trust_explanation():

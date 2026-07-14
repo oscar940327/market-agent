@@ -388,6 +388,8 @@ def test_build_report_for_holding_question_forces_exit_signal_section():
     assert "exit signal" in result["report"]
     assert "watch" in result["report"]
     assert "不是直接買賣指令" in result["report"]
+    assert "MU目前持有風險判斷為「提高觀察」" in result["report"]
+    assert "目前結論為「可列入觀察」" not in result["report"]
     return
 
     result = build_report(
@@ -460,6 +462,49 @@ def test_fundamental_report_explains_price_to_sales_driven_valuation():
     assert "合理偏貴" in report
     assert "Price/Sales 約 12.2" in report
     assert "本益比不高，但營收倍數偏高" in report
+
+
+def test_price_to_sales_near_twelve_prevents_cheap_valuation_label():
+    report = build_fundamental_analysis(
+        {
+            "fundamentals": {
+                "status": "success",
+                "metrics": {
+                    "forward_pe": 6.3,
+                    "price_to_sales": 11.7,
+                    "revenue_growth": 3.457,
+                },
+                "summary": {"risks": []},
+            }
+        }
+    )
+
+    assert "目前估值判斷為「合理偏貴」" in report
+    assert "本益比不高，但營收倍數偏高" in report
+
+
+def test_holding_report_uses_exit_conclusion_and_conservative_risk_overlay():
+    data = make_success_single_stock_data()
+    data["query"] = "MU 如果我已經持有，現在要不要減碼"
+    data["exit_signal"]["exit_signal"] = "reduce"
+    data["ml_research"] = {
+        "status": "success",
+        "targets": {},
+        "downside_risk_overlay": {
+            "active": True,
+            "risk_level": "severe",
+            "conservative_max_drop": -0.12,
+            "reasons": ["recent_risk_event_news"],
+        },
+    }
+
+    report = build_report(kind="single_stock", data=data, analyst_mode="rule_based")["report"]
+
+    assert "MU目前持有風險判斷為「評估減碼」" in report
+    assert "保守風險層級為 極高" in report
+    assert "近期有風險類新聞" in report
+    assert "風險等級為 high" in report
+    assert "不代表現在一定適合進場" not in report
 
 
 def test_short_term_news_explanation_matches_sentiment():

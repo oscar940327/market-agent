@@ -364,6 +364,24 @@ def _review_single_stock_contract(kind: str, data: dict, report: str, checks: li
         "持有／出場段落與問題類型不一致。",
         "依 question_type 新增或移除持有風險段落。",
     )
+    if holding:
+        entry_only_conclusions = (
+            "目前結論為「暫不進場」",
+            "目前結論為「等待更好價格」",
+            "目前結論為「可列入觀察」",
+            "目前結論為「觀察回踩是否有效」",
+            "目前結論為「降低進場信心」",
+        )
+        has_entry_only_conclusion = any(
+            conclusion in report for conclusion in entry_only_conclusions
+        )
+        _check(
+            checks,
+            "holding_conclusion_matches_exit_signal",
+            not has_entry_only_conclusion,
+            "持有問題仍使用只適用於進場的結論。",
+            "依 exit_signal 改用續抱觀察、提高觀察、評估減碼或出場風險偏高。",
+        )
 
 
 def _review_ml_trust(data: dict, report: str, checks: list[dict]) -> None:

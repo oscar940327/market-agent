@@ -20,6 +20,14 @@ REASON_CATEGORY_PRIORITY = {
     "historical_evidence": 8,
     "model_version": 9,
 }
+QUALITY_LABELS = {
+    "high": "高",
+    "medium": "中",
+    "low_to_medium": "低到中",
+    "low": "低",
+    "unknown": "未知",
+    "none": "無",
+}
 
 
 def build_ml_trust_explanation(
@@ -94,7 +102,7 @@ def build_ml_trust_explanation(
             reasons,
             code="return_model_quality_limited",
             category="model_quality",
-            message=f"報酬模型品質為 {return_quality}，報酬數字只能視為實驗性區間參考。",
+            message=f"報酬模型品質為 {translate_quality(return_quality)}，報酬數字只能視為實驗性區間參考。",
         )
 
     if model_policy and model_policy.get("status") == "reduced_trust":
@@ -142,7 +150,7 @@ def build_ml_trust_explanation(
             supports,
             code="historical_sample_available",
             category="historical_evidence",
-            message=f"歷史相似情境有 {sample_size} 筆，證據品質為 {evidence_quality}。",
+            message=f"歷史相似情境有 {sample_size} 筆，證據品質為 {translate_quality(evidence_quality)}。",
         )
     elif sample_size:
         add_item(
@@ -190,7 +198,7 @@ def add_signal_quality_reason(reasons: list[dict], targets: dict, key: str, labe
             reasons,
             code=f"{key}_signal_quality_{quality}",
             category="signal_quality",
-            message=f"{label}的訊號品質為 {quality}，不適合單獨作為進出場依據。",
+            message=f"{label}的訊號品質為 {translate_quality(quality)}，不適合單獨作為進出場依據。",
         )
 
 
@@ -213,6 +221,14 @@ def add_item(items: list[dict], *, code: str, category: str, message: str) -> No
     if any(item["code"] == code for item in items):
         return
     items.append({"code": code, "category": category, "message": message})
+
+
+def translate_quality(quality: str | None) -> str:
+    return QUALITY_LABELS.get(quality, quality or "未知")
+
+
+def strip_terminal_punctuation(message: str) -> str:
+    return message.rstrip().rstrip("。；;.")
 
 
 def build_summary(status: str, reasons: list[dict]) -> str:
@@ -261,13 +277,15 @@ def format_ml_trust_explanation_lines(explanation: dict | None) -> list[str]:
     if reasons:
         lines.append(
             "- 主要原因："
-            + "；".join(item["message"] for item in reasons[:4])
+            + "；".join(strip_terminal_punctuation(item["message"]) for item in reasons[:4])
+            + "。"
         )
     supports = explanation.get("supports") or []
     if supports:
         lines.append(
             "- 支持證據："
-            + "；".join(item["message"] for item in supports[:2])
+            + "；".join(strip_terminal_punctuation(item["message"]) for item in supports[:2])
+            + "。"
         )
     lines.append(f"- 使用方式：{explanation.get('how_to_use', '')}")
     return lines
