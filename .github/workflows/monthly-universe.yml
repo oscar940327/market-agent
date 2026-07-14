@@ -1,5 +1,9 @@
 name: Monthly Universe Update
 
+permissions:
+  contents: read
+  issues: write
+
 on:
   workflow_dispatch:
   schedule:
@@ -38,6 +42,13 @@ jobs:
       - name: Update QQQ100 universe
         run: python scripts/ingest_qqq_universe.py
 
+      - name: Build maintenance diagnosis
+        if: always()
+        uses: ./.github/actions/pipeline-diagnosis
+        with:
+          pipeline: monthly-universe
+          status: ${{ job.status }}
+
       - name: Send failure alert
         if: failure()
         run: >
@@ -51,5 +62,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: monthly-universe-reports
-          path: data/market/universe/*.csv
+          path: |
+            data/market/universe/*.csv
+            data/maintenance/diagnoses/*
           if-no-files-found: ignore

@@ -146,6 +146,7 @@ def log_one_fixture(*, query: str, args: argparse.Namespace) -> dict:
         output_snapshot={
             "data": data,
             "analyst": report_result["analyst"],
+            "report_review": report_result["review"],
             "fixture": True,
         },
     )
@@ -179,14 +180,18 @@ def log_one_fixture(*, query: str, args: argparse.Namespace) -> dict:
             "message": outcome_result.get("message"),
         }
 
+    review = report_result["review"]
+    review_passed = review.get("status") == "pass"
     return {
-        "status": "success",
+        "status": "success" if review_passed else "quality_failed",
         "intent": intent,
         "query": query,
         "report": report_result["report"],
+        "report_review": review,
         "tracking_status": log_row.get("tracking_status"),
         "outcome_count": len(outcome_rows),
         "research_log_id": log_result["row"]["id"],
+        "message": None if review_passed else "Research Report semantic quality review did not pass.",
     }
 
 
@@ -201,14 +206,48 @@ def build_daily_research_fixture_report(
         status = result.get("status", "unknown")
         status_counts[status] = status_counts.get(status, 0) + 1
 
+    quality_summary = build_fixture_quality_summary(results)
+    all_success = all(result.get("status") == "success" for result in results)
+
     return {
-        "report_version": f"{frequency}_research_fixture_report_v1",
+        "report_version": f"{frequency}_research_fixture_report_v2",
         "frequency": frequency,
         "generated_at": generated_at,
         "fixture_count": len(results),
-        "status": "success" if status_counts.get("error", 0) == 0 else "partial_success",
+        "status": "success" if all_success else "partial_success",
         "status_counts": status_counts,
+        "quality_summary": quality_summary,
         "results": results,
+    }
+
+
+def build_fixture_quality_summary(results: list[dict]) -> dict:
+    reviewed = []
+    passed = 0
+    score_totals = {}
+    score_counts = {}
+    for result in results:
+        review = result.get("report_review") or {}
+        semantic = review.get("semantic_quality") or {}
+        scores = semantic.get("quality_scores") or {}
+        if semantic.get("status") != "not_run":
+            reviewed.append(result)
+        if review.get("status") == "pass" and semantic.get("status") == "pass":
+            passed += 1
+        for field, value in scores.items():
+            if isinstance(value, (int, float)) and not isinstance(value, bool):
+                score_totals[field] = score_totals.get(field, 0.0) + float(value)
+                score_counts[field] = score_counts.get(field, 0) + 1
+    averages = {
+        field: round(total / score_counts[field], 2)
+        for field, total in score_totals.items()
+        if score_counts.get(field)
+    }
+    return {
+        "reviewed_count": len(reviewed),
+        "passed_count": passed,
+        "failed_count": len(reviewed) - passed,
+        "average_scores": averages,
     }
 
 
@@ -241,22 +280,63 @@ def build_daily_research_fixture_markdown(report: dict) -> str:
         f"- Generated at: `{report['generated_at']}`",
         f"- Status: `{report['status']}`",
         f"- Fixtures: `{report['fixture_count']}`",
-        "",
     ]
+    quality = report.get("quality_summary") or {}
+    if quality:
+        lines.extend(
+            [
+                f"- Semantic reviews: `{quality.get('reviewed_count', 0)}`",
+                f"- Quality passed: `{quality.get('passed_count', 0)}`",
+                f"- Quality failed: `{quality.get('failed_count', 0)}`",
+            ]
+        )
+        averages = quality.get("average_scores") or {}
+        if averages:
+            formatted = ", ".join(
+                f"{field}={score:.2f}" for field, score in averages.items()
+            )
+            lines.append(f"- Average quality scores: `{formatted}`")
+    lines.append("")
 
     for index, result in enumerate(report["results"]):
         if index:
             lines.extend(["", "---", ""])
         lines.append(result.get("query") or "Unknown query")
         lines.append("")
-        if result.get("status") != "success":
+        if result.get("status") == "error":
             lines.append("分析或紀錄失敗")
             lines.append("")
             lines.append(f"原因：{result.get('message', 'unknown')}")
             continue
+        lines.extend(format_fixture_quality_lines(result.get("report_review") or {}))
+        if result.get("status") == "quality_failed":
+            lines.extend(["", "品質審查未通過，以下保留最後一版報告供檢查。"])
+        lines.append("")
         lines.append(result.get("report", "").strip())
 
     return "\n".join(lines).rstrip() + "\n"
+
+
+def format_fixture_quality_lines(review: dict) -> list[str]:
+    semantic = review.get("semantic_quality") or {}
+    scores = semantic.get("quality_scores") or {}
+    lines = [
+        "品質審查",
+        f"- 最終狀態：{review.get('status', 'unknown')}",
+        f"- Semantic 狀態：{semantic.get('status', 'not_run')}",
+        f"- Reviewer：{review.get('provider') or 'none'} / {review.get('model') or 'none'}",
+        f"- 修訂次數：{review.get('iterations', 0)}",
+    ]
+    if scores:
+        lines.append(
+            "- 品質分數："
+            + "、".join(f"{field} {score}/5" for field, score in scores.items())
+        )
+    if semantic.get("reason"):
+        lines.append(f"- 說明：{semantic['reason']}")
+    if review.get("risk_notes"):
+        lines.append("- 未解決問題：" + "；".join(review["risk_notes"]))
+    return lines
 
 
 def send_daily_research_fixture_email(

@@ -35,5 +35,6 @@ data/ml/*
 !data/ml/return_model_reports/*.json
 !data/ml/return_model_reports/*.md
 data/pipeline_runs/
+data/maintenance/
 .pytest_cache/
 .pytest_tmp/

@@ -1,0 +1,57 @@
+name: Maintenance Checks
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  maintenance-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run test suite
+        run: python -m pytest -q
+
+      - name: Check documentation sync
+        if: github.event_name == 'pull_request'
+        run: >
+          python scripts/check_documentation_sync.py
+          --base-ref "${{ github.event.pull_request.base.sha }}"
+
+      - name: Build failure diagnosis
+        if: failure()
+        run: >
+          python scripts/build_pipeline_diagnosis.py
+          --pipeline maintenance-checks
+          --status failed
+          --message "Tests or documentation synchronization checks failed in this pull request."
+
+      - name: Upload maintenance diagnosis
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: maintenance-check-diagnosis
+          path: data/maintenance/diagnoses/*
+          if-no-files-found: ignore

@@ -1,5 +1,9 @@
 name: Daily Prices Pipeline
 
+permissions:
+  contents: read
+  issues: write
+
 on:
   workflow_dispatch:
   schedule:
@@ -42,6 +46,14 @@ jobs:
       - name: Run daily fundamentals pipeline
         run: python scripts/run_daily_pipeline.py --only fundamentals
 
+      - name: Build maintenance diagnosis
+        if: always()
+        uses: ./.github/actions/pipeline-diagnosis
+        with:
+          pipeline: daily-prices
+          status: ${{ job.status }}
+          input-paths: data/pipeline_runs/latest_daily_pipeline.json
+
       - name: Send failure alert
         if: failure()
         run: >
@@ -59,4 +71,5 @@ jobs:
           path: |
             data/pipeline_runs/*.json
             data/market/prices/*.csv
+            data/maintenance/diagnoses/*
           if-no-files-found: ignore

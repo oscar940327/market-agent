@@ -1,0 +1,40 @@
+name: Market Agent Pipeline Diagnosis
+description: Build a deterministic diagnosis and create or update a matching GitHub Issue.
+
+inputs:
+  pipeline:
+    description: Workflow or pipeline name.
+    required: true
+  status:
+    description: Current GitHub job status.
+    required: true
+  input-paths:
+    description: Optional comma-separated JSON log or monitoring report paths.
+    required: false
+    default: ""
+  message:
+    description: Fallback message when no structured log is available.
+    required: false
+    default: "Workflow did not complete successfully."
+
+runs:
+  using: composite
+  steps:
+    - name: Build rule-based diagnosis
+      id: diagnosis
+      shell: bash
+      run: >
+        python scripts/build_pipeline_diagnosis.py
+        --pipeline "${{ inputs.pipeline }}"
+        --status "${{ inputs.status }}"
+        --input-paths "${{ inputs.input-paths }}"
+        --message "${{ inputs.message }}"
+
+    - name: Create or update matching GitHub Issue
+      if: steps.diagnosis.outputs.should_create_issue == 'true'
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+      run: >
+        python scripts/sync_github_issue.py
+        --diagnosis "${{ steps.diagnosis.outputs.diagnosis_path }}"

@@ -25,10 +25,19 @@ class SequenceClient:
         return response
 
 
-def llm_review(status="needs_revision"):
+def llm_review(status="needs_revision", scores=None):
+    scores = scores or {
+        "query_relevance": 5,
+        "evidence_consistency": 5,
+        "risk_balance": 5,
+        "clarity": 5,
+        "hallucination_safety": 5,
+        "overall_quality": 5,
+    }
     return json.dumps(
         {
             "status": status,
+            "quality_scores": scores,
             "risk_notes": [] if status == "pass" else ["語氣過度確定"],
             "suggested_fixes": [] if status == "pass" else ["改成研究觀察語氣"],
             "confidence_adjustment": "none" if status == "pass" else "lower",
@@ -93,11 +102,12 @@ def test_hybrid_review_revises_and_stops_after_pass():
     assert "analyst_consensus" in client.calls[0]["user"]
 
 
-def test_review_loop_is_capped_at_three_iterations_and_six_calls():
+def test_review_loop_is_capped_at_three_iterations_and_seven_calls():
     bad_report = "主題摘要\n保證獲利。\n\n風險提醒\n不構成投資建議。"
     responses = []
     for _ in range(3):
         responses.extend([llm_review(), bad_report])
+    responses.append(llm_review())
     client = SequenceClient(responses)
     result = review_and_revise_report(
         kind="theme",
@@ -110,7 +120,7 @@ def test_review_loop_is_capped_at_three_iterations_and_six_calls():
     assert result["review"]["status"] == "needs_revision"
     assert result["review"]["iterations"] == 3
     assert result["review"]["fallback_used"] is True
-    assert len(client.calls) == 6
+    assert len(client.calls) == 7
 
 
 def test_llm_failure_preserves_original_report_and_review_warning():
@@ -187,5 +197,68 @@ def test_holding_review_rejects_entry_only_conclusion():
 def test_build_report_exposes_review_in_result_and_structured_data():
     data = {"status": "no_price_data", "message": "price data unavailable"}
     result = build_report(kind="single_stock", data=data, analyst_mode="rule_based")
-    assert result["review"]["review_version"] == "report_review_v1"
+    assert result["review"]["review_version"] == "report_review_v2"
     assert data["report_review"] == result["review"]
+
+
+def test_semantic_mode_reviews_even_when_deterministic_checks_pass():
+    client = SequenceClient([llm_review("pass")])
+
+    result = review_and_revise_report(
+        kind="theme",
+        data={"status": "success", "query": "記憶體類股現在適合觀察嗎"},
+        report=VALID_THEME_REPORT,
+        mode="semantic",
+        llm_client=client,
+    )
+
+    assert result["review"]["status"] == "pass"
+    assert result["review"]["mode_used"] == "semantic"
+    assert result["review"]["semantic_quality"]["status"] == "pass"
+    assert result["review"]["semantic_quality"]["quality_scores"]["overall_quality"] == 5
+    assert len(client.calls) == 1
+    assert "記憶體類股現在適合觀察嗎" in client.calls[0]["user"]
+
+
+def test_semantic_review_rejects_pass_status_when_any_score_is_below_four():
+    low_scores = {
+        "query_relevance": 3,
+        "evidence_consistency": 5,
+        "risk_balance": 5,
+        "clarity": 5,
+        "hallucination_safety": 5,
+        "overall_quality": 4,
+    }
+    client = SequenceClient(
+        [llm_review("pass", low_scores), VALID_THEME_REPORT, llm_review("pass")]
+    )
+
+    result = review_and_revise_report(
+        kind="theme",
+        data={"status": "success"},
+        report=VALID_THEME_REPORT,
+        mode="semantic",
+        llm_client=client,
+    )
+
+    assert result["review"]["status"] == "pass"
+    assert result["review"]["iterations"] == 1
+    first_semantic = next(
+        entry for entry in result["review"]["history"] if entry["stage"] == "llm_review"
+    )
+    assert first_semantic["status"] == "needs_revision"
+
+
+def test_semantic_mode_fails_closed_when_review_client_is_missing(monkeypatch):
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    result = review_and_revise_report(
+        kind="theme",
+        data={"status": "success"},
+        report=VALID_THEME_REPORT,
+        mode="semantic",
+        llm_client=None,
+    )
+
+    assert result["review"]["status"] == "needs_revision"
+    assert result["review"]["fallback_used"] is True
+    assert result["review"]["semantic_quality"]["status"] == "not_run"

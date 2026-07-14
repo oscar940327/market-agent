@@ -8,18 +8,32 @@ from agent.llm_analyst import OpenRouterChatClient
 from agent.rule_based_router import SINGLE_STOCK_HOLDING_TERMS, query_contains_any
 
 
-REPORT_REVIEW_VERSION = "report_review_v1"
+REPORT_REVIEW_VERSION = "report_review_v2"
 MAX_REVIEW_ITERATIONS = 3
-MAX_REVIEW_LLM_CALLS = 6
+MAX_REVIEW_LLM_CALLS = 7
+MIN_PASSING_QUALITY_SCORE = 4
+QUALITY_SCORE_FIELDS = (
+    "query_relevance",
+    "evidence_consistency",
+    "risk_balance",
+    "clarity",
+    "hallucination_safety",
+    "overall_quality",
+)
 
 LLM_REVIEW_SYSTEM_PROMPT = """
 You are the quality reviewer for a market research report. Check the report only
 against the supplied structured context and deterministic findings. Do not give
-new investment advice and do not invent facts. Return exactly one JSON object:
-{"status":"pass|needs_revision","risk_notes":[],"suggested_fixes":[],
- "confidence_adjustment":"none|lower","reason":"short explanation"}
-Use needs_revision only for factual inconsistency, omitted material risk,
-overconfidence, or a workflow/section mismatch.
+new investment advice and do not invent facts. Score every quality dimension
+from 1 (poor) to 5 (excellent). Return exactly one JSON object:
+{"status":"pass|needs_revision","quality_scores":{"query_relevance":1,
+ "evidence_consistency":1,"risk_balance":1,"clarity":1,
+ "hallucination_safety":1,"overall_quality":1},"risk_notes":[],
+ "suggested_fixes":[],"confidence_adjustment":"none|lower",
+ "reason":"short explanation"}
+Use pass only when every score is at least 4 and there is no factual
+inconsistency, omitted material risk, unanswered user intent, overconfidence,
+hallucination, or workflow/section mismatch.
 """.strip()
 
 LLM_REVISER_SYSTEM_PROMPT = """
@@ -49,7 +63,10 @@ def review_and_revise_report(
     deterministic = run_deterministic_review(kind=kind, data=data, report=current_report)
     history.append(_history_entry(0, "deterministic", deterministic))
 
-    if deterministic["status"] == "pass" or selected_mode == "deterministic":
+    semantic_required = selected_mode == "semantic"
+    if selected_mode == "deterministic" or (
+        deterministic["status"] == "pass" and not semantic_required
+    ):
         return _result(
             report=current_report,
             deterministic=deterministic,
@@ -60,9 +77,18 @@ def review_and_revise_report(
 
     client = llm_client or get_review_llm_client_from_env()
     if client is None:
+        terminal = deterministic
+        if semantic_required and deterministic["status"] == "pass":
+            terminal = {
+                **deterministic,
+                "status": "needs_revision",
+                "risk_notes": ["Semantic quality review could not run."],
+                "suggested_fixes": ["Configure the report review LLM and rerun the fixture."],
+                "confidence_adjustment": "lower",
+            }
         return _result(
             report=current_report,
-            deterministic=deterministic,
+            deterministic=terminal,
             history=history,
             mode_used="deterministic_fallback",
             iterations=0,
@@ -72,7 +98,9 @@ def review_and_revise_report(
     latest_review = deterministic
     latest_llm_review = None
     llm_calls = 0
-    for iteration in range(1, limit + 1):
+    revisions = 0
+    while llm_calls < MAX_REVIEW_LLM_CALLS:
+        iteration = revisions + 1
         if llm_calls >= MAX_REVIEW_LLM_CALLS:
             break
         try:
@@ -90,8 +118,8 @@ def review_and_revise_report(
                 report=current_report,
                 deterministic=latest_review,
                 history=history,
-                mode_used="hybrid_fallback",
-                iterations=iteration - 1,
+                mode_used=f"{selected_mode}_fallback",
+                iterations=revisions,
                 client=client,
                 fallback_reason=f"LLM reviewer failed: {error}",
             )
@@ -103,11 +131,14 @@ def review_and_revise_report(
                 report=current_report,
                 deterministic=latest_review,
                 history=history,
-                mode_used="hybrid",
-                iterations=iteration - 1,
+                mode_used=selected_mode,
+                iterations=revisions,
                 client=client,
+                semantic_review=llm_review,
             )
 
+        if revisions >= limit:
+            break
         combined_findings = merge_review_findings(latest_review, llm_review)
         if llm_calls >= MAX_REVIEW_LLM_CALLS:
             break
@@ -126,51 +157,19 @@ def review_and_revise_report(
                 report=current_report,
                 deterministic=latest_review,
                 history=history,
-                mode_used="hybrid_fallback",
-                iterations=iteration - 1,
+                mode_used=f"{selected_mode}_fallback",
+                iterations=revisions,
                 client=client,
+                semantic_review=llm_review,
                 fallback_reason=f"LLM reviser failed: {error}",
             )
         if not revised.strip():
             history.append({"iteration": iteration, "stage": "llm_revision", "status": "error", "message": "LLM reviser returned an empty report."})
             break
         current_report = revised.strip()
+        revisions += 1
         latest_review = run_deterministic_review(kind=kind, data=data, report=current_report)
         history.append(_history_entry(iteration, "deterministic_after_revision", latest_review))
-        if latest_review["status"] == "pass":
-            if llm_calls >= MAX_REVIEW_LLM_CALLS:
-                break
-            try:
-                llm_calls += 1
-                final_llm_review = run_llm_review(
-                    client=client,
-                    kind=kind,
-                    data=data,
-                    report=current_report,
-                    deterministic=latest_review,
-                )
-            except Exception as error:
-                history.append({"iteration": iteration, "stage": "final_llm_review", "status": "error", "message": str(error)})
-                return _result(
-                    report=current_report,
-                    deterministic=latest_review,
-                    history=history,
-                    mode_used="hybrid_fallback",
-                    iterations=iteration,
-                    client=client,
-                    fallback_reason=f"Final LLM reviewer failed: {error}",
-                )
-            history.append(_history_entry(iteration, "final_llm_review", final_llm_review))
-            latest_llm_review = final_llm_review
-            if final_llm_review["status"] == "pass":
-                return _result(
-                    report=current_report,
-                    deterministic=latest_review,
-                    history=history,
-                    mode_used="hybrid",
-                    iterations=iteration,
-                    client=client,
-                )
 
     terminal_review = latest_review
     if latest_llm_review and latest_llm_review.get("status") == "needs_revision":
@@ -185,9 +184,10 @@ def review_and_revise_report(
         report=current_report,
         deterministic=terminal_review,
         history=history,
-        mode_used="hybrid",
-        iterations=limit,
+        mode_used=selected_mode,
+        iterations=revisions,
         client=client,
+        semantic_review=latest_llm_review,
         fallback_reason=(
             "Maximum review LLM calls reached before all checks passed."
             if llm_calls >= MAX_REVIEW_LLM_CALLS
@@ -253,6 +253,7 @@ def run_llm_revision(*, client, kind: str, data: dict, report: str, findings: di
 def build_review_context(data: dict) -> dict:
     return {
         "intent": data.get("intent"),
+        "query": data.get("query") or (data.get("route") or {}).get("query"),
         "ticker": data.get("ticker"),
         "question_type": data.get("question_type"),
         "analyst_outputs": data.get("analyst_outputs", {}),
@@ -284,14 +285,45 @@ def validate_llm_review(value: dict) -> dict:
     adjustment = value.get("confidence_adjustment", "none")
     if adjustment not in {"none", "lower"}:
         raise ValueError("LLM reviewer returned an invalid confidence adjustment.")
+    raw_scores = value.get("quality_scores")
+    if not isinstance(raw_scores, dict):
+        raise ValueError("LLM reviewer did not return quality_scores.")
+    quality_scores = {}
+    for field in QUALITY_SCORE_FIELDS:
+        score = raw_scores.get(field)
+        if isinstance(score, bool) or not isinstance(score, (int, float)):
+            raise ValueError(f"LLM reviewer returned an invalid {field} score.")
+        normalized_score = int(score)
+        if normalized_score != score or not 1 <= normalized_score <= 5:
+            raise ValueError(f"LLM reviewer returned an invalid {field} score.")
+        quality_scores[field] = normalized_score
+    risk_notes = _string_list(value.get("risk_notes"))
+    suggested_fixes = _string_list(value.get("suggested_fixes"))
+    low_fields = [
+        field
+        for field, score in quality_scores.items()
+        if score < MIN_PASSING_QUALITY_SCORE
+    ]
+    if status == "pass" and (low_fields or risk_notes):
+        status = "needs_revision"
+        adjustment = "lower"
+    if low_fields:
+        risk_notes.append(
+            "Quality score below the passing threshold: " + ", ".join(low_fields)
+        )
+        suggested_fixes.append(
+            "Revise the report to raise every semantic quality dimension to at least 4/5."
+        )
     return {
         "review_version": REPORT_REVIEW_VERSION,
         "status": status,
         "checks": [],
-        "risk_notes": _string_list(value.get("risk_notes")),
+        "risk_notes": list(dict.fromkeys(risk_notes)),
         "confidence_adjustment": adjustment,
-        "suggested_fixes": _string_list(value.get("suggested_fixes")),
+        "suggested_fixes": list(dict.fromkeys(suggested_fixes)),
         "reason": str(value.get("reason") or "LLM semantic review completed."),
+        "quality_scores": quality_scores,
+        "minimum_passing_score": MIN_PASSING_QUALITY_SCORE,
     }
 
 
@@ -326,7 +358,11 @@ def get_review_llm_client_from_env():
 
 def normalize_review_mode(value: str | None) -> str:
     normalized = str(value or "deterministic").strip().lower()
-    return normalized if normalized in {"deterministic", "hybrid"} else "deterministic"
+    return (
+        normalized
+        if normalized in {"deterministic", "hybrid", "semantic"}
+        else "deterministic"
+    )
 
 
 def normalize_max_iterations(value: int | None) -> int:
@@ -458,10 +494,21 @@ def _history_entry(iteration: int, stage: str, review: dict) -> dict:
         "status": review.get("status"),
         "risk_notes": review.get("risk_notes", []),
         "suggested_fixes": review.get("suggested_fixes", []),
+        "quality_scores": review.get("quality_scores", {}),
     }
 
 
-def _result(*, report, deterministic, history, mode_used, iterations, client=None, fallback_reason=None):
+def _result(
+    *,
+    report,
+    deterministic,
+    history,
+    mode_used,
+    iterations,
+    client=None,
+    semantic_review=None,
+    fallback_reason=None,
+):
     review = {
         **deterministic,
         "mode_used": mode_used,
@@ -472,8 +519,25 @@ def _result(*, report, deterministic, history, mode_used, iterations, client=Non
         "fallback_used": bool(fallback_reason),
         "fallback_reason": fallback_reason,
         "history": history,
+        "semantic_quality": _semantic_quality_summary(semantic_review),
     }
     return {"report": report, "review": review}
+
+
+def _semantic_quality_summary(review: dict | None) -> dict:
+    if not isinstance(review, dict):
+        return {
+            "status": "not_run",
+            "quality_scores": {},
+            "minimum_passing_score": MIN_PASSING_QUALITY_SCORE,
+            "reason": None,
+        }
+    return {
+        "status": review.get("status", "unknown"),
+        "quality_scores": review.get("quality_scores", {}),
+        "minimum_passing_score": MIN_PASSING_QUALITY_SCORE,
+        "reason": review.get("reason"),
+    }
 
 
 def _string_list(value) -> list[str]:

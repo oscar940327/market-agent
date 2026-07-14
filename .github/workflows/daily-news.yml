@@ -1,5 +1,9 @@
 name: Daily News Pipeline
 
+permissions:
+  contents: read
+  issues: write
+
 on:
   workflow_dispatch:
   schedule:
@@ -46,6 +50,14 @@ jobs:
       - name: Run daily news pipeline
         run: python scripts/run_daily_pipeline.py --only news
 
+      - name: Build maintenance diagnosis
+        if: always()
+        uses: ./.github/actions/pipeline-diagnosis
+        with:
+          pipeline: daily-news
+          status: ${{ job.status }}
+          input-paths: data/pipeline_runs/latest_daily_pipeline.json
+
       - name: Send failure alert
         if: failure()
         run: >
@@ -63,4 +75,5 @@ jobs:
           path: |
             data/pipeline_runs/*.json
             data/news/reports/*
+            data/maintenance/diagnoses/*
           if-no-files-found: ignore

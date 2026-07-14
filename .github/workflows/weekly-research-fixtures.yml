@@ -1,5 +1,9 @@
 name: Weekly Research Fixtures
 
+permissions:
+  contents: read
+  issues: write
+
 on:
   workflow_dispatch:
   schedule:
@@ -17,6 +21,10 @@ jobs:
       MARKET_AGENT_ANALYST_MODE: llm
       MARKET_AGENT_LLM_PROVIDER: openrouter
       MARKET_AGENT_LLM_MODEL: openai/gpt-4.1
+      MARKET_AGENT_REPORT_REVIEW_MODE: semantic
+      MARKET_AGENT_REPORT_REVIEW_PROVIDER: openrouter
+      MARKET_AGENT_REPORT_REVIEW_MODEL: openai/gpt-5.4-mini
+      MARKET_AGENT_REPORT_REVIEW_MAX_ITERATIONS: "3"
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
       OPENROUTER_APP_NAME: market-agent
       ALERT_EMAIL_ENABLED: ${{ secrets.ALERT_EMAIL_ENABLED }}
@@ -52,6 +60,13 @@ jobs:
           --query "MU 放量策略以前表現怎麼樣"
           --query "MU 拉回策略以前表現怎麼樣"
 
+      - name: Build maintenance diagnosis
+        if: always()
+        uses: ./.github/actions/pipeline-diagnosis
+        with:
+          pipeline: weekly-research-fixtures
+          status: ${{ job.status }}
+
       - name: Send failure alert
         if: failure()
         run: >
@@ -65,5 +80,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: weekly-research-fixture-report
-          path: data/research_reports/weekly_research_fixture_report_v1.*
+          path: |
+            data/research_reports/weekly_research_fixture_report_v1.*
+            data/maintenance/diagnoses/*
           if-no-files-found: ignore

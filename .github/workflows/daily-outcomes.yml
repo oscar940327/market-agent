@@ -1,5 +1,9 @@
 name: Daily Research Outcomes
 
+permissions:
+  contents: read
+  issues: write
+
 on:
   workflow_dispatch:
   schedule:
@@ -56,6 +60,14 @@ jobs:
       - name: Build ML health report
         run: python scripts/build_ml_health_report.py --drift-policy scheduled_weekly --send-alert
 
+      - name: Build maintenance diagnosis
+        if: always()
+        uses: ./.github/actions/pipeline-diagnosis
+        with:
+          pipeline: daily-outcomes
+          status: ${{ job.status }}
+          input-paths: data/ml/monitoring/ml_health_report_v1.json
+
       - name: Send failure alert
         if: failure()
         run: >
@@ -72,4 +84,5 @@ jobs:
           path: |
             data/ml/monitoring/*
             data/research_reports/*
+            data/maintenance/diagnoses/*
           if-no-files-found: ignore

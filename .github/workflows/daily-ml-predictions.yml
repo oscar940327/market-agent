@@ -1,5 +1,9 @@
 name: Daily ML Predictions
 
+permissions:
+  contents: read
+  issues: write
+
 on:
   workflow_dispatch:
     inputs:
@@ -90,6 +94,14 @@ jobs:
 
           python scripts/build_daily_ml_predictions.py "${ARGS[@]}"
 
+      - name: Build maintenance diagnosis
+        if: always()
+        uses: ./.github/actions/pipeline-diagnosis
+        with:
+          pipeline: daily-ml-predictions
+          status: ${{ job.status }}
+          input-paths: data/ml/training_dataset_v1_metadata.json,data/ml/monitoring/similar_case_accumulation_v1.json
+
       - name: Send failure alert
         if: failure()
         run: >
@@ -108,4 +120,5 @@ jobs:
             data/ml/training_dataset_v1_metadata.json
             data/ml/monitoring/similar_case_accumulation_v1.json
             data/ml/monitoring/similar_case_accumulation_summary_v1.md
+            data/maintenance/diagnoses/*
           if-no-files-found: ignore

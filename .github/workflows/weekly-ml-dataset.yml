@@ -1,5 +1,9 @@
 name: Weekly ML Dataset Build
 
+permissions:
+  contents: read
+  issues: write
+
 on:
   workflow_dispatch:
   schedule:
@@ -53,6 +57,14 @@ jobs:
       - name: Build ML health report
         run: python scripts/build_ml_health_report.py --send-alert
 
+      - name: Build maintenance diagnosis
+        if: always()
+        uses: ./.github/actions/pipeline-diagnosis
+        with:
+          pipeline: weekly-ml-dataset
+          status: ${{ job.status }}
+          input-paths: data/ml/monitoring/ml_health_report_v1.json,data/ml/monitoring/ml_drift_report_v1.json
+
       - name: Send failure alert
         if: failure()
         run: >
@@ -75,5 +87,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: weekly-ml-monitoring-reports
-          path: data/ml/monitoring/*
+          path: |
+            data/ml/monitoring/*
+            data/maintenance/diagnoses/*
           if-no-files-found: ignore
