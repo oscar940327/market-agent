@@ -1,3 +1,8 @@
+import os
+
+
+os.environ.setdefault("LOKY_MAX_CPU_COUNT", "1")
+
 from ml_model_improvement.audit import (
     build_baseline_audit_report,
     build_baseline_audit_summary_markdown,
@@ -31,6 +36,13 @@ from ml_model_improvement.step20_summary import (
     build_step20_improvement_summary_markdown,
     build_step20_improvement_summary_report,
 )
+from ml_model_improvement.quality_upgrade import (
+    QUALITY_POLICY,
+    build_step28_quality_upgrade,
+    build_step28_summary_markdown,
+    build_walk_forward_folds,
+    reevaluate_step28_report,
+)
 from ml_model_improvement.target_spec import (
     TARGET_METRIC_SPECS,
     build_target_metric_spec_report,
@@ -56,6 +68,11 @@ __all__ = [
     "build_step20_error_analysis_summary_markdown",
     "build_step20_improvement_summary_markdown",
     "build_step20_improvement_summary_report",
+    "QUALITY_POLICY",
+    "build_step28_quality_upgrade",
+    "build_step28_summary_markdown",
+    "build_walk_forward_folds",
+    "reevaluate_step28_report",
     "build_target_metric_spec_report",
     "build_target_metric_spec_summary_markdown",
 ]

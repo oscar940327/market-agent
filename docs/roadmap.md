@@ -72,7 +72,13 @@ Market Agent 目前已經完成一個可以 demo 的研究系統。
 
 ## 中期方向
 
-### 4. Portfolio Workflow Refactor
+### 4. Model Retraining and Promotion Automation
+
+Step 28 已具備可重現的模型選拔機制，但目前仍需手動啟動。下一階段會使用 GitHub Actions 每月或每季重跑比較，產生版本化報告並寄送 Email。
+
+通過政策的 candidate 會先進入 shadow validation：舊模型繼續服務，candidate 只同步產生預測並等待真實 outcomes 驗證。系統不會因單次測試自動替換 production model，也不會直接 push 到 main。
+
+### 5. Portfolio Workflow Refactor
 
 Portfolio 目前不是主要展示重點。
 
@@ -87,7 +93,7 @@ Portfolio 目前不是主要展示重點。
 
 這會讓系統從「單一股票研究」往「個人投資組合研究」延伸。
 
-### 5. Frontend Redesign / Monitoring UI
+### 6. Frontend Redesign / Monitoring UI
 
 目前前端已可 demo，但未來如果要展示更多 health / monitoring 資訊，需要重新整理畫面層級。
 
@@ -102,9 +108,11 @@ Portfolio 目前不是主要展示重點。
 
 ## 長期方向
 
-### 6. Better ML Models
+### 7. Better ML Models
 
 目前 ML Reference 是 research-only。
+
+Step 28 已完成第一輪 walk-forward 多模型比較與 promotion policy。結果只有 `large_drop_20d` 候選達到 `medium` 並通過單一 target policy；整套 candidate bundle 未通過，因此 production model 沒有被替換，ML Reference 維持 `reduced_trust`。
 
 長期可以改善：
 
@@ -112,13 +120,15 @@ Portfolio 目前不是主要展示重點。
 - 更穩定的 labels
 - 更好的 downside risk modeling
 - calibration 改善
-- XGBoost / LightGBM candidate model
+- 讓已通過的 downside candidate 先進行 shadow validation
+- 針對未通過的 upside / return targets 改善 features 與 labels
+- 持續比較 XGBoost / LightGBM candidates
 - quantile regression / return range model
 - 更完整的 model promotion policy
 
 模型升級不會只看準確率，也會看風險、校準、穩定性與可解釋性。
 
-### 7. News and Sentiment Improvement
+### 8. News and Sentiment Improvement
 
 新聞目前已能收集、分類、摘要，但仍有改善空間。
 
@@ -133,7 +143,7 @@ Portfolio 目前不是主要展示重點。
 
 社群資料目前因 API 取得不易，暫不作為近期主線。
 
-### 8. Agent Structure Refactor
+### 9. Agent Structure Refactor
 
 目前已經是 controlled agent workflow，但不是每個 agent 都獨立成大型資料夾。
 
