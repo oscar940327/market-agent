@@ -55,6 +55,7 @@ GitHub Actions 負責排程資料更新。
 - `weekly-research-fixtures.yml`
 - `weekly-ml-dataset.yml`
 - `monthly-universe.yml`
+- `monthly-model-promotion.yml`
 
 詳細排程與資料流程請看：
 
@@ -73,6 +74,8 @@ docs/automation_maintenance.md
 Supabase 是主要資料庫。
 
 Step 29 起，`ml_dataset_metadata` 也會保存 weekly training dataset 的共享 freshness 狀態。執行 `supabase/migrations/014_create_ml_dataset_metadata.sql` 後，Render 與 GitHub Actions 才能讀到相同的 dataset 更新時間。
+
+Step 30 需要再執行 `supabase/migrations/015_create_model_promotion_tables.sql`。它會新增 production / shadow prediction role、模型 registry 與每月 promotion review；未執行 migration 前不要啟動 monthly promotion workflow。
 
 它讓 Render 後端不需要每次 query 都重新抓完整資料。
 

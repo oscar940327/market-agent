@@ -1,6 +1,7 @@
 from data_store.supabase_store import (
     fetch_active_tickers,
     fetch_active_ticker_metadata,
+    fetch_active_shadow_model,
     fetch_daily_prices,
     fetch_latest_date,
     fetch_latest_fundamental_snapshot,
@@ -25,6 +26,8 @@ from data_store.supabase_store import (
     upsert_fundamental_snapshots,
     upsert_market_regimes,
     upsert_ml_dataset_metadata,
+    upsert_ml_model_registry,
+    upsert_ml_promotion_review,
     upsert_ml_prediction_outcomes,
     upsert_ml_predictions,
     upsert_news_event_summaries,
@@ -37,6 +40,7 @@ from data_store.supabase_store import (
 __all__ = [
     "fetch_active_tickers",
     "fetch_active_ticker_metadata",
+    "fetch_active_shadow_model",
     "fetch_daily_prices",
     "fetch_latest_date",
     "fetch_latest_fundamental_snapshot",
@@ -61,6 +65,8 @@ __all__ = [
     "upsert_fundamental_snapshots",
     "upsert_market_regimes",
     "upsert_ml_dataset_metadata",
+    "upsert_ml_model_registry",
+    "upsert_ml_promotion_review",
     "upsert_ml_prediction_outcomes",
     "upsert_ml_predictions",
     "upsert_news_event_summaries",

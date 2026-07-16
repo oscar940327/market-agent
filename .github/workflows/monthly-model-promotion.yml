@@ -1,0 +1,93 @@
+name: Monthly Model Promotion Review
+
+permissions:
+  contents: read
+  issues: write
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Build the review without writing Supabase or sending Email."
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+  schedule:
+    # 15:00 Taiwan time on the second day of each month.
+    - cron: "0 7 2 * *"
+
+jobs:
+  monthly-model-promotion:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      PYTHONUNBUFFERED: "1"
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+      ALERT_EMAIL_ENABLED: ${{ secrets.ALERT_EMAIL_ENABLED }}
+      ALERT_EMAIL_PROVIDER: gmail
+      ALERT_EMAIL_FROM: ${{ secrets.ALERT_EMAIL_FROM }}
+      ALERT_EMAIL_TO: ${{ secrets.ALERT_EMAIL_TO }}
+      GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Build current ML dataset
+        run: python scripts/build_ml_training_dataset.py
+
+      - name: Run Step 28 walk-forward comparison
+        run: python scripts/build_step28_model_quality_upgrade.py
+
+      - name: Run monthly promotion review
+        shell: bash
+        run: |
+          ARGS=(--send-email)
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            ARGS+=(--dry-run --dry-run-email)
+          fi
+          python scripts/run_monthly_model_promotion.py "${ARGS[@]}"
+
+      - name: Build maintenance diagnosis
+        if: always()
+        uses: ./.github/actions/pipeline-diagnosis
+        with:
+          pipeline: monthly-model-promotion
+          status: ${{ job.status }}
+          input-paths: data/ml/model_reports/step28_model_quality_upgrade_v1.json,data/ml/promotion
+
+      - name: Send failure alert
+        if: failure()
+        run: >
+          python scripts/send_pipeline_alert.py
+          --pipeline monthly-model-promotion
+          --status failed
+          --message "Monthly model promotion workflow failed."
+
+      - name: Upload promotion reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: monthly-model-promotion-reports
+          path: |
+            data/ml/model_reports/step28_model_quality_upgrade_v1.json
+            data/ml/model_reports/step28_model_quality_upgrade_v1.md
+            data/ml/promotion/*
+            data/maintenance/diagnoses/*
+          if-no-files-found: ignore
+

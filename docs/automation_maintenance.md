@@ -48,6 +48,8 @@ Workflow 執行
 
 Data Recovery 第一版也會透過現有 pipeline alert 寄 Email。通知包含缺口、是否影響 Research Report 與 recommended action，但不會在背景自行執行修復命令。
 
+每月 model promotion workflow 不論候選模型是否通過都會寄出 Email，明確寫出「不建議更換」、「繼續觀察」或「建議更換」。建議更換仍需使用者確認，自動化沒有權限直接替換 production model。
+
 ## Diagnosis Artifact
 
 每次 workflow 都會保留：

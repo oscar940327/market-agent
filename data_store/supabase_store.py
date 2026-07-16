@@ -163,6 +163,112 @@ def insert_ml_model_run(
     return {"status": "success", "row": rows[0] if rows else None}
 
 
+def upsert_ml_model_registry(
+    row: dict,
+    *,
+    supabase_url: str | None = None,
+    supabase_key: str | None = None,
+    open_url=urlopen,
+) -> dict:
+    return upsert_single_record(
+        table="ml_model_registry",
+        conflict_columns="model_version",
+        row=row,
+        supabase_url=supabase_url,
+        supabase_key=supabase_key,
+        open_url=open_url,
+    )
+
+
+def upsert_ml_promotion_review(
+    row: dict,
+    *,
+    supabase_url: str | None = None,
+    supabase_key: str | None = None,
+    open_url=urlopen,
+) -> dict:
+    return upsert_single_record(
+        table="ml_promotion_reviews",
+        conflict_columns="review_month,production_model_version,candidate_model_version",
+        row=row,
+        supabase_url=supabase_url,
+        supabase_key=supabase_key,
+        open_url=open_url,
+    )
+
+
+def fetch_active_shadow_model(
+    *,
+    supabase_url: str | None = None,
+    supabase_key: str | None = None,
+    open_url=urlopen,
+) -> dict | None:
+    base_url, api_key = resolve_supabase_credentials(
+        supabase_url=supabase_url,
+        supabase_key=supabase_key,
+    )
+    query = urlencode(
+        {
+            "select": "*",
+            "model_role": "eq.shadow",
+            "lifecycle_status": "in.(shadow_active,shadow_observing,promotion_recommended)",
+            "order": "created_at.desc",
+            "limit": "1",
+        }
+    )
+    request = Request(
+        f"{base_url}/rest/v1/ml_model_registry?{query}",
+        method="GET",
+        headers={
+            "apikey": api_key,
+            "Authorization": f"Bearer {api_key}",
+            "Accept": "application/json",
+        },
+    )
+    with open_url(request, timeout=30) as response:
+        rows = json.loads(response.read().decode("utf-8"))
+    return rows[0] if rows else None
+
+
+def upsert_single_record(
+    *,
+    table: str,
+    conflict_columns: str,
+    row: dict,
+    supabase_url: str | None,
+    supabase_key: str | None,
+    open_url,
+) -> dict:
+    base_url, api_key = resolve_supabase_credentials(
+        supabase_url=supabase_url,
+        supabase_key=supabase_key,
+    )
+    endpoint = f"{base_url}/rest/v1/{table}?on_conflict={conflict_columns}"
+    request = Request(
+        endpoint,
+        data=json.dumps(row, allow_nan=False).encode("utf-8"),
+        method="POST",
+        headers={
+            "apikey": api_key,
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "Prefer": "resolution=merge-duplicates,return=representation",
+        },
+    )
+    try:
+        with open_url(request, timeout=30) as response:
+            rows = json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace")
+        return {
+            "status": "error",
+            "message": f"Supabase upsert failed with HTTP {exc.code}: {body}",
+        }
+    except Exception as exc:
+        return {"status": "error", "message": f"Supabase upsert failed: {exc}"}
+    return {"status": "success", "row": rows[0] if rows else row}
+
+
 def insert_pipeline_run(
     row: dict,
     *,
@@ -422,6 +528,7 @@ def fetch_latest_ml_prediction(
         "select=*"
         f"&ticker=eq.{ticker.upper()}"
         f"&universe=eq.{universe}"
+        "&prediction_role=eq.production"
         "&order=data_as_of.desc,created_at.desc"
         "&limit=1"
     )

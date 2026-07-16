@@ -154,6 +154,7 @@ Render 負責部署後端 API。
 
 - [Data Pipeline](docs/data_pipeline.md)
 - [Data Recovery](docs/data_recovery.md)
+- [Model Promotion](docs/model_promotion.md)
 - [Outcome Tracking](docs/outcome_tracking.md)
 - [Automation and Self-Maintenance](docs/automation_maintenance.md)
 - [Deployment](docs/deployment.md)

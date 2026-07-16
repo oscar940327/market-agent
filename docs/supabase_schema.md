@@ -29,12 +29,20 @@ migration 方向；目前不連 Supabase、不匯入真實資料。
 | `research_logs` | 使用者研究問題與當時系統輸出摘要 | Step 6.7 |
 | `similar_case_results` | peer / market-wide 相似案例查詢結果 | Step 6.6 |
 | `ml_dataset_metadata` | 跨 GitHub Actions、Render、本地共用的 ML dataset freshness metadata | Step 29 |
+| `ml_model_registry` | production / shadow 模型生命週期 | Step 30 |
+| `ml_promotion_reviews` | 每月模型比較與明確升級建議 | Step 30 |
 
 ## Table: ml_dataset_metadata
 
 這張表保存最新 training dataset 的版本、產生時間、資料截止日、row count 與 workflow run id。唯一鍵為 `dataset_name + universe + provider`，weekly workflow 以 upsert 更新；它不保存大型 CSV 本身。
 
 Freshness service 優先讀取這張表，本地 metadata JSON 只作為 fallback。Schema 由 `supabase/migrations/014_create_ml_dataset_metadata.sql` 建立。
+
+## Tables: ml_model_registry / ml_promotion_reviews
+
+Step 30 以 `ml_model_registry` 保存候選模型目前是 shadow observing、rejected 或 promotion recommended；`ml_promotion_reviews` 保存每月比較報告與明確 recommendation。
+
+`ml_predictions.prediction_role` 會區分 `production` 與 `shadow`。正式 Research Report 只讀 production。Schema 由 `supabase/migrations/015_create_model_promotion_tables.sql` 建立。
 
 ## Enum Drafts
 
