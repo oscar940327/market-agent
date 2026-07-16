@@ -72,6 +72,8 @@ docs/automation_maintenance.md
 
 Supabase 是主要資料庫。
 
+Step 29 起，`ml_dataset_metadata` 也會保存 weekly training dataset 的共享 freshness 狀態。執行 `supabase/migrations/014_create_ml_dataset_metadata.sql` 後，Render 與 GitHub Actions 才能讀到相同的 dataset 更新時間。
+
 它讓 Render 後端不需要每次 query 都重新抓完整資料。
 
 主要儲存：

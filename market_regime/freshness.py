@@ -5,6 +5,8 @@ from zoneinfo import ZoneInfo
 PRICE_WARNING_TRADING_DAYS = 1
 PRICE_STALE_TRADING_DAYS = 2
 NEWS_STALE_DAYS = 30
+FUNDAMENTAL_WARNING_DAYS = 7
+FUNDAMENTAL_STALE_DAYS = 30
 ML_WARNING_DAYS = 7
 ML_STALE_DAYS = 14
 PIPELINE_WARNING_HOURS = 24
@@ -20,6 +22,9 @@ def build_freshness_report(
     technical_features_latest_date: date | None,
     market_regimes_latest_date: date | None,
     news_latest_at: datetime | date | None = None,
+    include_news: bool = True,
+    fundamentals_latest_at: datetime | date | None = None,
+    include_fundamentals: bool = False,
     ml_training_generated_at: datetime | date | None = None,
     pipeline_last_run_at: datetime | date | None = None,
     now: datetime | None = None,
@@ -49,6 +54,10 @@ def build_freshness_report(
         now=now,
         latest_at=news_latest_at,
     )
+    fundamental_snapshots = classify_fundamental_freshness(
+        now=now,
+        latest_at=fundamentals_latest_at,
+    )
     ml_training_data = classify_ml_training_freshness(
         now=now,
         generated_at=ml_training_generated_at,
@@ -62,10 +71,13 @@ def build_freshness_report(
         "daily_prices": daily_prices,
         "technical_features": technical_features,
         "market_regimes": market_regimes,
-        "news_events": news_events,
         "ml_training_data": ml_training_data,
         "pipeline_last_run": pipeline_last_run,
     }
+    if include_news:
+        sections["news_events"] = news_events
+    if include_fundamentals:
+        sections["fundamental_snapshots"] = fundamental_snapshots
 
     return {
         **sections,
@@ -203,6 +215,46 @@ def classify_news_freshness(*, now: datetime, latest_at: datetime | date | None)
         "status": "fresh",
         "reason": "news_within_30_days",
         "message": "新聞資料在 30 天內有更新。",
+    }
+
+
+def classify_fundamental_freshness(
+    *,
+    now: datetime,
+    latest_at: datetime | date | None,
+) -> dict:
+    if latest_at is None:
+        return {
+            "status": "missing",
+            "reason": "missing_fundamental_snapshot",
+            "message": "找不到基本面 snapshot。",
+        }
+
+    latest_datetime = coerce_datetime(latest_at)
+    age_days = (now - latest_datetime).days
+    payload = {
+        "latest_at": latest_datetime.isoformat(),
+        "age_days": age_days,
+    }
+    if age_days > FUNDAMENTAL_STALE_DAYS:
+        return {
+            **payload,
+            "status": "stale",
+            "reason": "fundamental_snapshot_too_old",
+            "message": "基本面 snapshot 已超過 30 天未更新。",
+        }
+    if age_days > FUNDAMENTAL_WARNING_DAYS:
+        return {
+            **payload,
+            "status": "warning",
+            "reason": "fundamental_snapshot_getting_old",
+            "message": "基本面 snapshot 已超過 7 天未更新。",
+        }
+    return {
+        **payload,
+        "status": "fresh",
+        "reason": "fundamental_snapshot_recent",
+        "message": "基本面 snapshot 在 7 天內更新。",
     }
 
 

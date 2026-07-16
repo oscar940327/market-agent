@@ -279,6 +279,11 @@ Single stock / theme 會檢查：
 - news events
 - ML training data
 - pipeline last run
+- fundamental snapshots
+
+Step 29 在 freshness 後加入 deterministic Data Recovery policy。它把每個缺口轉成 `report_impact`、`affected_output` 與 `recommended_action`，並區分當次報告問題和單純維護問題。第一版不會自動執行 recovery。
+
+ML dataset metadata 會由 weekly workflow 寫入 Supabase，Render、GitHub Actions 與本地優先讀取同一份 shared metadata；本地 JSON 只作為 fallback。
 
 Daily price freshness 使用 expected latest trading day，而不是單純用日曆日期。
 

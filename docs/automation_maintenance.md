@@ -25,6 +25,7 @@ Workflow 執行
 | `supabase_schema` | Payload 欄位與 Supabase schema 不一致 | 比對 migration 與寫入欄位 |
 | `supabase_connection` | Supabase 讀寫或連線失敗 | 檢查服務狀態、secret 與 request |
 | `freshness` | 價格、新聞或 pipeline 資料過舊 | 執行對應 pipeline 並檢查依賴日期 |
+| `data_recovery` | Structured recovery report 已指出資料缺口 | 使用報告中的指定命令，確認後再執行 |
 | `ml_health` | 模型品質、校準或 drift 警告 | 維持 reduced trust 並查看 monitoring artifact |
 | `configuration` | Secret、權限或環境設定錯誤 | 檢查 GitHub Secrets 與 workflow permissions |
 | `test_failure` | pytest 或維護檢查失敗 | 本地重現後在獨立分支修正 |
@@ -44,6 +45,8 @@ Workflow 執行
 同一個 fingerprint 再次發生時，不會每天建立新 Issue，而是在原 Issue 留下新的 occurrence comment。
 
 單純 `warning` 仍會留在 diagnosis artifact，但不會自動建立 Issue，避免 Issue 數量失控。
+
+Data Recovery 第一版也會透過現有 pipeline alert 寄 Email。通知包含缺口、是否影響 Research Report 與 recommended action，但不會在背景自行執行修復命令。
 
 ## Diagnosis Artifact
 

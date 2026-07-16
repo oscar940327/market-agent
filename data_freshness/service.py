@@ -2,7 +2,11 @@ import json
 from datetime import UTC, date, datetime
 from pathlib import Path
 
-from data_store.supabase_store import fetch_latest_date, fetch_latest_pipeline_run
+from data_store.supabase_store import (
+    fetch_latest_date,
+    fetch_latest_ml_dataset_metadata,
+    fetch_latest_pipeline_run,
+)
 from market_regime import build_freshness_report
 
 
@@ -18,6 +22,11 @@ def build_current_data_freshness(
     provider: str = "yfinance",
     feature_version: str = "v1",
     rule_version: str = "v1",
+    include_news: bool = True,
+    include_fundamentals: bool = True,
+    dataset_name: str = "training_dataset_v1",
+    dataset_version: str = "training_dataset_v1",
+    universe: str = "QQQ100",
     today: date | None = None,
     now: datetime | None = None,
     ml_metadata_path: str | Path = DEFAULT_ML_METADATA_PATH,
@@ -48,6 +57,22 @@ def build_current_data_freshness(
         date_column="published_at",
         filters={"ticker": f"eq.{price_ticker}"},
     )
+    fundamentals_latest = safe_fetch_latest_date(
+        table="fundamental_snapshots",
+        date_column="fetched_at",
+        filters={"ticker": f"eq.{price_ticker}", "status": "eq.success"},
+    )
+
+    supabase_ml_metadata = safe_fetch_ml_dataset_metadata(
+        dataset_name=dataset_name,
+        universe=universe,
+        provider=provider,
+    )
+    local_ml_metadata = read_ml_metadata(ml_metadata_path)
+    ml_metadata = supabase_ml_metadata or local_ml_metadata
+    ml_metadata_source = "supabase" if supabase_ml_metadata else (
+        "local_file" if local_ml_metadata else "missing"
+    )
 
     pipeline_last_run = (
         read_latest_pipeline_run_from_supabase()
@@ -61,7 +86,10 @@ def build_current_data_freshness(
         technical_features_latest_date=parse_date(technical_features_latest),
         market_regimes_latest_date=parse_date(market_regimes_latest),
         news_latest_at=parse_datetime(news_latest),
-        ml_training_generated_at=read_ml_metadata_generated_at(ml_metadata_path),
+        include_news=include_news,
+        fundamentals_latest_at=parse_datetime(fundamentals_latest),
+        include_fundamentals=include_fundamentals,
+        ml_training_generated_at=parse_datetime((ml_metadata or {}).get("generated_at")),
         pipeline_last_run_at=pipeline_last_run,
     )
     report["scope"] = {
@@ -70,7 +98,20 @@ def build_current_data_freshness(
         "provider": provider,
         "feature_version": feature_version,
         "rule_version": rule_version,
+        "dataset_name": dataset_name,
+        "dataset_version": dataset_version,
+        "universe": universe,
     }
+    report["ml_training_data"].update(
+        {
+            "metadata_source": ml_metadata_source,
+            "dataset_name": (ml_metadata or {}).get("dataset_name", dataset_name),
+            "dataset_version": (ml_metadata or {}).get("dataset_version", dataset_version),
+            "data_as_of": (ml_metadata or {}).get("data_end_date"),
+            "row_count": (ml_metadata or {}).get("row_count"),
+            "workflow_run_id": (ml_metadata or {}).get("workflow_run_id"),
+        }
+    )
     return report
 
 
@@ -103,6 +144,11 @@ def read_latest_pipeline_run_from_supabase() -> datetime | None:
 
 
 def read_ml_metadata_generated_at(path: str | Path) -> datetime | None:
+    metadata = read_ml_metadata(path)
+    return parse_datetime((metadata or {}).get("generated_at"))
+
+
+def read_ml_metadata(path: str | Path) -> dict | None:
     metadata_path = Path(path)
     if not metadata_path.exists():
         return None
@@ -111,8 +157,23 @@ def read_ml_metadata_generated_at(path: str | Path) -> datetime | None:
         metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
     except Exception:
         return None
+    return metadata if isinstance(metadata, dict) else None
 
-    return parse_datetime(metadata.get("generated_at"))
+
+def safe_fetch_ml_dataset_metadata(
+    *,
+    dataset_name: str,
+    universe: str,
+    provider: str,
+) -> dict | None:
+    try:
+        return fetch_latest_ml_dataset_metadata(
+            dataset_name=dataset_name,
+            universe=universe,
+            provider=provider,
+        )
+    except Exception:
+        return None
 
 
 def read_latest_pipeline_run_at(log_dir: str | Path) -> datetime | None:

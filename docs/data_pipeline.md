@@ -185,6 +185,7 @@ Daily Research Outcomes
 | `technical_features` | 是否和 `daily_prices` 同步。 |
 | `market_regimes` | 是否和 `daily_prices` 同步。 |
 | `news_events` | 最近 30 天內是否有新聞。 |
+| `fundamental_snapshots` | 最新基本面 snapshot 是否可用。 |
 | `ml_training_data` | ML dataset 是否在 7 天內更新。 |
 | `pipeline_last_run` | pipeline 是否最近有成功執行紀錄。 |
 
@@ -196,6 +197,10 @@ Daily Research Outcomes
 | `warning` | 可以使用，但要留意資料可能稍微落後或部分流程需要檢查。 |
 | `stale` | 資料過舊，Research Report 應保守解讀。 |
 | `missing` | 缺少必要資料。 |
+
+每次單股研究也會產生 `data_recovery`。它會區分問題是否影響本次 Research Report，並提供對應 pipeline 或檢查命令。第一版只提供建議，不會自動執行修復。
+
+ML dataset freshness 優先讀取 Supabase `ml_dataset_metadata`，本地 metadata 檔案只作為 fallback。這可以避免 GitHub Actions 已更新 dataset，但 Render 仍因本地舊檔案顯示 stale。
 
 ## 交易日當天為什麼不一定 warning
 
@@ -258,6 +263,14 @@ python scripts/run_daily_pipeline.py --only news
 ```bash
 python scripts/check_freshness.py --json
 ```
+
+只檢查共享 ML dataset metadata：
+
+```bash
+python scripts/check_freshness.py --scope ml_training --json
+```
+
+詳細 recovery 欄位請見 [Data Recovery](data_recovery.md)。
 
 ## 常見狀況
 

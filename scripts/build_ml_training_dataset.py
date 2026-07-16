@@ -1,4 +1,5 @@
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -13,6 +14,7 @@ from data_store.supabase_store import (  # noqa: E402
     fetch_news_events_for_dataset,
     fetch_similar_case_results,
     fetch_technical_features,
+    upsert_ml_dataset_metadata,
 )
 from ml_dataset import build_training_dataset, write_dataset_outputs  # noqa: E402
 
@@ -43,6 +45,11 @@ def main() -> int:
     parser.add_argument("--market-rule-version", default="v1")
     parser.add_argument("--csv-path", default=str(DEFAULT_CSV_PATH))
     parser.add_argument("--metadata-path", default=str(DEFAULT_METADATA_PATH))
+    parser.add_argument(
+        "--skip-metadata-sync",
+        action="store_true",
+        help="Build local outputs without writing dataset freshness metadata to Supabase.",
+    )
     args = parser.parse_args()
 
     tickers = parse_tickers(args.tickers)
@@ -115,7 +122,40 @@ def main() -> int:
     print(f"csv_path={args.csv_path}")
     print(f"metadata_path={args.metadata_path}")
     print(f"excluded={metadata['excluded_row_reason_summary']}")
+    if args.skip_metadata_sync:
+        print("metadata_sync=skipped")
+        return 0
+
+    metadata_result = upsert_ml_dataset_metadata(
+        build_ml_dataset_metadata_record(
+            metadata=metadata,
+            provider=args.provider,
+        )
+    )
+    print(f"metadata_sync={metadata_result['status']}")
+    if metadata_result.get("message"):
+        print(f"warning=ml_dataset_metadata:{metadata_result['message']}")
+    if metadata_result["status"] != "success":
+        return 1
     return 0
+
+
+def build_ml_dataset_metadata_record(*, metadata: dict, provider: str) -> dict:
+    return {
+        "dataset_name": "training_dataset_v1",
+        "dataset_version": "training_dataset_v1",
+        "universe": metadata.get("universe", "QQQ100"),
+        "provider": provider,
+        "feature_version": metadata.get("feature_version", "unknown"),
+        "label_version": metadata.get("label_version", "unknown"),
+        "generated_at": metadata["generated_at"],
+        "data_start_date": metadata.get("data_start_date"),
+        "data_end_date": metadata.get("data_end_date"),
+        "row_count": metadata.get("row_count", 0),
+        "status": "success",
+        "workflow_run_id": os.getenv("GITHUB_RUN_ID"),
+        "metadata": metadata,
+    }
 
 
 if __name__ == "__main__":

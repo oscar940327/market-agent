@@ -146,6 +146,7 @@ def run_theme_analysis(user_query: str, theme_hint: str | None = None) -> dict:
     )
     theme_ml_reference_trust = build_ml_reference_trust(theme_ml_reference)
     failed_results = build_theme_failed_results(sorted_results)
+    data_recovery = build_theme_data_recovery(sorted_results)
     analyst_outputs = aggregate_theme_analyst_outputs(sorted_results)
     analyst_consensus = build_analyst_consensus(analyst_outputs)
 
@@ -164,6 +165,7 @@ def run_theme_analysis(user_query: str, theme_hint: str | None = None) -> dict:
         "sector_summary": sector_summary,
         "evidence_quality": evidence_quality,
         "failed_results": failed_results,
+        "data_recovery": data_recovery,
         "theme_ml_reference": theme_ml_reference,
         "theme_ml_reference_trust": theme_ml_reference_trust,
         "ml_reference_trust": theme_ml_reference_trust,
@@ -284,6 +286,37 @@ def should_retry_theme_single_stock_analysis(analysis_data: dict) -> bool:
         "market_data_unavailable",
         "not_enough_price_data",
         "invalid_price_data",
+    }
+
+
+def build_theme_data_recovery(results: list[dict]) -> dict:
+    findings = []
+    healthy_count = 0
+    for result in results:
+        analysis = result.get("analysis") or {}
+        recovery = analysis.get("data_recovery") or {}
+        if recovery.get("status") == "healthy":
+            healthy_count += 1
+        for finding in recovery.get("findings") or []:
+            findings.append({"ticker": result.get("ticker"), **finding})
+
+    current_findings = [item for item in findings if item.get("affects_current_report")]
+    return {
+        "recovery_version": "theme_data_recovery_v1",
+        "status": "healthy" if not findings else "action_recommended",
+        "report_impact": "usable_with_caution" if current_findings else "none",
+        "constituent_count": len(results),
+        "healthy_constituent_count": healthy_count,
+        "finding_count": len(findings),
+        "current_report_finding_count": len(current_findings),
+        "email_alert_eligible": any(
+            item.get("affects_current_report")
+            or item.get("status") in {"stale", "missing", "failed", "unavailable"}
+            for item in findings
+        ),
+        "automatic_recovery_executed": False,
+        "automatic_recovery_policy": "advisory_only",
+        "findings": findings,
     }
 
 

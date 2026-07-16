@@ -23,6 +23,7 @@ from agent.ml_reference_trust import build_ml_reference_trust
 from agent.orchestration_policy import build_single_stock_orchestration_summary
 from backtesting.signal_evidence import build_signal_backtest_evidence
 from data_freshness import build_current_data_freshness
+from data_recovery import build_data_recovery_report
 from ml_model_improvement import (
     apply_downside_risk_overlay,
     build_current_downside_feature_snapshot,
@@ -346,7 +347,23 @@ class MarketManagerAgent:
             signals=technical_agent["signals"],
             ml_research=ml_research,
         )
-        data_freshness = build_current_data_freshness(ticker=ticker)
+        data_freshness = build_current_data_freshness(
+            ticker=ticker,
+            include_news=include_news,
+            include_fundamentals=include_fundamentals,
+        )
+        data_recovery = build_data_recovery_report(
+            freshness=data_freshness,
+            ticker=ticker,
+            fundamentals=fundamental_agent["fundamentals"],
+            ml_research=ml_research,
+            ml_prediction=ml_prediction,
+            include_news=include_news,
+            include_fundamentals=include_fundamentals,
+            include_technicals=True,
+            include_ml=include_ml,
+        )
+        data_freshness["recovery"] = data_recovery
         analyst_outputs = build_single_stock_analyst_outputs(
             technical=technical_agent["technical_analysis"],
             signals=technical_agent["signals"],
@@ -428,6 +445,7 @@ class MarketManagerAgent:
             "ml_trust_explanation": ml_reference_trust.get("explanation"),
             "exit_signal": exit_signal,
             "data_freshness": data_freshness,
+            "data_recovery": data_recovery,
         }
 
     def run_backtest_query(

@@ -52,7 +52,7 @@ jobs:
         with:
           pipeline: daily-prices
           status: ${{ job.status }}
-          input-paths: data/pipeline_runs/latest_daily_pipeline.json
+          input-paths: data/pipeline_runs/latest_daily_pipeline.json,data/maintenance/data_recovery/latest_data_recovery.json
 
       - name: Send failure alert
         if: failure()
@@ -71,5 +71,6 @@ jobs:
           path: |
             data/pipeline_runs/*.json
             data/market/prices/*.csv
+            data/maintenance/data_recovery/*.json
             data/maintenance/diagnoses/*
           if-no-files-found: ignore

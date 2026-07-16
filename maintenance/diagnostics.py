@@ -180,6 +180,19 @@ def strongest_status(statuses: list[str]) -> str:
 def collect_raw_issues(sources: list[dict]) -> list[dict]:
     issues = []
     for source in sources:
+        if source.get("recovery_version"):
+            for finding in source.get("findings") or []:
+                action = finding.get("recommended_action") or {}
+                issues.append(
+                    {
+                        "step": finding.get("source", "data_recovery"),
+                        "status": finding.get("status", "warning"),
+                        "message": finding.get("message", "Data recovery action recommended."),
+                        "recovery_action": action.get("command") or action.get("id"),
+                        "retryable": action.get("safe_auto_recovery_candidate", False),
+                        "affects_current_report": finding.get("affects_current_report", False),
+                    }
+                )
         for key in ("errors", "warnings"):
             for item in source.get(key) or []:
                 issues.append(normalize_issue(item, default_status="failed" if key == "errors" else "warning"))
@@ -237,6 +250,19 @@ def redact_sensitive_text(value: str) -> str:
 
 
 def classify_issue(issue: dict) -> dict:
+    if issue.get("recovery_action"):
+        impact = (
+            "This data gap affects the current research report."
+            if issue.get("affects_current_report")
+            else "This is a system-maintenance gap and does not directly invalidate the current report."
+        )
+        return {
+            **issue,
+            "category": "data_recovery",
+            "explanation": impact,
+            "recommended_action": issue["recovery_action"],
+            "retryable": bool(issue.get("retryable")),
+        }
     text = f"{issue.get('step', '')} {issue.get('message', '')}".lower()
     for category, keywords, explanation, action, retryable in CATEGORY_RULES:
         if any(keyword in text for keyword in keywords):

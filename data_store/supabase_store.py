@@ -203,6 +203,52 @@ def insert_pipeline_run(
     return {"status": "success", "row": rows[0] if rows else None}
 
 
+def upsert_ml_dataset_metadata(
+    row: dict,
+    *,
+    supabase_url: str | None = None,
+    supabase_key: str | None = None,
+    open_url=urlopen,
+) -> dict:
+    base_url, api_key = resolve_supabase_credentials(
+        supabase_url=supabase_url,
+        supabase_key=supabase_key,
+    )
+    endpoint = (
+        f"{base_url}/rest/v1/ml_dataset_metadata?"
+        "on_conflict=dataset_name,universe,provider"
+    )
+    payload = json.dumps(row, allow_nan=False).encode("utf-8")
+    request = Request(
+        endpoint,
+        data=payload,
+        method="POST",
+        headers={
+            "apikey": api_key,
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "Prefer": "resolution=merge-duplicates,return=representation",
+        },
+    )
+
+    try:
+        with open_url(request, timeout=30) as response:
+            rows = json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace")
+        return {
+            "status": "error",
+            "message": f"Supabase ML dataset metadata upsert failed with HTTP {exc.code}: {body}",
+        }
+    except Exception as exc:
+        return {
+            "status": "error",
+            "message": f"Supabase ML dataset metadata upsert failed: {exc}",
+        }
+
+    return {"status": "success", "row": rows[0] if rows else None}
+
+
 def upsert_ml_predictions(
     records: list[dict],
     *,
@@ -1495,6 +1541,47 @@ def fetch_latest_pipeline_run(
         return None
 
     return rows[0]
+
+
+def fetch_latest_ml_dataset_metadata(
+    *,
+    dataset_name: str = "training_dataset_v1",
+    universe: str = "QQQ100",
+    provider: str = "yfinance",
+    supabase_url: str | None = None,
+    supabase_key: str | None = None,
+    open_url=urlopen,
+) -> dict | None:
+    base_url, api_key = resolve_supabase_credentials(
+        supabase_url=supabase_url,
+        supabase_key=supabase_key,
+    )
+    endpoint = (
+        f"{base_url}/rest/v1/ml_dataset_metadata?"
+        "select=dataset_name,dataset_version,universe,provider,feature_version,"
+        "label_version,generated_at,data_start_date,data_end_date,row_count,status,"
+        "workflow_run_id,metadata,updated_at"
+        f"&dataset_name=eq.{dataset_name}"
+        f"&universe=eq.{universe}"
+        f"&provider=eq.{provider}"
+        "&status=eq.success"
+        "&order=generated_at.desc"
+        "&limit=1"
+    )
+    request = Request(
+        endpoint,
+        method="GET",
+        headers={
+            "apikey": api_key,
+            "Authorization": f"Bearer {api_key}",
+            "Accept": "application/json",
+        },
+    )
+
+    with open_url(request, timeout=30) as response:
+        rows = json.loads(response.read().decode("utf-8"))
+
+    return rows[0] if rows else None
 
 
 def resolve_supabase_credentials(

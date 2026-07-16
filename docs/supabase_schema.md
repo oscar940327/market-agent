@@ -28,6 +28,13 @@ migration 方向；目前不連 Supabase、不匯入真實資料。
 | `social_events` | 社群事件與社群特徵 | Step 6.9 |
 | `research_logs` | 使用者研究問題與當時系統輸出摘要 | Step 6.7 |
 | `similar_case_results` | peer / market-wide 相似案例查詢結果 | Step 6.6 |
+| `ml_dataset_metadata` | 跨 GitHub Actions、Render、本地共用的 ML dataset freshness metadata | Step 29 |
+
+## Table: ml_dataset_metadata
+
+這張表保存最新 training dataset 的版本、產生時間、資料截止日、row count 與 workflow run id。唯一鍵為 `dataset_name + universe + provider`，weekly workflow 以 upsert 更新；它不保存大型 CSV 本身。
+
+Freshness service 優先讀取這張表，本地 metadata JSON 只作為 fallback。Schema 由 `supabase/migrations/014_create_ml_dataset_metadata.sql` 建立。
 
 ## Enum Drafts
 

@@ -42,6 +42,9 @@ jobs:
       - name: Build ML training dataset
         run: python scripts/build_ml_training_dataset.py
 
+      - name: Verify shared dataset metadata
+        run: python scripts/check_freshness.py --scope ml_training --json
+
       - name: Build ML monitoring metrics
         run: python scripts/build_ml_monitoring_metrics.py --days 90
 
@@ -63,7 +66,7 @@ jobs:
         with:
           pipeline: weekly-ml-dataset
           status: ${{ job.status }}
-          input-paths: data/ml/monitoring/ml_health_report_v1.json,data/ml/monitoring/ml_drift_report_v1.json
+          input-paths: data/ml/monitoring/ml_health_report_v1.json,data/ml/monitoring/ml_drift_report_v1.json,data/maintenance/data_recovery/latest_data_recovery.json
 
       - name: Send failure alert
         if: failure()
@@ -89,5 +92,6 @@ jobs:
           name: weekly-ml-monitoring-reports
           path: |
             data/ml/monitoring/*
+            data/maintenance/data_recovery/*
             data/maintenance/diagnoses/*
           if-no-files-found: ignore

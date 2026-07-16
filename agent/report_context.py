@@ -59,6 +59,8 @@ def build_single_stock_report_context(data: dict) -> dict:
         "ml_reference_trust": ml_reference_trust,
         "exit_signal": data.get("exit_signal"),
         "data_freshness": data.get("data_freshness"),
+        "data_recovery": data.get("data_recovery")
+        or (data.get("data_freshness") or {}).get("recovery"),
         "agent_outputs": data.get("agent_outputs", {}),
         "analyst_outputs": data.get("analyst_outputs", {}),
         "analyst_consensus": data.get("analyst_consensus", {}),
