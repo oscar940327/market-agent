@@ -6,6 +6,8 @@
 
 第一層是 deterministic review，檢查必要段落、Structured Data 重要數字、ML trust、資料 freshness、持有問題格式、風險聲明與明顯過度自信語句。
 
+重要數字包含基本面 ratio 轉換後的百分比、MA20、MA50、MACD histogram 與 ML 機率。LLM 修訂若誤改基本面百分比，系統會先依 Structured Data 自動恢復，再重新審查；缺漏或仍不一致時則不予通過。
+
 第二層是 semantic review，由 OpenRouter 的 `openai/gpt-5.4-mini` 檢查報告是否真的回答問題，且沒有扭曲 Structured Data。
 
 ## 品質分數
@@ -33,6 +35,16 @@
 ```
 
 每次修訂後都必須重新檢查。三次後仍未通過時，系統保留最後一版報告與未解決問題，不會假裝品質合格。
+
+## 品質層級不混用
+
+- `evidence_quality.level`：整份研究資料的整體證據品質。
+- `return_reference.evidence_quality`：只評估歷史相似情境這個子項的樣本品質。
+- `ml_reference_trust`：決定 ML 數字應正常使用或降低信任。
+
+因此「歷史相似情境子項為 high、整體證據為 medium、ML Reference 為降低信任」可以同時成立。Semantic reviewer 不應將三者誤判為矛盾。
+
+資料新鮮度也只影響被標記的來源。例如 ML training data 過舊會降低 ML Reference 信任度，但不代表最新價格、技術面與基本面全部失效。
 
 ## 使用範圍
 

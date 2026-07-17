@@ -150,7 +150,10 @@ def build_ml_trust_explanation(
             supports,
             code="historical_sample_available",
             category="historical_evidence",
-            message=f"歷史相似情境有 {sample_size} 筆，證據品質為 {translate_quality(evidence_quality)}。",
+            message=(
+                f"歷史相似情境子項有 {sample_size} 筆，該子項證據品質為"
+                f"{translate_quality(evidence_quality)}；這不代表整體證據品質或 ML 信任度同樣為高。"
+            ),
         )
     elif sample_size:
         add_item(

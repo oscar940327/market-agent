@@ -74,9 +74,9 @@ def build_fundamental_analysis(context: dict) -> str:
     ):
         parts.append("本益比不高，但營收倍數偏高，因此估值仍需要保守看待。")
     if revenue_growth is not None:
-        parts.append(f"營收成長約 {revenue_growth * 100:.1f}% 。")
+        parts.append(f"資料來源回報的營收成長約 {revenue_growth * 100:.1f}%（期間定義依 provider）。")
     if earnings_growth is not None:
-        parts.append(f"獲利成長約 {earnings_growth * 100:.1f}% 。")
+        parts.append(f"資料來源回報的獲利成長約 {earnings_growth * 100:.1f}%（期間定義依 provider）。")
     if gross_margins is not None:
         parts.append(f"毛利率約 {gross_margins * 100:.1f}% 。")
 
@@ -340,6 +340,19 @@ def build_risk_reminder(context: dict) -> str:
     warnings = data_freshness.get("warnings") or []
     if warnings:
         lines.append("- 目前有資料新鮮度或完整性提醒，詳細資訊放在 Structured Data。")
+    warning_sources = {warning.get("source") for warning in warnings if isinstance(warning, dict)}
+    if warning_sources & {"ml_training_data", "ml_prediction", "ml_predictions"}:
+        lines.append("- ML 資料新鮮度提醒會降低 ML Reference 信任度，但不代表價格、技術面與基本面資料全部失效。")
+
+    exit_signal = context.get("exit_signal") or {}
+    if context.get("question_type") != "holding_exit" and exit_signal.get("status") == "success":
+        signal = exit_signal.get("exit_signal")
+        weakening = exit_signal.get("weakening_signal_20d")
+        if signal in {"reduce", "exit"} or weakening == "high":
+            lines.append(
+                "- 風險層顯示技術轉弱程度偏高；在本題中只作為進場風險提醒，"
+                "不應解讀成直接的持有或賣出指令。"
+            )
     return "\n".join(lines)
 
 

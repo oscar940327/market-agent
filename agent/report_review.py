@@ -8,7 +8,7 @@ from agent.llm_analyst import OpenRouterChatClient
 from agent.rule_based_router import SINGLE_STOCK_HOLDING_TERMS, query_contains_any
 
 
-REPORT_REVIEW_VERSION = "report_review_v2"
+REPORT_REVIEW_VERSION = "report_review_v3"
 MAX_REVIEW_ITERATIONS = 3
 MAX_REVIEW_LLM_CALLS = 7
 MIN_PASSING_QUALITY_SCORE = 4
@@ -34,6 +34,26 @@ from 1 (poor) to 5 (excellent). Return exactly one JSON object:
 Use pass only when every score is at least 4 and there is no factual
 inconsistency, omitted material risk, unanswered user intent, overconfidence,
 hallucination, or workflow/section mismatch.
+
+Interpret quality fields at their documented scope:
+- evidence_quality.level is the overall research evidence level.
+- return_reference.evidence_quality describes only the historical-similarity
+  sample, not the whole report and not model quality.
+- ml_reference_trust describes whether ML outputs should be trusted normally or
+  conservatively. A high historical-sample quality can coexist with medium
+  overall evidence and reduced ML trust; this is not a contradiction when the
+  report labels each scope clearly.
+- A freshness warning applies only to the named source. Do not claim every data
+  source is stale when only ML training data is stale.
+
+For an entry/research question, do not require a holding/exit section. Material
+risk from exit_signal or weakening_signal_20d must still be reflected as an
+entry-risk warning without turning it into a direct sell instruction.
+
+Fundamental growth values are ratios in structured context. For example, 3.457
+must be displayed as 345.7%, not 3.457%. Do not penalize a correctly converted
+percentage, but require the report to identify it as a provider-reported growth
+metric whose period follows the source data.
 """.strip()
 
 LLM_REVISER_SYSTEM_PROMPT = """
@@ -42,6 +62,13 @@ review findings. Preserve all supported numbers, section order, and disclaimers.
 Do not add facts, recommendations, or new calculations. Return only the complete
 revised report text. If a finding cannot be fixed from the context, disclose the
 limitation instead of guessing.
+
+The structured context contains immutable_facts. Every listed display value is
+authoritative and must remain exactly unchanged. Never rescale, round again, or
+replace those values. Keep overall evidence quality, historical-similarity
+evidence quality, and ML trust as separate concepts. For non-holding questions,
+describe material exit/weakening findings only as entry-risk context and do not
+add a holding/exit section.
 """.strip()
 
 
@@ -166,7 +193,11 @@ def review_and_revise_report(
         if not revised.strip():
             history.append({"iteration": iteration, "stage": "llm_revision", "status": "error", "message": "LLM reviser returned an empty report."})
             break
-        current_report = revised.strip()
+        current_report = restore_immutable_report_numbers(
+            kind=kind,
+            data=data,
+            report=revised.strip(),
+        )
         revisions += 1
         latest_review = run_deterministic_review(kind=kind, data=data, report=current_report)
         history.append(_history_entry(iteration, "deterministic_after_revision", latest_review))
@@ -275,7 +306,68 @@ def build_review_context(data: dict) -> dict:
         "news_summary": (data.get("news_analysis") or {}).get("summary", {}),
         "ml_targets": (data.get("ml_research") or {}).get("targets", {}),
         "return_model": (data.get("ml_research") or {}).get("return_model", {}),
+        "quality_scope_definitions": {
+            "overall_evidence": "evidence_quality.level evaluates the complete research payload.",
+            "historical_similarity_evidence": "ml_research.return_reference.evidence_quality evaluates only the historical-similarity sample.",
+            "ml_reference_trust": "ml_reference_trust controls how conservatively ML outputs should be interpreted.",
+        },
+        "immutable_facts": build_immutable_facts(data),
     }
+
+
+def build_immutable_facts(data: dict) -> dict:
+    facts = {}
+    metrics = (data.get("fundamentals") or {}).get("metrics") or {}
+    for key in ("revenue_growth", "earnings_growth", "gross_margins"):
+        value = _to_float(metrics.get(key))
+        if value is not None:
+            facts[key] = {"raw_ratio": value, "display_percent": f"{value * 100:.1f}%"}
+    for key in ("forward_pe", "trailing_pe", "price_to_sales"):
+        value = _to_float(metrics.get(key))
+        if value is not None:
+            facts[key] = {"raw_value": value, "display_value": f"{value:.1f}"}
+
+    technical = data.get("technical_analysis") or {}
+    for key in ("current_price", "ma20", "ma50", "rsi14", "rsi_14", "macd", "macd_signal", "macd_histogram"):
+        value = _to_float(technical.get(key))
+        if value is not None:
+            facts[key] = value
+
+    ml = data.get("ml_research") or data.get("theme_ml_reference") or {}
+    for key, target in (ml.get("targets") or {}).items():
+        percent = _to_float((target or {}).get("probability_percent"))
+        if percent is None:
+            probability = _to_float((target or {}).get("probability"))
+            percent = probability * 100 if probability is not None else None
+        if percent is not None:
+            facts[f"ml_{key}"] = f"{percent:.1f}%"
+    return facts
+
+
+def restore_immutable_report_numbers(*, kind: str, data: dict, report: str) -> str:
+    """Repair supported labeled values if an LLM revision rescales them."""
+    if kind != "single_stock":
+        return report
+
+    metrics = (data.get("fundamentals") or {}).get("metrics") or {}
+    replacements = (
+        ("revenue_growth", r"(營收成長(?:約|為)?\s*)([+-]?[\d,.]+)(\s*%)"),
+        ("earnings_growth", r"(獲利成長(?:約|為)?\s*)([+-]?[\d,.]+)(\s*%)"),
+        ("gross_margins", r"(毛利率(?:約|為)?\s*)([+-]?[\d,.]+)(\s*%)"),
+    )
+    repaired = report
+    for key, pattern in replacements:
+        raw = _to_float(metrics.get(key))
+        if raw is None:
+            continue
+        expected = f"{raw * 100:.1f}"
+        repaired = re.sub(
+            pattern,
+            lambda match, value=expected: f"{match.group(1)}{value}{match.group(3)}",
+            repaired,
+            count=1,
+        )
+    return repaired
 
 
 def validate_llm_review(value: dict) -> dict:
@@ -465,11 +557,67 @@ def _review_key_numbers(kind: str, data: dict, report: str, checks: list[dict]) 
                     f"報告未保留 {target_name} 的結構化機率 {formatted}。",
                     f"使用 Structured Data 的 {formatted}，不要自行改算。",
                 )
+    if kind == "single_stock":
+        _review_fundamental_numbers(data, report, checks)
+        _review_technical_numbers(data, report, checks)
     if kind == "backtest":
         metrics = data.get("metrics") or {}
         total = metrics.get("total_trades")
         if total is not None:
             _check(checks, "backtest_trade_count", str(total) in report, "回測報告未保留總交易次數。", "補回 Structured Data 的 total_trades。")
+
+
+def _review_fundamental_numbers(data: dict, report: str, checks: list[dict]) -> None:
+    metrics = (data.get("fundamentals") or {}).get("metrics") or {}
+    fields = (
+        ("revenue_growth", "營收成長", r"營收成長(?:約|為)?\s*([+-]?[\d,.]+)\s*%"),
+        ("earnings_growth", "獲利成長", r"獲利成長(?:約|為)?\s*([+-]?[\d,.]+)\s*%"),
+        ("gross_margins", "毛利率", r"毛利率(?:約|為)?\s*([+-]?[\d,.]+)\s*%"),
+    )
+    for key, label, pattern in fields:
+        raw = _to_float(metrics.get(key))
+        if raw is None:
+            continue
+        match = re.search(pattern, report)
+        actual = _to_float(match.group(1).replace(",", "")) if match else None
+        expected = round(raw * 100, 1)
+        _check(
+            checks,
+            f"fundamental_number_matches:{key}",
+            actual is not None and abs(actual - expected) <= 0.05,
+            f"{label}百分比未保留結構化資料的比例換算結果 {expected:.1f}%。",
+            f"將{label}顯示為 {expected:.1f}%，不可把原始 ratio 直接加上百分號。",
+        )
+
+
+def _review_technical_numbers(data: dict, report: str, checks: list[dict]) -> None:
+    technical = data.get("technical_analysis") or {}
+    fields = (
+        ("ma20", "MA20", r"MA20\s*約?\s*\$?([\d,.]+)"),
+        ("ma50", "MA50", r"MA50\s*約?\s*\$?([\d,.]+)"),
+        ("macd_histogram", "MACD histogram", r"histogram\s*為\s*([+-]?[\d,.]+)"),
+    )
+    for key, label, pattern in fields:
+        expected = _to_float(technical.get(key))
+        if expected is None:
+            continue
+        match = re.search(pattern, report, flags=re.IGNORECASE)
+        actual = _to_float(match.group(1).replace(",", "")) if match else None
+        tolerance = 0.51 if key in {"ma20", "ma50"} else 0.00011
+        _check(
+            checks,
+            f"technical_number_matches:{key}",
+            actual is not None and abs(actual - expected) <= tolerance,
+            f"報告中的 {label} 未保留 Structured Data 數值。",
+            f"使用 Structured Data 的 {label}，不可由 LLM 重新計算。",
+        )
+
+
+def _to_float(value):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _has_disclaimer(report: str) -> bool:

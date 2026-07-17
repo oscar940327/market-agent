@@ -65,6 +65,8 @@ ML Reference 是機器學習參考訊號。
 
 目前這段通常比報酬模型更適合當主要參考。
 
+這裡的 `evidence_quality` 只代表歷史相似情境子項。即使這個子項為 `high`，整體 Evidence Quality 仍可能是 `medium`，ML Reference 也可能因模型校準、資料新鮮度或訊號品質而處於降低信任狀態。
+
 ### 報酬模型估算
 
 報酬模型會估算：

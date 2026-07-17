@@ -49,6 +49,12 @@ def test_normal_trust_explanation_shows_supporting_evidence():
         "prediction_fresh",
         "historical_sample_available",
     }
+    historical = next(
+        item for item in explanation["supports"]
+        if item["code"] == "historical_sample_available"
+    )
+    assert "歷史相似情境子項" in historical["message"]
+    assert "不代表整體證據品質或 ML 信任度同樣為高" in historical["message"]
 
 
 def test_reduced_trust_explanation_combines_calibration_signal_and_downside_reasons():

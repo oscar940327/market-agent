@@ -1,6 +1,11 @@
 import json
 
-from agent.report_review import review_and_revise_report, run_deterministic_review
+from agent.fixed_single_stock_report import build_risk_reminder
+from agent.report_review import (
+    restore_immutable_report_numbers,
+    review_and_revise_report,
+    run_deterministic_review,
+)
 from agent.reporting import build_report
 
 
@@ -197,8 +202,151 @@ def test_holding_review_rejects_entry_only_conclusion():
 def test_build_report_exposes_review_in_result_and_structured_data():
     data = {"status": "no_price_data", "message": "price data unavailable"}
     result = build_report(kind="single_stock", data=data, analyst_mode="rule_based")
-    assert result["review"]["review_version"] == "report_review_v2"
+    assert result["review"]["review_version"] == "report_review_v3"
     assert data["report_review"] == result["review"]
+
+
+def test_deterministic_review_rejects_rescaled_fundamental_percentages():
+    data = {
+        "status": "success",
+        "fundamentals": {
+            "status": "success",
+            "metrics": {
+                "revenue_growth": 3.457,
+                "earnings_growth": 13.685,
+                "gross_margins": 0.72569,
+            },
+        },
+    }
+    report = "\n".join(
+        [
+            "研究摘要", "摘要", "基本面分析",
+            "營收成長約 3.457%。獲利成長約 13.685%。毛利率約 72.6%。",
+            "技術面分析", "內容", "新聞面分析", "內容", "ML Reference", "內容",
+            "綜合評估", "內容", "風險提醒", "不構成投資建議。",
+        ]
+    )
+
+    result = run_deterministic_review(kind="single_stock", data=data, report=report)
+    failed = {item["code"] for item in result["checks"] if item["status"] == "fail"}
+
+    assert "fundamental_number_matches:revenue_growth" in failed
+    assert "fundamental_number_matches:earnings_growth" in failed
+    assert "fundamental_number_matches:gross_margins" not in failed
+
+
+def test_deterministic_review_accepts_ratio_to_percent_conversion():
+    data = {
+        "status": "success",
+        "fundamentals": {
+            "status": "success",
+            "metrics": {
+                "revenue_growth": 3.457,
+                "earnings_growth": 13.685,
+                "gross_margins": 0.72569,
+            },
+        },
+    }
+    report = "\n".join(
+        [
+            "研究摘要", "摘要", "基本面分析",
+            "資料來源回報的營收成長約 345.7%（期間定義依 provider）。"
+            "資料來源回報的獲利成長約 1368.5%（期間定義依 provider）。"
+            "毛利率約 72.6%。",
+            "技術面分析", "內容", "新聞面分析", "內容", "ML Reference", "內容",
+            "綜合評估", "內容", "風險提醒", "不構成投資建議。",
+        ]
+    )
+
+    result = run_deterministic_review(kind="single_stock", data=data, report=report)
+    failed = {item["code"] for item in result["checks"] if item["status"] == "fail"}
+
+    assert not {code for code in failed if code.startswith("fundamental_number_matches:")}
+
+
+def test_semantic_prompt_defines_evidence_scopes_and_immutable_facts():
+    client = SequenceClient([llm_review("pass")])
+    data = {
+        "status": "success",
+        "query": "MU 現在適合進場嗎",
+        "evidence_quality": {"level": "medium"},
+        "fundamentals": {
+            "status": "success",
+            "metrics": {"revenue_growth": 3.457},
+        },
+        "ml_research": {
+            "status": "success",
+            "return_reference": {"evidence_quality": "high"},
+        },
+        "ml_reference_trust": {"status": "reduced_trust"},
+    }
+    report = "\n".join(
+        [
+            "研究摘要", "摘要", "基本面分析",
+            "資料來源回報的營收成長約 345.7%（期間定義依 provider）。",
+            "技術面分析", "內容", "新聞面分析", "內容",
+            "ML Reference", "降低信任，請保守解讀。",
+            "綜合評估", "整體證據品質為 medium。",
+            "風險提醒", "不構成投資建議。",
+        ]
+    )
+
+    result = review_and_revise_report(
+        kind="single_stock",
+        data=data,
+        report=report,
+        mode="semantic",
+        llm_client=client,
+    )
+
+    prompt_payload = json.loads(client.calls[0]["user"])
+    assert result["review"]["status"] == "pass"
+    assert prompt_payload["structured_context"]["quality_scope_definitions"]
+    assert prompt_payload["structured_context"]["immutable_facts"]["revenue_growth"]["display_percent"] == "345.7%"
+
+
+def test_llm_rescaled_fundamental_percentages_are_restored():
+    data = {
+        "fundamentals": {
+            "metrics": {
+                "revenue_growth": 3.457,
+                "earnings_growth": 13.685,
+                "gross_margins": 0.72569,
+            }
+        }
+    }
+    revised = "營收成長約 3.457%。獲利成長約 13.685%。毛利率約 0.72569%。"
+
+    repaired = restore_immutable_report_numbers(
+        kind="single_stock",
+        data=data,
+        report=revised,
+    )
+
+    assert "營收成長約 345.7%" in repaired
+    assert "獲利成長約 1368.5%" in repaired
+    assert "毛利率約 72.6%" in repaired
+
+
+def test_entry_report_discloses_material_risk_without_holding_section():
+    reminder = build_risk_reminder(
+        {
+            "question_type": "entry_or_research",
+            "exit_signal": {
+                "status": "success",
+                "exit_signal": "exit",
+                "weakening_signal_20d": "high",
+            },
+            "data_freshness": {
+                "warnings": [{"source": "ml_training_data"}],
+            },
+        }
+    )
+
+    assert "技術轉弱程度偏高" in reminder
+    assert "只作為進場風險提醒" in reminder
+    assert "ML 資料新鮮度提醒會降低 ML Reference 信任度" in reminder
+    assert "持有風險 / 出場觀察" not in reminder
 
 
 def test_semantic_mode_reviews_even_when_deterministic_checks_pass():
