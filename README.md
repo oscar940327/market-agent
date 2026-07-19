@@ -114,6 +114,50 @@ Market Agent 目前是一個後端 API，加上一個個人網站上的前端頁
 
 詳細說明：[Architecture](docs/architecture.md)
 
+### 規劃中的 Agentic 流程
+
+Step 31 預計把目前固定的 workflow 升級成受控的 Agentic Research Orchestration。LLM 會負責規劃研究步驟與判斷是否需要補資料，但所有數字仍由既有工具與資料來源計算，並保留權限、步數、成本與品質限制。
+
+```mermaid
+flowchart TD
+    A[使用者提出研究問題] --> B[Router 理解問題與研究範圍]
+    B --> C[Research Orchestrator 制定研究計畫]
+    C --> D{選擇需要的專業 Agent}
+    D --> E[Technical Agent]
+    D --> F[Fundamental Agent]
+    D --> G[News Agent]
+    D --> H[ML Agent]
+    D --> P[Theme Analyst]
+    E -. 呼叫 .-> T[Market Data / Backtest / Supabase Tools]
+    F -. 呼叫 .-> T
+    G -. 呼叫 .-> T
+    H -. 呼叫 .-> T
+    P -. 呼叫 .-> T
+    E --> S[Agent self-check + Schema / Evidence Validation]
+    F --> S
+    G --> S
+    H --> S
+    P --> S
+    S --> I[Structured Agent Outputs]
+    I --> O[Risk Agent 整合下跌與持有風險]
+    O -. 呼叫 .-> T
+    O --> J{資料足夠且訊號一致嗎}
+    J -- 否 --> K[補資料或重新規劃]
+    K --> C
+    J -- 是 --> L[Evidence / Freshness Validators]
+    L --> W[Report Writer 組成研究報告]
+    W --> V[Number Validator 檢查數字一致性]
+    V --> M[Review Agent 檢查語意與結論]
+    M -- 需要修正 --> W
+    M -- 通過 --> N[輸出 Research Report]
+```
+
+每個 Analyst 會先檢查自己的結論是否有資料依據，再由程式驗證輸出 schema 與 evidence reference。Agent 的 self-check 不能取代 deterministic validation，通過這兩層後才會形成 Structured Agent Outputs。
+
+圖中的 Research Orchestrator、各 Analyst、Risk Agent、Report Writer 與 Review Agent 會使用 LLM 做受控判斷。Market Data、Backtest、Supabase、Evidence 與 Freshness 則是 Tool 或 deterministic validator，不會因為程式檔名包含 `agent` 就被視為自主 Agent。
+
+這些 Agent 可以決定下一個研究動作，但不能任意交易、任意修改資料庫，或跳過既有的資料與報告驗證規則。
+
 ## ML Reference
 
 ML Reference 是輔助研究訊號，不會直接改變最後結論或價格計畫。
@@ -171,7 +215,7 @@ Render 負責部署後端 API。
 
 為了讓系統維持穩定，我會固定用幾組問題檢查資料、報告格式與 ML Reference 狀態。
 
-### 每天必測
+### 每天測試
 
 ```text
 MU 現在適合進場嗎
@@ -189,7 +233,7 @@ MU 如果我已經持有，現在要不要減碼
 - 回測報告是否維持固定格式，且沒有被 LLM 改寫數字邏輯。
 - 持有風險問題是否出現「持有風險 / 出場觀察」。
 
-### 每週加測
+### 每週測試
 
 ```text
 NVDA 現在適合進場嗎
