@@ -1,6 +1,7 @@
 import argparse
 import html
 import json
+import os
 import sys
 from datetime import UTC, date, datetime
 from pathlib import Path
@@ -12,6 +13,7 @@ for path in (PROJECT_ROOT, SCRIPT_DIR):
     if str(path) not in sys.path:
         sys.path.insert(0, str(path))
 
+from agent.agentic_orchestrator import orchestrate_research  # noqa: E402
 from agent.reporting import build_report  # noqa: E402
 from agent.rule_based_router import detect_intent  # noqa: E402
 from alerts import load_alert_email_config, send_alert_email  # noqa: E402
@@ -125,15 +127,37 @@ def log_one_fixture(*, query: str, args: argparse.Namespace) -> dict:
             "message": data.get("message") or data.get("status"),
         }
 
+    request_options = {
+        "include_news": args.include_news,
+        "include_fundamentals": args.include_fundamentals,
+        "include_technicals": True,
+        "include_ml": report_kind != "backtest",
+    }
+    orchestration = orchestrate_research(
+        kind=report_kind,
+        query=query,
+        data=data,
+        request_options=request_options,
+        mode=(
+            os.getenv("MARKET_AGENT_ORCHESTRATOR_MODE", "fixed")
+            if args.analyst_mode == "llm"
+            else "fixed"
+        ),
+    )
+    data["agentic_orchestration"] = orchestration
+    data["agentic_outputs"] = orchestration.get("specialist_outputs", {})
+    data["research_scope"] = (
+        orchestration.get("decision_trace", {}).get("request_scope", {})
+    )
+    agent_flow = build_agent_flow_summary(orchestration)
+
     report_result = build_report(
         kind=report_kind,
         data=data,
         analyst_mode=args.analyst_mode,
     )
     request_options = {
-        "include_news": args.include_news,
-        "include_fundamentals": args.include_fundamentals,
-        "include_technicals": True,
+        **request_options,
         "analyst_mode": args.analyst_mode,
         "fixture": True,
     }
@@ -191,7 +215,27 @@ def log_one_fixture(*, query: str, args: argparse.Namespace) -> dict:
         "tracking_status": log_row.get("tracking_status"),
         "outcome_count": len(outcome_rows),
         "research_log_id": log_result["row"]["id"],
+        "agent_flow": agent_flow,
         "message": None if review_passed else "Research Report semantic quality review did not pass.",
+    }
+
+
+def build_agent_flow_summary(orchestration: dict | None) -> dict:
+    value = orchestration or {}
+    mode = str(value.get("mode_used") or "").lower()
+    if value.get("fallback_used") or mode == "fixed_fallback":
+        label = "Fallback"
+    elif mode == "llm":
+        label = "LLM"
+    elif mode == "fixed":
+        label = "Fixed"
+    else:
+        label = "Unknown"
+    return {
+        "label": label,
+        "mode_used": mode or "unknown",
+        "fallback_used": bool(value.get("fallback_used")),
+        "fallback_reason": value.get("fallback_reason"),
     }
 
 
@@ -308,6 +352,11 @@ def build_daily_research_fixture_markdown(report: dict) -> str:
             lines.append("")
             lines.append(f"原因：{result.get('message', 'unknown')}")
             continue
+        agent_flow = result.get("agent_flow") or {}
+        lines.append(f"Agent Flow: {agent_flow.get('label', 'Unknown')}")
+        if agent_flow.get("label") == "Fallback" and agent_flow.get("fallback_reason"):
+            lines.append(f"- Fallback 原因：{agent_flow['fallback_reason']}")
+        lines.append("")
         lines.extend(format_fixture_quality_lines(result.get("report_review") or {}))
         if result.get("status") == "quality_failed":
             lines.extend(["", "品質審查未通過，以下保留最後一版報告供檢查。"])

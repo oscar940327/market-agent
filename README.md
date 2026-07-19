@@ -114,9 +114,9 @@ Market Agent 目前是一個後端 API，加上一個個人網站上的前端頁
 
 詳細說明：[Architecture](docs/architecture.md)
 
-### 規劃中的 Agentic 流程
+### Agentic Research Orchestration
 
-Step 31 預計把目前固定的 workflow 升級成受控的 Agentic Research Orchestration。LLM 會負責規劃研究步驟與判斷是否需要補資料，但所有數字仍由既有工具與資料來源計算，並保留權限、步數、成本與品質限制。
+系統支援受控的 Agentic Research Orchestration。LLM Research Orchestrator 會依問題與前端選取的研究範圍制定計畫，專業 Agent 只可呼叫白名單內的唯讀工具；所有市場數字仍由既有資料來源與 deterministic tools 計算。
 
 ```mermaid
 flowchart TD
@@ -156,7 +156,13 @@ flowchart TD
 
 圖中的 Research Orchestrator、各 Analyst、Risk Agent、Report Writer 與 Review Agent 會使用 LLM 做受控判斷。Market Data、Backtest、Supabase、Evidence 與 Freshness 則是 Tool 或 deterministic validator，不會因為程式檔名包含 `agent` 就被視為自主 Agent。
 
+模型採交叉供應商配置：GPT 負責 Router、Orchestrator、專業分析與 Report Writer；Claude Sonnet 負責 Risk Agent 與 Final Reviewer，避免整條流程都由相同模型自我審查。
+
 這些 Agent 可以決定下一個研究動作，但不能任意交易、任意修改資料庫，或跳過既有的資料與報告驗證規則。
+
+若 Orchestrator、專業 Agent、schema 或 Tool 發生錯誤，系統會保留原因並回到固定流程，不會因單次 LLM 失敗中斷 Research Report。第一版 decision trace 顯示在 Structured Data，不另外寫入 Supabase。
+
+詳細說明：[Agentic Orchestration](docs/agentic_orchestration.md)
 
 ## ML Reference
 
@@ -278,6 +284,7 @@ README 只放專案概覽。
 主要文件：
 
 - [Architecture](docs/architecture.md)
+- [Agentic Orchestration](docs/agentic_orchestration.md)
 - [Frontend and Research Report Guide](docs/frontend_report_guide.md)
 - [Data Pipeline](docs/data_pipeline.md)
 - [ML Reference](docs/ml_reference.md)

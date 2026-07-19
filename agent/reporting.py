@@ -56,6 +56,13 @@ def build_report(
         analyst_mode=analyst_mode,
         llm_client=llm_client,
     )
+    append_agentic_report_trace(
+        data,
+        event="report_writer",
+        status="success",
+        mode=draft["analyst"].get("mode_used"),
+        model=draft["analyst"].get("model"),
+    )
     reviewed = review_and_revise_report(
         kind=kind,
         data=data,
@@ -64,6 +71,13 @@ def build_report(
         llm_client=review_llm_client,
     )
     data["report_review"] = reviewed["review"]
+    append_agentic_report_trace(
+        data,
+        event="review_agent",
+        status=reviewed["review"].get("status"),
+        mode=reviewed["review"].get("mode_used"),
+        iterations=reviewed["review"].get("iterations", 0),
+    )
     return {
         **draft,
         "report": reviewed["report"],
@@ -92,7 +106,14 @@ def _build_report_draft(
             ),
         }
 
-    if kind == "single_stock":
+    agentic = data.get("agentic_orchestration") or {}
+    agentic_llm_writer = (
+        requested_mode == "llm"
+        and agentic.get("mode_used") == "llm"
+        and bool(data.get("agentic_outputs"))
+    )
+
+    if kind == "single_stock" and not agentic_llm_writer:
         fixed_report = build_fixed_single_stock_report(data)
         return {
             "report": fixed_report,
@@ -104,7 +125,7 @@ def _build_report_draft(
             ),
         }
 
-    if kind == "backtest":
+    if kind == "backtest" and not agentic_llm_writer:
         return {
             "report": fallback_report,
             "analyst": build_analyst_metadata(
@@ -126,7 +147,11 @@ def _build_report_draft(
             ),
         }
 
-    client = llm_client or get_llm_client_from_env()
+    client = llm_client or (
+        get_report_writer_llm_client_from_env()
+        if agentic_llm_writer
+        else get_llm_client_from_env()
+    )
 
     if client is None:
         return {
@@ -168,7 +193,11 @@ def _build_report_draft(
             provider=getattr(client, "provider", None),
             model=getattr(client, "model", None),
             fallback_used=False,
-            message="使用 LLM analyst 解釋 structured analysis data。",
+            message=(
+                "使用 Agentic Report Writer 根據已驗證的 specialist outputs 組成報告。"
+                if agentic_llm_writer
+                else "使用 LLM analyst 解釋 structured analysis data。"
+            ),
         ),
     }
 
@@ -421,6 +450,24 @@ def get_llm_client_from_env():
         return OpenRouterChatClient.from_env()
 
     return OpenAIResponsesClient.from_env()
+
+
+def get_report_writer_llm_client_from_env():
+    client = get_llm_client_from_env()
+    if client is None:
+        return None
+    model = os.getenv("MARKET_AGENT_REPORT_WRITER_MODEL", "").strip()
+    if model:
+        client.model = model
+    return client
+
+
+def append_agentic_report_trace(data: dict, *, event: str, **details) -> None:
+    trace = (data.get("agentic_orchestration") or {}).get("decision_trace")
+    if not isinstance(trace, dict):
+        return
+    events = trace.setdefault("events", [])
+    events.append({"sequence": len(events) + 1, "event": event, **details})
 
 
 def build_analyst_metadata(

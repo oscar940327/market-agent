@@ -20,6 +20,8 @@ LLM_ANALYST_SYSTEM_PROMPT = """
 - 如果 ML Reference 是降低信任，20 日上漲機率要保守看待，20 日中途大跌風險只能作為風險控管參考，不可單獨當作出場依據。
 - 如果主題分析的 ML Reference 是降低信任，不可以寫成「信任度為一般」或「信任度正常」。
 - 如果新聞 / 基本面偏正，但技術面與 ML 偏弱，請寫「尚未形成多方共振」，不要寫成三者一致偏弱。
+- 如果 payload 有 agentic_outputs，只能把它們當成已驗證資料的解釋觀點；所有數字仍以 structured payload 的原始欄位為準。
+- 不要在報告中描述 Agent 的內部 plan、Tool 呼叫或 self-check，除非資料缺口會影響研究結論。
 
 嚴格限制：
 - 不可以自行抓資料。
@@ -253,16 +255,32 @@ def build_single_stock_payload(data: dict) -> dict:
         "data_freshness": context["data_freshness"],
         "research_profile": context["research_profile"],
         "agent_summaries": context["agent_summaries"],
+        "agentic_plan": (context.get("agentic_orchestration") or {}).get("plan"),
+        "agentic_outputs": context.get("agentic_outputs", {}),
     }
     if context["question_type"] == "holding_exit":
         payload["exit_signal"] = context["exit_signal"]
+
+    scope = context.get("research_scope") or {}
+    if scope.get("include_technicals") is False:
+        payload.pop("technical_analysis", None)
+        payload.pop("signals", None)
+    if scope.get("include_news") is False:
+        payload.pop("news_summary", None)
+        payload.pop("news_events_summary", None)
+    if scope.get("include_fundamentals") is False:
+        payload.pop("fundamental_summary", None)
+    if scope.get("include_ml") is False:
+        payload.pop("ml_research", None)
+        payload.pop("ml_prediction", None)
+        payload.pop("ml_reference_trust", None)
 
     return payload
 
 
 def build_backtest_payload(data: dict) -> dict:
     report = data.get("report", {})
-    return {
+    payload = {
         "kind": "backtest",
         "intent": data.get("intent"),
         "status": data.get("status"),
@@ -277,7 +295,10 @@ def build_backtest_payload(data: dict) -> dict:
             name: output.get("summary", {})
             for name, output in data.get("agent_outputs", {}).items()
         },
+        "agentic_plan": (data.get("agentic_orchestration") or {}).get("plan"),
+        "agentic_outputs": data.get("agentic_outputs", {}),
     }
+    return payload
 
 
 def build_theme_payload(data: dict) -> dict:
@@ -318,7 +339,7 @@ def build_theme_payload(data: dict) -> dict:
             }
         )
 
-    return {
+    payload = {
         "kind": "theme",
         "intent": data.get("intent"),
         "status": data.get("status"),
@@ -331,8 +352,19 @@ def build_theme_payload(data: dict) -> dict:
         "theme_ml_reference": data.get("theme_ml_reference") or data.get("ml_research"),
         "ml_reference_trust": data.get("theme_ml_reference_trust") or data.get("ml_reference_trust"),
         "evidence_quality": data.get("evidence_quality", {}),
+        "agentic_plan": (data.get("agentic_orchestration") or {}).get("plan"),
+        "agentic_outputs": data.get("agentic_outputs", {}),
         "top_results": top_results,
     }
+    scope = data.get("research_scope") or {}
+    if scope.get("include_news") is False:
+        payload.pop("theme_news_summary", None)
+    if scope.get("include_fundamentals") is False:
+        payload.pop("theme_fundamental_summary", None)
+    if scope.get("include_ml") is False:
+        payload.pop("theme_ml_reference", None)
+        payload.pop("ml_reference_trust", None)
+    return payload
 
 
 def summarize_theme_news(results: list[dict]) -> dict:

@@ -19,11 +19,12 @@ jobs:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
       MARKET_AGENT_LLM_PROVIDER: openrouter
-      MARKET_AGENT_LLM_MODEL: openai/gpt-4.1
+      MARKET_AGENT_LLM_MODEL: openai/gpt-5.4-mini
+      NEWS_EXTRACTOR_MODE: rule_based
       NEWS_LLM_PROVIDER: openrouter
-      NEWS_LLM_MODEL: openai/gpt-5.4-mini
-      NEWS_LLM_ESCALATION_MODEL: openai/gpt-5.5
-      NEWS_LLM_ESCALATION_ENABLED: "false"
+      NEWS_LLM_MODEL: openai/gpt-5-mini
+      NEWS_LLM_ESCALATION_MODEL: openai/gpt-5.4-mini
+      NEWS_LLM_ESCALATION_ENABLED: "true"
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
       OPENROUTER_APP_NAME: market-agent
       ALERT_EMAIL_ENABLED: ${{ secrets.ALERT_EMAIL_ENABLED }}

@@ -1,4 +1,5 @@
 import inspect
+import os
 import re
 
 from fastapi import FastAPI
@@ -6,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from agent.analyst import format_error_message
+from agent.agentic_orchestrator import orchestrate_research
 from agent.hybrid_router import route_market_query
 from agent.reporting import apply_required_report_sections, build_report
 from agent.rule_based_router import (
@@ -242,6 +244,33 @@ def finalize_single_stock_report(
     )
 
 
+def attach_agentic_orchestration(
+    *,
+    kind: str,
+    data: dict,
+    user_query: str,
+    analyst_mode: str,
+    request_options: dict | None = None,
+) -> dict:
+    orchestration = orchestrate_research(
+        kind=kind,
+        query=user_query,
+        data=data,
+        request_options=request_options,
+        mode=(
+            os.getenv("MARKET_AGENT_ORCHESTRATOR_MODE", "fixed")
+            if analyst_mode == "llm"
+            else "fixed"
+        ),
+    )
+    data["agentic_orchestration"] = orchestration
+    data["agentic_outputs"] = orchestration.get("specialist_outputs", {})
+    data["research_scope"] = (
+        orchestration.get("decision_trace", {}).get("request_scope", {})
+    )
+    return data
+
+
 @app.get("/health")
 def health_check() -> dict:
     return {
@@ -291,6 +320,18 @@ def query_market_agent(request: QueryRequest) -> dict:
             include_fundamentals=request.include_fundamentals,
         )
         analysis_data["question_type"] = route_result.get("question_type", "entry_or_research")
+        attach_agentic_orchestration(
+            kind="single_stock",
+            data=analysis_data,
+            user_query=request.user_query,
+            analyst_mode=request.analyst_mode,
+            request_options={
+                "include_news": request.include_news,
+                "include_fundamentals": request.include_fundamentals,
+                "include_technicals": request.include_technicals,
+                "include_ml": True,
+            },
+        )
         report_result = build_report(
             kind="single_stock",
             data=analysis_data,
@@ -329,6 +370,13 @@ def query_market_agent(request: QueryRequest) -> dict:
             hint_name="strategy_hint",
             hint_value=route_result.get("strategy"),
         )
+        attach_agentic_orchestration(
+            kind="backtest",
+            data=backtest_data,
+            user_query=request.user_query,
+            analyst_mode=request.analyst_mode,
+            request_options={"include_technicals": True, "include_ml": False},
+        )
         report_result = build_report(
             kind="backtest",
             data=backtest_data,
@@ -349,6 +397,18 @@ def query_market_agent(request: QueryRequest) -> dict:
             user_query=request.user_query,
             hint_name="theme_hint",
             hint_value=route_result.get("theme"),
+        )
+        attach_agentic_orchestration(
+            kind="theme",
+            data=theme_data,
+            user_query=request.user_query,
+            analyst_mode=request.analyst_mode,
+            request_options={
+                "include_news": request.include_news,
+                "include_fundamentals": request.include_fundamentals,
+                "include_technicals": request.include_technicals,
+                "include_ml": True,
+            },
         )
         report_result = build_report(
             kind="theme",
@@ -431,6 +491,18 @@ def analyze_single_stock(request: SingleStockAnalysisRequest) -> dict:
         include_news=request.include_news,
         include_fundamentals=request.include_fundamentals,
     )
+    attach_agentic_orchestration(
+        kind="single_stock",
+        data=analysis_data,
+        user_query=request.user_query,
+        analyst_mode=request.analyst_mode,
+        request_options={
+            "include_news": request.include_news,
+            "include_fundamentals": request.include_fundamentals,
+            "include_technicals": True,
+            "include_ml": True,
+        },
+    )
     report_result = build_report(
         kind="single_stock",
         data=analysis_data,
@@ -456,6 +528,13 @@ def backtest_strategy(request: BacktestRequest) -> dict:
         ticker=normalize_ticker(request.ticker),
         user_query=request.user_query,
     )
+    attach_agentic_orchestration(
+        kind="backtest",
+        data=backtest_data,
+        user_query=request.user_query,
+        analyst_mode=request.analyst_mode,
+        request_options={"include_technicals": True, "include_ml": False},
+    )
     report_result = build_report(
         kind="backtest",
         data=backtest_data,
@@ -473,6 +552,12 @@ def backtest_strategy(request: BacktestRequest) -> dict:
 @app.post("/themes")
 def analyze_theme(request: ThemeAnalysisRequest) -> dict:
     theme_data = run_theme_analysis(request.user_query)
+    attach_agentic_orchestration(
+        kind="theme",
+        data=theme_data,
+        user_query=request.user_query,
+        analyst_mode=request.analyst_mode,
+    )
     report_result = build_report(
         kind="theme",
         data=theme_data,

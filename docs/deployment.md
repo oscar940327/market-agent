@@ -100,14 +100,28 @@ Step 30 需要再執行 `supabase/migrations/015_create_model_promotion_tables.s
 ```env
 MARKET_AGENT_ANALYST_MODE=llm
 MARKET_AGENT_LLM_PROVIDER=openrouter
-MARKET_AGENT_LLM_MODEL=openai/gpt-4.1
+MARKET_AGENT_LLM_MODEL=openai/gpt-5.4-mini
+MARKET_AGENT_ROUTER_MODEL=openai/gpt-5.4-mini
 OPENROUTER_API_KEY=
 OPENROUTER_APP_NAME=market-agent
 
 MARKET_AGENT_REPORT_REVIEW_MODE=hybrid
 MARKET_AGENT_REPORT_REVIEW_PROVIDER=openrouter
-MARKET_AGENT_REPORT_REVIEW_MODEL=openai/gpt-5.4-mini
+MARKET_AGENT_REPORT_REVIEW_MODEL=anthropic/claude-sonnet-4.6
 MARKET_AGENT_REPORT_REVIEW_MAX_ITERATIONS=3
+
+MARKET_AGENT_ORCHESTRATOR_MODE=llm
+MARKET_AGENT_ORCHESTRATOR_PROVIDER=openrouter
+MARKET_AGENT_ORCHESTRATOR_MODEL=openai/gpt-5.4
+MARKET_AGENT_ORCHESTRATOR_MAX_STEPS=8
+MARKET_AGENT_ORCHESTRATOR_MAX_REPLANS=2
+MARKET_AGENT_TECHNICAL_MODEL=openai/gpt-5.4-mini
+MARKET_AGENT_FUNDAMENTAL_MODEL=openai/gpt-5.4-mini
+MARKET_AGENT_NEWS_MODEL=openai/gpt-5.4-mini
+MARKET_AGENT_ML_MODEL=openai/gpt-5.4-mini
+MARKET_AGENT_THEME_MODEL=openai/gpt-5.4-mini
+MARKET_AGENT_RISK_MODEL=anthropic/claude-sonnet-4.6
+MARKET_AGENT_REPORT_WRITER_MODEL=openai/gpt-5.4-mini
 
 NEWS_EXTRACTOR_MODE=rule_based
 NEWS_LLM_PROVIDER=openrouter
@@ -126,6 +140,8 @@ GMAIL_APP_PASSWORD=
 ```
 
 `MARKET_AGENT_REPORT_REVIEW_MODE=deterministic` 不會增加 LLM token；設為 `hybrid` 時，只有 deterministic review 未通過才會呼叫 reviewer/reviser。每日與每週 fixture workflow 固定使用 `semantic`，每份報告都會由 `openai/gpt-5.4-mini` 評分，不合格時最多修訂 3 次。一般前端仍建議使用 `hybrid` 控制成本。
+
+`MARKET_AGENT_ORCHESTRATOR_MODE=llm` 會啟用受控研究規劃與專業 Agent；未設定 OpenRouter 或 Agentic 流程失敗時會自動使用 `fixed_fallback`。目前由 GPT 負責規劃、專業分析與報告撰寫，Claude Sonnet 負責獨立的 Risk Agent 與 Final Reviewer。
 
 ## 部署後遇到的狀況
 

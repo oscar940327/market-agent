@@ -3,7 +3,7 @@
 這份文件說明 Market Agent 目前的系統架構。
 
 Market Agent 的核心設計是 controlled agent workflow。  
-它不是讓 LLM 自由決定所有分析步驟，而是由明確的 router 與 manager 控制流程，再把不同分析模組的結果整理成 structured data 與 Research Report。
+Router 與既有 manager 先建立可驗證的 structured data；啟用 Agentic mode 時，再由受限的 LLM Orchestrator 與專業 Agent 規劃研究動作。所有 Agent 都受工具白名單、schema、步數與 read-only 權限控制。
 
 ## 系統總覽
 
@@ -14,6 +14,7 @@ Market Agent 的核心設計是 controlled agent workflow。
 | Frontend | 個人網站上的 MktAgent 頁面，負責輸入問題與展示報告。 |
 | API | FastAPI 後端，提供 `/query`、`/backtest`、`/themes` 等 endpoint。 |
 | Workflow Manager | `MarketManagerAgent`，負責協調不同分析模組。 |
+| Agentic Orchestration | Research Orchestrator 與專業 Agent，負責受控規劃、資料缺口檢查和觀點整合。 |
 | Data / ML Pipeline | GitHub Actions 與 scripts，負責更新價格、新聞、基本面、ML prediction 等資料。 |
 | Database | Supabase，儲存價格、技術特徵、新聞、基本面、ML prediction 與監控資料。 |
 
@@ -26,13 +27,14 @@ Frontend
   -> MarketManagerAgent
   -> Analysis Modules
   -> Structured Data
+  -> Agentic Orchestrator / Specialist Agents
   -> Report Builder
   -> Frontend
 ```
 
 ## 為什麼是 Controlled Agent Workflow
 
-這個專案不是讓多個 agent 自由聊天，也不是讓 LLM 直接決定最後答案。
+這個專案不是讓多個 agent 自由聊天，也不是讓 LLM 直接決定最後答案。Agentic mode 允許 LLM 選擇白名單內的研究步驟，但不能計算或改寫原始數字。
 
 原因是投資研究需要：
 
@@ -51,6 +53,14 @@ Frontend
 5. Report Builder 根據 workflow 產生報告。
 
 這樣可以保留 agent workflow 的彈性，同時避免 LLM 自由發揮造成結果不穩。
+
+### Agentic Research Orchestrator
+
+啟用 `MARKET_AGENT_ORCHESTRATOR_MODE=llm` 後，Research Orchestrator 會根據問題類型與前端選取範圍建立 execution plan，再呼叫 Technical、Fundamental、News、ML、Theme 與 Risk 等專業 Agent。
+
+每個 Agent 只能讀取 allowlist 內的 tools，並回傳 `specialist_output_v1`。系統會驗證 status、confidence、evidence references 與 missing data；資料不足時最多進行設定次數內的唯讀補查。錯誤時回到 deterministic workflow，並在 `agentic_orchestration` 留下 fallback 與 decision trace。
+
+詳細邊界與環境設定見 [Agentic Orchestration](agentic_orchestration.md)。
 
 ## 主要元件
 
@@ -180,9 +190,9 @@ MU 現在適合進場嗎
 8. 建立 ML Reference。
 9. 建立 Exit Signal。
 10. 建立 Data Freshness。
-11. 產生固定格式 Research Report。
+11. 啟用 Agentic mode 時，由 Report Writer 使用已驗證的專業輸出組成報告；否則產生固定格式 Research Report。
 
-Single stock report 目前使用固定格式，避免 LLM 改變版型或關鍵數字。
+無論採用哪種模式，Report Writer 都不能改變 structured values，且輸出仍會經過 Number Validator 與 Review Layer。
 
 ## Industry / Theme Workflow
 

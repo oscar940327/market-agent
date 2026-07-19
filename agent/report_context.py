@@ -64,6 +64,9 @@ def build_single_stock_report_context(data: dict) -> dict:
         "agent_outputs": data.get("agent_outputs", {}),
         "analyst_outputs": data.get("analyst_outputs", {}),
         "analyst_consensus": data.get("analyst_consensus", {}),
+        "agentic_orchestration": data.get("agentic_orchestration", {}),
+        "agentic_outputs": data.get("agentic_outputs", {}),
+        "research_scope": data.get("research_scope", {}),
         "agent_summaries": {
             name: output.get("summary", {})
             for name, output in data.get("agent_outputs", {}).items()

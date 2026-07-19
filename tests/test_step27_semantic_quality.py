@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from scripts.log_daily_research_fixtures import (
+    build_agent_flow_summary,
     build_daily_research_fixture_markdown,
     build_daily_research_fixture_report,
 )
@@ -98,12 +99,46 @@ def test_quality_failure_makes_fixture_report_partial_but_keeps_report_visible()
     assert "結論沒有回答原始問題" in markdown
 
 
-def test_fixture_workflows_force_semantic_review_with_gpt_5_4_mini():
+def test_fixture_workflows_force_semantic_review_with_claude_sonnet():
     root = Path(__file__).resolve().parents[1]
     for name in ("daily-research-fixtures.yml", "weekly-research-fixtures.yml"):
         workflow = (root / ".github" / "workflows" / name).read_text(
             encoding="utf-8"
         )
         assert "MARKET_AGENT_REPORT_REVIEW_MODE: semantic" in workflow
-        assert "MARKET_AGENT_REPORT_REVIEW_MODEL: openai/gpt-5.4-mini" in workflow
+        assert "MARKET_AGENT_REPORT_REVIEW_MODEL: anthropic/claude-sonnet-4.6" in workflow
         assert 'MARKET_AGENT_REPORT_REVIEW_MAX_ITERATIONS: "3"' in workflow
+
+
+def test_fixture_markdown_exposes_agent_flow_status():
+    report = build_daily_research_fixture_report(
+        [
+            {
+                "status": "success",
+                "query": "MU 現在適合進場嗎",
+                "report": "研究摘要\n內容",
+                "report_review": passing_review(),
+                "agent_flow": {
+                    "label": "LLM",
+                    "mode_used": "llm",
+                    "fallback_used": False,
+                },
+            }
+        ]
+    )
+
+    markdown = build_daily_research_fixture_markdown(report)
+
+    assert "Agent Flow: LLM" in markdown
+
+
+def test_agent_flow_summary_maps_llm_fixed_and_fallback():
+    assert build_agent_flow_summary({"mode_used": "llm"})["label"] == "LLM"
+    assert build_agent_flow_summary({"mode_used": "fixed"})["label"] == "Fixed"
+    assert build_agent_flow_summary(
+        {
+            "mode_used": "fixed_fallback",
+            "fallback_used": True,
+            "fallback_reason": "tool_error",
+        }
+    )["label"] == "Fallback"

@@ -303,6 +303,7 @@ MU 如果我已經持有，現在要不要減碼
 | Evidence | 顯示本次研究的證據品質，例如 `high`、`medium`、`low`。 |
 | System Data | 顯示系統資料狀態，例如價格、技術指標、新聞、pipeline 或回測資料日期。 |
 | ML Reference | 顯示 ML Reference 的來源與狀態，例如 `saved / fresh`、`aggregated / fresh`、`fallback` 或 `not used`。 |
+| Agent Flow | 顯示本次是否使用 LLM Agentic orchestration，或是否回到固定流程。 |
 
 常見狀態：
 
@@ -315,6 +316,9 @@ MU 如果我已經持有，現在要不要減碼
 | `aggregated / fresh` | 使用主題內成分股聚合後的 ML Reference。 |
 | `fallback` | 沒有可用 saved prediction，改用 runtime fallback。 |
 | `not used` | 這個 workflow 不使用 ML Reference，例如策略回測。 |
+| `Agent Flow: LLM` | Orchestrator 與專業 Agent 已成功執行。 |
+| `Agent Flow: Fixed` | 本次使用 deterministic fixed workflow。 |
+| `Agent Flow: Fallback` | 原本要求 Agentic flow，但因 LLM、Tool 或 schema 問題回到固定流程。 |
 
 System Data 判斷 daily price 時，會使用 expected latest trading day。  
 如果交易日當天還沒到美股收盤後的預期更新時間，系統不會強迫要求當天日線資料已經存在。
@@ -333,6 +337,7 @@ Structured Data 是 Research Report 背後的原始結構化資料。
 - evidence quality
 - data freshness
 - analyst mode
+- Agent execution plan、specialist outputs 與 decision trace
 
 一般閱讀時不一定需要打開，但 demo 或 debug 時很重要。
 
