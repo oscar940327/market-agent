@@ -55,7 +55,11 @@ def main(argv: list[str] | None = None) -> int:
 
 def safe_build_freshness_report() -> dict:
     try:
-        return build_current_data_freshness(ticker="QQQ")
+        return build_current_data_freshness(
+            ticker="QQQ",
+            include_news=False,
+            include_fundamentals=False,
+        )
     except Exception as exc:
         return {
             "overall": "unknown",

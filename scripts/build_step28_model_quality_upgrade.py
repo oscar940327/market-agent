@@ -34,7 +34,7 @@ def main(argv=None) -> int:
     parser.add_argument("--output-dir", default=str(DEFAULT_OUTPUT_DIR))
     parser.add_argument(
         "--classification-models",
-        default="logistic_regression,random_forest,xgboost,lightgbm",
+        default="logistic_regression,random_forest,extra_trees,xgboost,lightgbm",
     )
     parser.add_argument(
         "--regression-models",

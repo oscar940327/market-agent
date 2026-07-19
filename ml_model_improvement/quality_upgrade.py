@@ -12,6 +12,7 @@ os.environ.setdefault("LOKY_MAX_CPU_COUNT", "1")
 
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.ensemble import (
+    ExtraTreesClassifier,
     HistGradientBoostingRegressor,
     RandomForestClassifier,
     RandomForestRegressor,
@@ -33,6 +34,16 @@ from ml_model_improvement.candidate_models import CORE_FEATURES, select_core_fea
 
 
 CLASSIFICATION_TARGETS = ("up_5d", "up_10d", "up_20d", "large_drop_20d")
+TARGET_HORIZONS = {
+    "up_5d": 5,
+    "up_10d": 10,
+    "up_20d": 20,
+    "large_drop_20d": 20,
+    "forward_return_5d": 5,
+    "forward_return_10d": 10,
+    "forward_return_20d": 20,
+    "max_drop_20d": 20,
+}
 REGRESSION_TARGETS = (
     "forward_return_5d",
     "forward_return_10d",
@@ -42,6 +53,7 @@ REGRESSION_TARGETS = (
 DEFAULT_CLASSIFICATION_MODELS = (
     "logistic_regression",
     "random_forest",
+    "extra_trees",
     "xgboost",
     "lightgbm",
 )
@@ -51,7 +63,7 @@ DEFAULT_REGRESSION_MODELS = (
     "xgboost",
     "lightgbm",
 )
-CALIBRATED_MODEL_NAMES = {"logistic_regression", "random_forest"}
+CALIBRATED_MODEL_NAMES = {"logistic_regression", "random_forest", "extra_trees"}
 
 
 QUALITY_POLICY = {
@@ -137,10 +149,11 @@ def build_step28_quality_upgrade(
             "ticker_count": int(prepared["ticker"].nunique()) if "ticker" in prepared else None,
         },
         "evaluation_design": {
-            "method": "expanding_walk_forward_with_final_holdout",
+            "method": "purged_expanding_walk_forward_with_final_holdout",
             "folds": [public_fold(fold) for fold in folds],
             "model_selection": "selection folds only",
             "promotion_validation": "final holdout fold plus regime stability",
+            "label_overlap_policy": "purge each training fold by the target horizon before evaluation",
             "max_train_rows_per_fold": max_train_rows,
             "max_evaluation_rows_per_fold": max_evaluation_rows,
         },
@@ -498,6 +511,10 @@ def target_fold_frames(
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     train = dataset.loc[fold["train_index"]].dropna(subset=[target]).copy()
     test = dataset.loc[fold["test_index"]].dropna(subset=[target]).copy()
+    horizon = TARGET_HORIZONS.get(target, 0)
+    if horizon and not test.empty:
+        purge_cutoff = test["_date"].min() - pd.offsets.BDay(horizon)
+        train = train[train["_date"] < purge_cutoff]
     train = deterministic_sample(train, max_train_rows, random_state)
     test = deterministic_sample(test, max_evaluation_rows, random_state + 101)
     return train, test
@@ -529,6 +546,16 @@ def build_classification_model(name: str, *, y_train: pd.Series, random_state: i
             max_depth=10,
             min_samples_leaf=40,
             class_weight="balanced_subsample",
+            n_jobs=-1,
+            random_state=random_state,
+        )
+    if name == "extra_trees":
+        return ExtraTreesClassifier(
+            n_estimators=180,
+            max_depth=12,
+            min_samples_leaf=40,
+            max_features="sqrt",
+            class_weight="balanced",
             n_jobs=-1,
             random_state=random_state,
         )
@@ -1044,8 +1071,13 @@ def build_bundle_promotion(target_results: dict) -> dict:
     }
     ready = all(value == "pass" for value in target_decisions.values())
     passed_targets = [target for target, result in target_results.items() if result.get("promotion_decision") == "pass"]
+    status = (
+        "candidate_bundle_ready"
+        if ready
+        else "partial_candidate_ready" if passed_targets else "do_not_promote"
+    )
     return {
-        "status": "candidate_bundle_ready" if ready else "do_not_promote",
+        "status": status,
         "automatic_replacement": False,
         "target_decisions": target_decisions,
         "passed_targets": passed_targets,
@@ -1053,6 +1085,8 @@ def build_bundle_promotion(target_results: dict) -> dict:
         "action": (
             "manual approval and persisted candidate artifacts are required before replacement"
             if ready
+            else "start target-level shadow validation for passed targets; keep other production targets"
+            if passed_targets
             else "keep current production models and reduced_trust policy"
         ),
     }

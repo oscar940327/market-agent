@@ -88,6 +88,28 @@ def test_build_drift_report_handles_clean_dataset_without_warnings():
     assert report["alert"]["should_alert"] is False
 
 
+def test_news_coverage_improvement_is_observation_not_harmful_drift():
+    dataset = make_dataset()
+    baseline_mask = dataset["date"].str.startswith("2026-01")
+    recent_mask = dataset["date"].str.startswith("2026-06")
+    dataset.loc[baseline_mask, "news_missing"] = True
+    dataset.loc[baseline_mask, "news_count_30d"] = 0
+    dataset.loc[recent_mask, "news_missing"] = dataset.loc[recent_mask].index % 2 == 0
+    dataset.loc[recent_mask, "news_count_30d"] = 4
+    dataset.loc[recent_mask, "rsi_14"] = 50
+    dataset.loc[recent_mask, "qqq_above_ma200"] = True
+    dataset.loc[recent_mask, "regime_changed"] = False
+
+    report = build_drift_report(dataset, recent_days=30, baseline_days=365)
+
+    assert not any(
+        warning["source"] in {"feature_drift", "news_coverage_drift"}
+        for warning in report["warnings"]
+    )
+    assert any(item["metric"] == "news_count_30d" for item in report["observations"])
+    assert report["news_coverage_drift"]["baseline_news_missing_ratio"] == 1.0
+
+
 def test_build_drift_summary_markdown_includes_sections():
     report = build_drift_report(make_dataset(), recent_days=30, baseline_days=365)
 

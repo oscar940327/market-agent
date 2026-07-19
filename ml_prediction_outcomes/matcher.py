@@ -117,6 +117,10 @@ def build_horizon_outcome(
     predicted_large_drop_risk = (
         safe_float(prediction.get("large_drop_risk_20d")) if horizon == 20 else None
     )
+    large_drop_threshold = get_probability_threshold(
+        prediction,
+        target="large_drop_20d",
+    )
 
     return {
         **base_row,
@@ -139,6 +143,7 @@ def build_horizon_outcome(
             build_probability_correctness(
                 probability=predicted_large_drop_risk,
                 actual=actual_large_drop,
+                threshold=large_drop_threshold,
             )
             if horizon == 20
             else None
@@ -201,10 +206,22 @@ def get_predicted_return(prediction: dict, horizon: int) -> float | None:
     return safe_float(prediction.get(f"predicted_return_{horizon}d"))
 
 
-def build_probability_correctness(*, probability: float | None, actual: bool) -> bool | None:
+def get_probability_threshold(prediction: dict, *, target: str) -> float:
+    payload = prediction.get("prediction_payload") or {}
+    thresholds = payload.get("decision_thresholds") or {}
+    threshold = safe_float(thresholds.get(target))
+    return threshold if threshold is not None else PROBABILITY_THRESHOLD
+
+
+def build_probability_correctness(
+    *,
+    probability: float | None,
+    actual: bool,
+    threshold: float = PROBABILITY_THRESHOLD,
+) -> bool | None:
     if probability is None:
         return None
-    return (probability >= PROBABILITY_THRESHOLD) == actual
+    return (probability >= threshold) == actual
 
 
 def safe_float(value) -> float | None:

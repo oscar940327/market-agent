@@ -10,7 +10,7 @@ from ml_model_improvement import (
     build_walk_forward_folds,
 )
 from scripts import build_step28_model_quality_upgrade as script
-from ml_model_improvement.quality_upgrade import choose_recall_threshold
+from ml_model_improvement.quality_upgrade import choose_recall_threshold, target_fold_frames
 from agent.ml_model_policy import build_step28_policy
 
 
@@ -39,7 +39,7 @@ def test_step28_report_evaluates_all_targets_without_auto_promotion():
     )
 
     assert report["report_version"] == "step28_model_quality_upgrade_v1"
-    assert report["evaluation_design"]["method"] == "expanding_walk_forward_with_final_holdout"
+    assert report["evaluation_design"]["method"] == "purged_expanding_walk_forward_with_final_holdout"
     assert len(report["targets"]) == 8
     assert report["targets"]["up_5d"]["best_candidate"] in {
         "logistic_regression",
@@ -100,6 +100,22 @@ def test_large_drop_threshold_prioritizes_recall():
     threshold = choose_recall_threshold(labels, probabilities, minimum_recall=0.80)
 
     assert threshold == 0.30
+
+
+def test_target_fold_frames_purges_overlapping_forward_label_window():
+    dataset = make_dataset().assign(_date=lambda frame: pd.to_datetime(frame["date"]))
+    fold = build_walk_forward_folds(dataset)[-1]
+
+    train, test = target_fold_frames(
+        dataset,
+        target="up_20d",
+        fold=fold,
+        max_train_rows=100_000,
+        max_evaluation_rows=100_000,
+        random_state=42,
+    )
+
+    assert train["_date"].max() < test["_date"].min() - pd.offsets.BDay(20)
 
 
 def test_step28_policy_keeps_bundle_reduced_trust_and_exposes_target_results():

@@ -39,6 +39,24 @@ def test_ready_candidate_starts_shadow_without_replacing_production():
     assert report["shadow_visibility"] == "monitoring_only"
 
 
+def test_partial_large_drop_candidate_starts_target_level_shadow():
+    report = build_monthly_promotion_review(
+        step28_report={
+            "promotion": {
+                "status": "partial_candidate_ready",
+                "passed_targets": ["large_drop_20d"],
+                "blocked_targets": ["up_20d"],
+            }
+        },
+        production_model_version="baseline_v1",
+        generated_at=GENERATED,
+    )
+
+    assert report["recommendation"] == "start_shadow"
+    assert report["candidate_targets"] == ["large_drop_20d"]
+    assert report["research_report_affected"] is False
+
+
 def test_active_shadow_waits_for_mature_outcomes():
     active = {
         "model_version": "candidate_202605",
@@ -77,6 +95,30 @@ def test_mature_better_shadow_produces_explicit_promotion_recommendation():
     assert report["recommendation_label"] == "建議更換正式模型"
     assert report["requires_user_confirmation"] is True
     assert report["automatic_replacement"] is False
+
+
+def test_target_level_shadow_compares_only_trained_large_drop_target():
+    active = {
+        "model_version": "candidate_202604",
+        "started_at": (GENERATED - timedelta(days=90)).isoformat(),
+        "metadata": {"trained_targets": ["large_drop_20d"]},
+    }
+    production = make_outcomes(120, correct=False, probability=0.55)
+    shadow = make_outcomes(120, correct=True, probability=0.80)
+
+    report = build_monthly_promotion_review(
+        step28_report=None,
+        production_model_version="baseline_v1",
+        active_shadow=active,
+        production_outcomes=production,
+        shadow_outcomes=shadow,
+        generated_at=GENERATED,
+    )
+
+    assert report["recommendation"] == "promote_candidate"
+    assert report["candidate_targets"] == ["large_drop_20d"]
+    assert not any(check["name"].startswith("up_accuracy") for check in report["checks"])
+    assert any(check["name"] == "large_drop_brier_20d" for check in report["checks"])
 
 
 def test_shadow_models_create_hidden_prediction_records():
@@ -183,4 +225,3 @@ def make_dataset():
                 }
             )
     return pd.DataFrame(rows)
-

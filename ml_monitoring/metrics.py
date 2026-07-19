@@ -9,10 +9,12 @@ HORIZONS = (5, 10, 20)
 DEFAULT_WARNING_THRESHOLDS = {
     "min_sample_size": 50,
     "min_up_accuracy": 0.50,
+    "min_up_roc_auc": 0.50,
     "max_downside_underestimation_rate": 0.20,
 }
 DEFAULT_CALIBRATION_THRESHOLDS = {
     "min_usable_sample_size": 50,
+    "min_bucket_sample_size": 20,
     "max_mean_absolute_calibration_error": 0.10,
     "max_calibration_error": 0.20,
 }
@@ -171,7 +173,11 @@ def build_large_drop_hit_rate(rows: list[dict]) -> float | None:
         1
         for row in actual_large_drops
         if safe_float(row.get("predicted_large_drop_risk")) is not None
-        and safe_float(row.get("predicted_large_drop_risk")) >= 0.5
+        and (
+            row.get("large_drop_prediction_correct") is True
+            if row.get("large_drop_prediction_correct") is not None
+            else safe_float(row.get("predicted_large_drop_risk")) >= 0.5
+        )
     )
     return ratio(predicted_hits, len(actual_large_drops))
 
@@ -248,6 +254,19 @@ def build_warnings(horizon_metrics: dict, *, thresholds: dict) -> list[dict]:
                     "value": up_accuracy,
                     "threshold": thresholds["min_up_accuracy"],
                     "message": f"Horizon {horizon} up accuracy is below threshold.",
+                }
+            )
+
+        roc_auc = metrics.get("roc_auc")
+        if roc_auc is not None and roc_auc < thresholds["min_up_roc_auc"]:
+            warnings.append(
+                {
+                    "source": f"horizon_{horizon}",
+                    "status": "warning",
+                    "metric": "roc_auc",
+                    "value": roc_auc,
+                    "threshold": thresholds["min_up_roc_auc"],
+                    "message": f"Horizon {horizon} up ROC AUC is below random ranking.",
                 }
             )
 
@@ -369,14 +388,24 @@ def build_calibration_report(
     computed = [row for row in outcomes if row.get("outcome_status") == "computed"]
     generated = generated_at or datetime.now(UTC)
     targets = {
-        "up_5d": build_target_calibration(computed, target="up_5d", horizon=5, bucket_count=bucket_count),
-        "up_10d": build_target_calibration(computed, target="up_10d", horizon=10, bucket_count=bucket_count),
-        "up_20d": build_target_calibration(computed, target="up_20d", horizon=20, bucket_count=bucket_count),
+        "up_5d": build_target_calibration(
+            computed, target="up_5d", horizon=5, bucket_count=bucket_count,
+            min_bucket_sample_size=thresholds["min_bucket_sample_size"],
+        ),
+        "up_10d": build_target_calibration(
+            computed, target="up_10d", horizon=10, bucket_count=bucket_count,
+            min_bucket_sample_size=thresholds["min_bucket_sample_size"],
+        ),
+        "up_20d": build_target_calibration(
+            computed, target="up_20d", horizon=20, bucket_count=bucket_count,
+            min_bucket_sample_size=thresholds["min_bucket_sample_size"],
+        ),
         "large_drop_20d": build_target_calibration(
             computed,
             target="large_drop_20d",
             horizon=20,
             bucket_count=bucket_count,
+            min_bucket_sample_size=thresholds["min_bucket_sample_size"],
         ),
     }
     warnings = build_calibration_warnings(targets, thresholds=thresholds)
@@ -412,6 +441,7 @@ def build_target_calibration(
     target: str,
     horizon: int,
     bucket_count: int,
+    min_bucket_sample_size: int = DEFAULT_CALIBRATION_THRESHOLDS["min_bucket_sample_size"],
 ) -> dict:
     rows = [
         row
@@ -425,21 +455,30 @@ def build_target_calibration(
     ]
     buckets = build_probability_buckets(pairs, bucket_count=bucket_count)
     usable_buckets = [bucket for bucket in buckets if bucket["sample_size"] > 0]
-    absolute_errors = [
-        abs(bucket["calibration_error"])
+    weighted_error = sum(
+        bucket["sample_size"] * abs(bucket["calibration_error"])
         for bucket in usable_buckets
         if bucket["calibration_error"] is not None
+    )
+    reliable_buckets = [
+        bucket
+        for bucket in usable_buckets
+        if bucket["sample_size"] >= min_bucket_sample_size
+        and bucket["calibration_error"] is not None
     ]
+    reliable_errors = [abs(bucket["calibration_error"]) for bucket in reliable_buckets]
     return {
         "target": target,
         "horizon_trading_days": horizon,
         "usable_sample_size": len(pairs),
         "bucket_count": len(usable_buckets),
+        "reliable_bucket_count": len(reliable_buckets),
+        "min_bucket_sample_size": min_bucket_sample_size,
         "mean_absolute_calibration_error": (
-            round(mean(absolute_errors), 6) if absolute_errors else None
+            round(weighted_error / len(pairs), 6) if pairs else None
         ),
         "max_calibration_error": (
-            round(max(absolute_errors), 6) if absolute_errors else None
+            round(max(reliable_errors), 6) if reliable_errors else None
         ),
         "buckets": buckets,
     }

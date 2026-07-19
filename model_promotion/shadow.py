@@ -28,7 +28,10 @@ def train_shadow_candidate_models(
     max_train_rows: int = 100_000,
 ) -> dict:
     promotion = step28_report.get("promotion") or {}
-    if promotion.get("status") != "candidate_bundle_ready":
+    if promotion.get("status") not in {
+        "candidate_bundle_ready",
+        "partial_candidate_ready",
+    }:
         return {
             "status": "skipped",
             "reason": "candidate_bundle_not_ready",
@@ -169,6 +172,11 @@ def build_shadow_prediction_records(
     records = []
     for _, row in latest.iterrows():
         predictions = predict_row(row.to_dict(), candidate_bundle["models"])
+        decision_thresholds = {
+            target: payload.get("decision_threshold", 0.5)
+            for target, payload in candidate_bundle["models"].items()
+            if payload.get("target_type") == "classification"
+        }
         data_as_of = str(row.get("date") or date.today().isoformat())[:10]
         record = {
             "model_run_id": model_run_id,
@@ -200,6 +208,8 @@ def build_shadow_prediction_records(
                 "usage_policy": "shadow_only",
                 "research_report_visible": False,
                 "candidate_version": candidate_version,
+                "trained_targets": candidate_bundle.get("trained_targets", []),
+                "decision_thresholds": decision_thresholds,
                 "predictions": predictions,
             },
             "feature_snapshot": sanitize_mapping(row.to_dict()),

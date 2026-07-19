@@ -10,6 +10,7 @@ DEFAULT_PROMOTION_POLICY = {
     "maximum_accuracy_regression": 0.01,
     "maximum_brier_regression": 0.01,
     "maximum_large_drop_recall_regression": 0.05,
+    "maximum_large_drop_brier_regression": 0.01,
     "automatic_production_replacement": False,
 }
 
@@ -41,14 +42,17 @@ def build_monthly_promotion_review(
     checks: list[dict] = []
 
     if active_shadow:
+        candidate_targets = active_shadow_targets(active_shadow)
         recommendation, checks = review_active_shadow(
             active_shadow=active_shadow,
             production_metrics=production_metrics,
             shadow_metrics=shadow_metrics,
             generated_at=generated,
             policy=rules,
+            candidate_targets=candidate_targets,
         )
     else:
+        candidate_targets = passed_candidate_targets(step28_report)
         recommendation, checks = review_new_candidate(step28_report)
         candidate_version = candidate_version or infer_candidate_version(
             step28_report,
@@ -65,6 +69,7 @@ def build_monthly_promotion_review(
         "review_month": generated.date().replace(day=1).isoformat(),
         "production_model_version": production_model_version,
         "candidate_model_version": candidate_version,
+        "candidate_targets": candidate_targets,
         "recommendation": recommendation,
         "recommendation_label": label,
         "automatic_replacement": False,
@@ -88,9 +93,14 @@ def review_new_candidate(step28_report: dict | None) -> tuple[str, list[dict]]:
         ]
     promotion = step28_report.get("promotion") or {}
     status = promotion.get("status")
-    if status == "candidate_bundle_ready":
+    if status in {"candidate_bundle_ready", "partial_candidate_ready"}:
+        passed_targets = passed_candidate_targets(step28_report)
         return "start_shadow", [
-            check("walk_forward_policy", "pass", "候選模型已通過 Step 28 初步政策。")
+            check(
+                "walk_forward_policy",
+                "pass",
+                f"Step 28 通過的候選 targets：{', '.join(passed_targets)}。",
+            )
         ]
     return "keep_production", [
         check(
@@ -113,6 +123,7 @@ def review_active_shadow(
     shadow_metrics: dict,
     generated_at: datetime,
     policy: dict,
+    candidate_targets: list[str],
 ) -> tuple[str, list[dict]]:
     checks: list[dict] = []
     age_days = shadow_age_days(active_shadow, generated_at)
@@ -126,27 +137,34 @@ def review_active_shadow(
         )
     )
 
-    horizons_ready = True
-    for horizon in (5, 10, 20):
-        sample_size = shadow_metrics.get("horizons", {}).get(str(horizon), {}).get("sample_size", 0)
+    targets_ready = True
+    for target in candidate_targets:
+        horizon = target_horizon(target)
+        horizon_metrics = shadow_metrics.get("horizons", {}).get(str(horizon), {})
+        sample_key = "large_drop_sample_size" if target == "large_drop_20d" else "up_sample_size"
+        sample_size = horizon_metrics.get(sample_key, 0)
         ready = sample_size >= policy["minimum_shadow_outcomes_per_horizon"]
-        horizons_ready &= ready
+        targets_ready &= ready
         checks.append(
             check(
-                f"shadow_sample_{horizon}d",
+                f"shadow_sample_{target}",
                 "pass" if ready else "pending",
-                f"{horizon} 日 shadow outcomes 為 {sample_size} 筆。",
-                details={"minimum": policy["minimum_shadow_outcomes_per_horizon"]},
+                f"{target} 已有 {sample_size} 筆成熟 shadow outcomes。",
+                details={
+                    "minimum": policy["minimum_shadow_outcomes_per_horizon"],
+                    "horizon": horizon,
+                },
             )
         )
 
-    if not age_ready or not horizons_ready:
+    if not age_ready or not targets_ready:
         return "continue_shadow", checks
 
     comparisons = compare_shadow_to_production(
         production_metrics=production_metrics,
         shadow_metrics=shadow_metrics,
         policy=policy,
+        candidate_targets=candidate_targets,
     )
     checks.extend(comparisons)
     if any(item["status"] == "unable" for item in comparisons):
@@ -157,10 +175,17 @@ def review_active_shadow(
 
 
 def compare_shadow_to_production(
-    *, production_metrics: dict, shadow_metrics: dict, policy: dict
+    *,
+    production_metrics: dict,
+    shadow_metrics: dict,
+    policy: dict,
+    candidate_targets: list[str],
 ) -> list[dict]:
     checks = []
-    for horizon in (5, 10, 20):
+    up_horizons = sorted(
+        {target_horizon(target) for target in candidate_targets if target.startswith("up_")}
+    )
+    for horizon in up_horizons:
         production = production_metrics.get("horizons", {}).get(str(horizon), {})
         shadow = shadow_metrics.get("horizons", {}).get(str(horizon), {})
         checks.extend(
@@ -181,17 +206,27 @@ def compare_shadow_to_production(
                 tolerance=policy["maximum_brier_regression"],
             )
         )
-    production_20 = production_metrics.get("horizons", {}).get("20", {})
-    shadow_20 = shadow_metrics.get("horizons", {}).get("20", {})
-    checks.extend(
-        compare_metric(
-            name="large_drop_recall_20d",
-            production=production_20.get("large_drop_recall"),
-            candidate=shadow_20.get("large_drop_recall"),
-            lower_is_better=False,
-            tolerance=policy["maximum_large_drop_recall_regression"],
+    if "large_drop_20d" in candidate_targets:
+        production_20 = production_metrics.get("horizons", {}).get("20", {})
+        shadow_20 = shadow_metrics.get("horizons", {}).get("20", {})
+        checks.extend(
+            compare_metric(
+                name="large_drop_recall_20d",
+                production=production_20.get("large_drop_recall"),
+                candidate=shadow_20.get("large_drop_recall"),
+                lower_is_better=False,
+                tolerance=policy["maximum_large_drop_recall_regression"],
+            )
         )
-    )
+        checks.extend(
+            compare_metric(
+                name="large_drop_brier_20d",
+                production=production_20.get("large_drop_brier_score"),
+                candidate=shadow_20.get("large_drop_brier_score"),
+                lower_is_better=True,
+                tolerance=policy["maximum_large_drop_brier_regression"],
+            )
+        )
     return checks
 
 
@@ -240,17 +275,37 @@ def calculate_outcome_metrics(rows: Iterable[dict]) -> dict:
         actual_large_drops = [
             item for item in large_drop_rows if float(item["actual_max_drop_pct"]) <= -0.08
         ]
+        large_drop_probabilities = [
+            (
+                float(item["predicted_large_drop_risk"]),
+                float(item["actual_max_drop_pct"]) <= -0.08,
+            )
+            for item in large_drop_rows
+            if item.get("predicted_large_drop_risk") is not None
+        ]
         recalled = [
             item for item in actual_large_drops
             if item.get("predicted_large_drop_risk") is not None
-            and float(item["predicted_large_drop_risk"]) >= 0.5
+            and (
+                item.get("large_drop_prediction_correct") is True
+                if item.get("large_drop_prediction_correct") is not None
+                else float(item["predicted_large_drop_risk"]) >= 0.5
+            )
         ]
         horizons[str(horizon)] = {
             "sample_size": len(items),
+            "up_sample_size": len(probabilities),
             "up_accuracy": mean(up_correct),
             "brier_score": mean([(probability - float(actual)) ** 2 for probability, actual in probabilities]),
             "large_drop_recall": (
                 len(recalled) / len(actual_large_drops) if actual_large_drops else None
+            ),
+            "large_drop_sample_size": len(large_drop_probabilities),
+            "large_drop_brier_score": mean(
+                [
+                    (probability - float(actual)) ** 2
+                    for probability, actual in large_drop_probabilities
+                ]
             ),
             "actual_large_drop_count": len(actual_large_drops),
         }
@@ -264,6 +319,7 @@ def build_promotion_summary_markdown(report: dict) -> str:
         f"- Recommendation: **{report['recommendation_label']}** (`{report['recommendation']}`)",
         f"- Production: `{report['production_model_version']}`",
         f"- Candidate: `{report.get('candidate_model_version') or 'none'}`",
+        f"- Candidate targets: `{', '.join(report.get('candidate_targets') or []) or 'none'}`",
         f"- Shadow outcomes: `{report['shadow_outcome_count']}`",
         f"- Automatic replacement: `{report['automatic_replacement']}`",
         "",
@@ -280,9 +336,39 @@ def build_promotion_summary_markdown(report: dict) -> str:
 
 def infer_candidate_version(report: dict | None, *, generated: datetime) -> str | None:
     promotion = (report or {}).get("promotion") or {}
-    if promotion.get("status") != "candidate_bundle_ready":
+    if promotion.get("status") not in {
+        "candidate_bundle_ready",
+        "partial_candidate_ready",
+    }:
         return None
     return f"candidate_{generated:%Y%m}"
+
+
+def passed_candidate_targets(report: dict | None) -> list[str]:
+    promotion = (report or {}).get("promotion") or {}
+    return sorted(str(target) for target in promotion.get("passed_targets") or [])
+
+
+def active_shadow_targets(active_shadow: dict) -> list[str]:
+    metadata = active_shadow.get("metadata") or {}
+    if isinstance(metadata, str):
+        try:
+            import json
+
+            metadata = json.loads(metadata)
+        except (TypeError, ValueError):
+            metadata = {}
+    targets = metadata.get("trained_targets") if isinstance(metadata, dict) else None
+    default_targets = ["up_5d", "up_10d", "up_20d", "large_drop_20d"]
+    return sorted(str(target) for target in (targets or default_targets))
+
+
+def target_horizon(target: str) -> int:
+    if target.endswith("_5d"):
+        return 5
+    if target.endswith("_10d"):
+        return 10
+    return 20
 
 
 def shadow_age_days(active_shadow: dict, generated_at: datetime) -> int | None:
@@ -321,4 +407,3 @@ def build_summary(recommendation: str, checks: list[dict]) -> str:
     blocked = [item["name"] for item in checks if item["status"] in {"reject", "unable"}]
     suffix = f" 未通過：{', '.join(blocked)}。" if blocked else ""
     return f"{RECOMMENDATION_LABELS[recommendation]}。{suffix}".strip()
-

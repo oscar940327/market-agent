@@ -25,6 +25,7 @@ DEFAULT_FEATURES = [
 DEFAULT_THRESHOLDS = {
     "feature_std_multiplier": 2.0,
     "news_missing_ratio": 0.30,
+    "news_missing_worsening_margin": 0.10,
     "news_count_drop_ratio": 0.50,
 }
 
@@ -146,6 +147,10 @@ def build_drift_report(
         + news_coverage_drift["warnings"]
         + data_freshness_drift["warnings"]
     )
+    observations = (
+        feature_drift.get("observations", [])
+        + news_coverage_drift.get("observations", [])
+    )
     return {
         "report_version": "ml_drift_report_v1",
         "generated_at": generated.replace(microsecond=0).isoformat(),
@@ -160,6 +165,7 @@ def build_drift_report(
         "news_coverage_drift": news_coverage_drift,
         "data_freshness_drift": data_freshness_drift,
         "warnings": warnings,
+        "observations": observations,
         "alert": {
             "should_alert": bool(warnings),
             "severity": "warning" if warnings else "info",
@@ -192,6 +198,7 @@ def split_windows(dataset: pd.DataFrame, *, recent_days: int, baseline_days: int
 def build_feature_drift(*, recent: pd.DataFrame, baseline: pd.DataFrame, thresholds: dict) -> dict:
     features = []
     warnings = []
+    observations = []
     for feature in DEFAULT_FEATURES:
         if feature not in recent.columns or feature not in baseline.columns:
             continue
@@ -215,7 +222,13 @@ def build_feature_drift(*, recent: pd.DataFrame, baseline: pd.DataFrame, thresho
             z_score = abs(mean_diff) / baseline_std
         else:
             z_score = 999999.0 if abs(mean_diff) > 1e-12 else 0.0
-        status = "warning" if z_score > thresholds["feature_std_multiplier"] else "ok"
+        exceeds_threshold = z_score > thresholds["feature_std_multiplier"]
+        coverage_expansion = feature == "news_count_30d" and mean_diff > 0
+        status = (
+            "coverage_expansion"
+            if exceeds_threshold and coverage_expansion
+            else "warning" if exceeds_threshold else "ok"
+        )
         record = {
             "feature": feature,
             "status": status,
@@ -239,7 +252,17 @@ def build_feature_drift(*, recent: pd.DataFrame, baseline: pd.DataFrame, thresho
                     "message": f"{feature} recent mean moved more than threshold vs baseline.",
                 }
             )
-    return {"features": features, "warnings": warnings}
+        elif status == "coverage_expansion":
+            observations.append(
+                {
+                    "source": "feature_drift",
+                    "status": "info",
+                    "metric": feature,
+                    "value": record["z_score"],
+                    "message": "Recent news coverage increased versus the sparse historical baseline.",
+                }
+            )
+    return {"features": features, "warnings": warnings, "observations": observations}
 
 
 def build_market_regime_drift(recent: pd.DataFrame) -> dict:
@@ -287,7 +310,9 @@ def build_market_regime_drift(recent: pd.DataFrame) -> dict:
 
 def build_news_coverage_drift(*, recent: pd.DataFrame, baseline: pd.DataFrame, thresholds: dict) -> dict:
     warnings = []
+    observations = []
     recent_missing_ratio = mean_bool(recent.get("news_missing")) or 0.0
+    baseline_missing_ratio = mean_bool(baseline.get("news_missing")) or 0.0
     baseline_news_count = numeric_values(baseline.get("news_count_30d", []))
     recent_news_count = numeric_values(recent.get("news_count_30d", []))
     baseline_avg_news = mean(baseline_news_count) if baseline_news_count else None
@@ -298,7 +323,14 @@ def build_news_coverage_drift(*, recent: pd.DataFrame, baseline: pd.DataFrame, t
         else None
     )
 
-    if recent_missing_ratio > thresholds["news_missing_ratio"]:
+    missing_coverage_worsened = (
+        recent_missing_ratio
+        > baseline_missing_ratio + thresholds["news_missing_worsening_margin"]
+    )
+    if (
+        recent_missing_ratio > thresholds["news_missing_ratio"]
+        and missing_coverage_worsened
+    ):
         warnings.append(
             {
                 "source": "news_coverage_drift",
@@ -307,6 +339,16 @@ def build_news_coverage_drift(*, recent: pd.DataFrame, baseline: pd.DataFrame, t
                 "value": round(recent_missing_ratio, 6),
                 "threshold": thresholds["news_missing_ratio"],
                 "message": "Recent news_missing ratio is above threshold.",
+            }
+        )
+    elif recent_missing_ratio > thresholds["news_missing_ratio"]:
+        observations.append(
+            {
+                "source": "news_coverage_drift",
+                "status": "info",
+                "metric": "news_missing_ratio",
+                "value": round(recent_missing_ratio, 6),
+                "message": "News coverage remains sparse but improved versus the historical baseline.",
             }
         )
     if news_count_ratio is not None and news_count_ratio < thresholds["news_count_drop_ratio"]:
@@ -323,10 +365,12 @@ def build_news_coverage_drift(*, recent: pd.DataFrame, baseline: pd.DataFrame, t
 
     return {
         "recent_news_missing_ratio": round(recent_missing_ratio, 6),
+        "baseline_news_missing_ratio": round(baseline_missing_ratio, 6),
         "recent_avg_news_count_30d": round(recent_avg_news, 6) if recent_avg_news is not None else None,
         "baseline_avg_news_count_30d": round(baseline_avg_news, 6) if baseline_avg_news is not None else None,
         "news_count_ratio": round(news_count_ratio, 6) if news_count_ratio is not None else None,
         "warnings": warnings,
+        "observations": observations,
     }
 
 
@@ -400,6 +444,7 @@ def build_drift_summary_markdown(report: dict) -> str:
             "## News Coverage",
             "",
             f"- Recent news missing ratio: `{format_percent(report['news_coverage_drift'].get('recent_news_missing_ratio'))}`",
+            f"- Baseline news missing ratio: `{format_percent(report['news_coverage_drift'].get('baseline_news_missing_ratio'))}`",
             f"- News count ratio: `{format_number(report['news_coverage_drift'].get('news_count_ratio'))}`",
             "",
             "## Data Freshness",
@@ -414,6 +459,14 @@ def build_drift_summary_markdown(report: dict) -> str:
         lines.extend(f"- {warning['message']} ({warning['source']} / {warning['metric']})" for warning in report["warnings"])
     else:
         lines.append("- No warnings.")
+    lines.extend(["", "## Observations", ""])
+    if report.get("observations"):
+        lines.extend(
+            f"- {item['message']} ({item['source']} / {item['metric']})"
+            for item in report["observations"]
+        )
+    else:
+        lines.append("- No informational observations.")
     return "\n".join(lines) + "\n"
 
 

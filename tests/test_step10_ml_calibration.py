@@ -36,6 +36,7 @@ def test_build_calibration_report_buckets_upside_probabilities():
         bucket_count=10,
         thresholds={
             "min_usable_sample_size": 0,
+            "min_bucket_sample_size": 1,
             "max_mean_absolute_calibration_error": 1.0,
             "max_calibration_error": 1.0,
         },
@@ -96,6 +97,7 @@ def test_build_calibration_report_warns_when_error_is_high():
         outcomes,
         thresholds={
             "min_usable_sample_size": 1,
+            "min_bucket_sample_size": 1,
             "max_mean_absolute_calibration_error": 0.10,
             "max_calibration_error": 0.20,
         },
@@ -105,6 +107,30 @@ def test_build_calibration_report_warns_when_error_is_high():
     assert "mean_absolute_calibration_error" in warning_metrics
     assert "max_calibration_error" in warning_metrics
     assert report["alert"]["should_alert"] is True
+
+
+def test_calibration_uses_sample_weighted_error_and_ignores_tiny_max_bucket():
+    outcomes = [
+        make_outcome(horizon=5, probability=0.45, actual_up=index % 2 == 0)
+        for index in range(100)
+    ]
+    outcomes.append(make_outcome(horizon=5, probability=0.35, actual_up=True))
+
+    report = build_calibration_report(
+        outcomes,
+        thresholds={
+            "min_usable_sample_size": 50,
+            "min_bucket_sample_size": 20,
+            "max_mean_absolute_calibration_error": 0.10,
+            "max_calibration_error": 0.20,
+        },
+    )
+
+    target = report["targets"]["up_5d"]
+    assert target["reliable_bucket_count"] == 1
+    assert target["mean_absolute_calibration_error"] < 0.06
+    assert target["max_calibration_error"] < 0.06
+    assert report["warnings"] == []
 
 
 def test_build_calibration_report_does_not_warn_without_computed_outcomes():

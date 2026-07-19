@@ -103,6 +103,24 @@ def test_build_monitoring_metrics_report_warns_for_small_sample_and_low_accuracy
     assert "up_accuracy" in warning_metrics
 
 
+def test_build_monitoring_metrics_report_warns_when_auc_is_below_random():
+    outcomes = [
+        make_outcome(horizon=20, actual_up=True, probability=0.2),
+        make_outcome(horizon=20, actual_up=True, probability=0.3),
+        make_outcome(horizon=20, actual_up=False, probability=0.7),
+        make_outcome(horizon=20, actual_up=False, probability=0.8),
+    ]
+
+    report = build_monitoring_metrics_report(
+        outcomes,
+        thresholds={"min_sample_size": 1, "min_up_accuracy": 0.0},
+    )
+
+    warning_metrics = {warning["metric"] for warning in report["warnings"]}
+    assert report["horizons"]["20"]["roc_auc"] == 0.0
+    assert "roc_auc" in warning_metrics
+
+
 def test_build_monitoring_metrics_report_does_not_warn_without_computed_outcomes():
     report = build_monitoring_metrics_report([], thresholds={"min_sample_size": 50})
 

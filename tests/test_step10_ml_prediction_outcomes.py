@@ -67,6 +67,25 @@ def test_build_single_ml_prediction_outcomes_keeps_unmatured_horizon_pending():
     assert by_horizon[20]["outcome_status"] == "pending"
 
 
+def test_large_drop_outcome_uses_shadow_model_decision_threshold():
+    prediction = make_prediction()
+    prediction["large_drop_risk_20d"] = 0.30
+    prediction["prediction_payload"] = {
+        "decision_thresholds": {"large_drop_20d": 0.15}
+    }
+    prices = make_price_rows()
+    prices[10]["close"] = 90
+
+    updates = build_single_ml_prediction_outcomes(
+        prediction=prediction,
+        price_data=prices,
+    )
+
+    outcome = next(row for row in updates if row["horizon_trading_days"] == 20)
+    assert outcome["actual_max_drop_pct"] == -0.10
+    assert outcome["large_drop_prediction_correct"] is True
+
+
 def test_build_single_ml_prediction_outcomes_marks_missing_prediction_price():
     prediction = make_prediction()
     prediction["prediction_date"] = "2026-06-29"
@@ -107,6 +126,7 @@ def test_fetch_ml_predictions_for_outcomes_queries_ready_predictions():
     assert rows == [{"id": "prediction-1", "ticker": "MU"}]
     assert "ml_predictions?select=" in captured["url"]
     assert "ml_prediction_outcomes" in captured["url"]
+    assert "prediction_payload" in captured["url"]
     assert "prediction_status=eq.ready" in captured["url"]
     assert "limit=25" in captured["url"]
 

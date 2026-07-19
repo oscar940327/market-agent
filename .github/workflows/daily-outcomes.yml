@@ -49,10 +49,10 @@ jobs:
         run: python scripts/compute_ml_prediction_outcomes.py --limit 500
 
       - name: Build ML monitoring metrics
-        run: python scripts/build_ml_monitoring_metrics.py --days 90
+        run: python scripts/build_ml_monitoring_metrics.py --days 90 --model-version baseline_v1
 
       - name: Build ML calibration report
-        run: python scripts/build_ml_calibration_report.py --days 90
+        run: python scripts/build_ml_calibration_report.py --days 90 --model-version baseline_v1
 
       - name: Build ML model upgrade review
         run: python scripts/build_ml_model_upgrade_review.py --send-alert
