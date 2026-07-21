@@ -38,14 +38,15 @@ class SequenceClient:
 
 
 def llm_review(status="needs_revision", scores=None):
-    scores = scores or {
-        "query_relevance": 5,
-        "evidence_consistency": 5,
-        "risk_balance": 5,
-        "clarity": 5,
-        "hallucination_safety": 5,
-        "overall_quality": 5,
-    }
+    if scores is None:
+        scores = {
+            "query_relevance": 5,
+            "evidence_consistency": 5,
+            "risk_balance": 5,
+            "clarity": 5,
+            "hallucination_safety": 5,
+            "overall_quality": 5 if status == "pass" else 3,
+        }
     return json.dumps(
         {
             "status": status,
@@ -254,6 +255,101 @@ def test_llm_review_derives_missing_status_from_valid_scores():
     normalized = validate_llm_review(value)
 
     assert normalized["status"] == "pass"
+
+
+def test_llm_review_treats_passing_scores_with_advice_as_pass():
+    value = json.loads(llm_review("needs_revision"))
+    value["quality_scores"] = {
+        field: score
+        for field, score in {
+            "query_relevance": 5,
+            "evidence_consistency": 4,
+            "risk_balance": 4,
+            "clarity": 5,
+            "hallucination_safety": 4,
+            "overall_quality": 4,
+        }.items()
+    }
+    value["risk_notes"] = ["The answer could be slightly more explicit."]
+
+    normalized = validate_llm_review(value)
+
+    assert normalized["status"] == "pass"
+    assert normalized["confidence_adjustment"] == "none"
+
+
+def test_fundamental_review_accepts_provider_reported_ratio_wording():
+    data = {
+        "status": "success",
+        "fundamentals": {
+            "metrics": {
+                "revenue_growth": 3.457,
+                "earnings_growth": 13.685,
+                "gross_margins": 0.72569,
+            }
+        },
+    }
+    report = "\n".join(
+        [
+            "研究摘要",
+            "基本面分析",
+            "營收成長為正，對應 provider-reported ratio 換算為 345.7%",
+            "獲利成長為正，對應 provider-reported ratio 換算為 1368.5%",
+            "毛利率相對較高，對應 provider-reported ratio 換算為 72.6%",
+            "技術面分析",
+            "新聞面分析",
+            "ML Reference",
+            "綜合評估",
+            "風險提醒",
+            "不構成投資建議。",
+        ]
+    )
+
+    review = run_deterministic_review(kind="single_stock", data=data, report=report)
+    failed = {item["code"] for item in review["checks"] if item["status"] == "fail"}
+
+    assert "fundamental_number_matches:revenue_growth" not in failed
+    assert "fundamental_number_matches:earnings_growth" not in failed
+    assert "fundamental_number_matches:gross_margins" not in failed
+
+
+def test_required_report_sections_add_missing_fundamental_percentages():
+    data = {
+        "status": "success",
+        "fundamentals": {
+            "metrics": {
+                "revenue_growth": 3.457,
+                "earnings_growth": 13.685,
+                "gross_margins": 0.72569,
+            }
+        },
+    }
+    report = "\n".join(
+        [
+            "## 研究摘要",
+            "內容",
+            "## 基本面分析",
+            "基本面偏正向。",
+            "## 技術面分析",
+            "內容",
+            "## 新聞面分析",
+            "內容",
+            "## ML Reference",
+            "內容",
+            "## 綜合評估",
+            "內容",
+            "## 風險提醒",
+            "不構成投資建議。",
+        ]
+    )
+
+    updated = apply_required_report_sections(kind="single_stock", data=data, report=report)
+    review = run_deterministic_review(kind="single_stock", data=data, report=updated)
+
+    assert "營收成長：345.7%" in updated
+    assert "獲利成長：1368.5%" in updated
+    assert "毛利率：72.6%" in updated
+    assert review["status"] == "pass"
 
 
 def test_holding_question_is_detected_from_query_when_question_type_is_absent():

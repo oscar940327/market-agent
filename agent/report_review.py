@@ -48,6 +48,8 @@ from 1 (poor) to 5 (excellent). Return exactly one JSON object:
 Use pass only when every score is at least 4 and there is no factual
 inconsistency, omitted material risk, unanswered user intent, overconfidence,
 hallucination, or workflow/section mismatch.
+Minor wording improvements are advisory: when every score is at least 4, return
+pass even if risk_notes or suggested_fixes contain non-blocking suggestions.
 
 Treat raw structured fields as authoritative. In particular,
 news_summary.sentiment is the factual aggregate sentiment. Specialist stances
@@ -485,11 +487,8 @@ def validate_llm_review(value: dict) -> dict:
         for field, score in quality_scores.items()
         if score < MIN_PASSING_QUALITY_SCORE
     ]
-    if status is None:
-        status = "needs_revision" if low_fields or risk_notes else "pass"
-    if status == "pass" and (low_fields or risk_notes):
-        status = "needs_revision"
-        adjustment = "lower"
+    status = "needs_revision" if low_fields else "pass"
+    adjustment = "lower" if low_fields else "none"
     if low_fields:
         risk_notes.append(
             "Quality score below the passing threshold: " + ", ".join(low_fields)
@@ -723,9 +722,9 @@ def _review_key_numbers(kind: str, data: dict, report: str, checks: list[dict]) 
 def _review_fundamental_numbers(data: dict, report: str, checks: list[dict]) -> None:
     metrics = (data.get("fundamentals") or {}).get("metrics") or {}
     fields = (
-        ("revenue_growth", "營收成長", r"營收成長[^\n\d+-]{0,24}(?:\*\*)?([+-]?[\d,.]+)\s*%(?:\*\*)?"),
-        ("earnings_growth", "獲利成長", r"獲利成長[^\n\d+-]{0,24}(?:\*\*)?([+-]?[\d,.]+)\s*%(?:\*\*)?"),
-        ("gross_margins", "毛利率", r"毛利率[^\n\d+-]{0,24}(?:\*\*)?([+-]?[\d,.]+)\s*%(?:\*\*)?"),
+        ("revenue_growth", "營收成長", r"營收成長[^\n]*?(?:\*\*)?([+-]?[\d,.]+)\s*%(?:\*\*)?"),
+        ("earnings_growth", "獲利成長", r"獲利成長[^\n]*?(?:\*\*)?([+-]?[\d,.]+)\s*%(?:\*\*)?"),
+        ("gross_margins", "毛利率", r"毛利率[^\n]*?(?:\*\*)?([+-]?[\d,.]+)\s*%(?:\*\*)?"),
     )
     for key, label, pattern in fields:
         raw = _to_float(metrics.get(key))

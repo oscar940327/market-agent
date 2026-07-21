@@ -44,7 +44,13 @@ AGENT_TOOL_ALLOWLIST = {
 TOOL_EVIDENCE_ROOTS = {
     "market_data": {"market_data", "price_source", "ticker"},
     "technical": {"technical", "technical_analysis", "signals"},
-    "backtest": {"backtest", "backtest_evidence", "report", "metrics"},
+    "backtest": {
+        "backtest",
+        "backtest_evidence",
+        "report",
+        "metrics",
+        "sampling_policy",
+    },
     "fundamental": {"fundamental", "fundamentals"},
     "news": {"news", "news_analysis", "summary"},
     "ml_reference": {

@@ -207,6 +207,19 @@ def test_risk_specialist_accepts_backtest_reference_when_tool_is_available():
     )
 
 
+def test_risk_specialist_accepts_backtest_sampling_policy_reference():
+    output = json.loads(
+        specialist("risk", references=["sampling_policy.cooldown_trading_days"])
+    )
+    output["agent"] = "risk"
+
+    validate_specialist_output(
+        output,
+        agent="risk",
+        available_tools={"backtest", "evidence"},
+    )
+
+
 def test_risk_specialist_accepts_completed_specialist_reference():
     output = json.loads(
         specialist("risk", references=["technical.findings"])

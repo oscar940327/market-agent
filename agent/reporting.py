@@ -221,6 +221,7 @@ def apply_required_report_sections(*, kind: str, data: dict, report: str) -> str
         return report
 
     report = normalize_single_stock_section_titles(report)
+    report = ensure_fundamental_key_metrics(data=data, report=report)
     report = ensure_ml_target_probabilities(data=data, report=report)
     context = build_single_stock_report_context(data)
     if context.get("question_type") != "holding_exit":
@@ -374,6 +375,39 @@ def ensure_ml_target_probabilities(*, data: dict, report: str) -> str:
         return report
     heading = re.search(
         r"(?m)^\s*(?:#{1,6}\s*)?(?:\*\*)?ML Reference(?:\*\*)?\s*$",
+        report,
+    )
+    if not heading:
+        return report
+    block = "\n".join(missing_lines)
+    return report[: heading.end()] + "\n" + block + report[heading.end() :]
+
+
+def ensure_fundamental_key_metrics(*, data: dict, report: str) -> str:
+    """Add canonical provider percentages when the writer omits them."""
+    metrics = (data.get("fundamentals") or {}).get("metrics") or {}
+    fields = (
+        ("revenue_growth", "營收成長"),
+        ("earnings_growth", "獲利成長"),
+        ("gross_margins", "毛利率"),
+    )
+    missing_lines = []
+    for key, label in fields:
+        try:
+            percentage = float(metrics.get(key)) * 100
+        except (TypeError, ValueError):
+            continue
+        formatted = f"{percentage:.1f}%"
+        if re.search(rf"{re.escape(label)}[^\n]*?{re.escape(formatted)}", report):
+            continue
+        missing_lines.append(
+            f"- {label}：{formatted}（provider-reported ratio；期間定義依資料來源）。"
+        )
+
+    if not missing_lines:
+        return report
+    heading = re.search(
+        r"(?m)^\s*(?:#{1,6}\s*)?(?:\*\*)?基本面分析(?:\*\*)?\s*$",
         report,
     )
     if not heading:
