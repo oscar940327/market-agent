@@ -264,6 +264,60 @@ def test_deterministic_review_accepts_ratio_to_percent_conversion():
     assert not {code for code in failed if code.startswith("fundamental_number_matches:")}
 
 
+def test_deterministic_review_accepts_markdown_bold_immutable_numbers():
+    data = {
+        "status": "success",
+        "fundamentals": {
+            "metrics": {
+                "revenue_growth": 3.457,
+                "earnings_growth": 13.685,
+                "gross_margins": 0.72569,
+            },
+        },
+        "technical_analysis": {
+            "ma20": 1009.92,
+            "ma50": 937.55,
+            "macd_histogram": -28.5724,
+        },
+    }
+    report = "\n".join(
+        [
+            "研究摘要", "摘要", "基本面分析",
+            "- **營收成長**：**345.7%**",
+            "- **獲利成長**：**1368.5%**",
+            "- **毛利率**：**72.6%**",
+            "技術面分析",
+            "現價低於 MA20 **1009.92**、MA50 **937.55**。",
+            "MACD Histogram 為 **-28.5724**。",
+            "新聞面分析", "內容", "ML Reference", "內容",
+            "綜合評估", "內容", "風險提醒", "不構成投資建議。",
+        ]
+    )
+
+    result = run_deterministic_review(kind="single_stock", data=data, report=report)
+    failed = {item["code"] for item in result["checks"] if item["status"] == "fail"}
+
+    assert not {code for code in failed if "_number_matches:" in code}
+
+
+def test_backtest_review_accepts_signal_history_statistics_section():
+    data = {"status": "success", "metrics": {"total_trades": 222}}
+    report = "\n".join(
+        [
+            "MU 策略回測摘要",
+            "訊號歷史統計",
+            "- 非重疊交易次數：222",
+            "風險提醒",
+            "本報告不構成投資建議。",
+        ]
+    )
+
+    result = run_deterministic_review(kind="backtest", data=data, report=report)
+    failed = {item["code"] for item in result["checks"] if item["status"] == "fail"}
+
+    assert "required_section:績效摘要" not in failed
+
+
 def test_semantic_prompt_defines_evidence_scopes_and_immutable_facts():
     client = SequenceClient([llm_review("pass")])
     data = {

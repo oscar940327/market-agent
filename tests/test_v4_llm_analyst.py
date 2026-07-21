@@ -1,3 +1,5 @@
+import json
+
 from agent.llm_analyst import (
     OpenRouterChatClient,
     build_llm_payload,
@@ -570,6 +572,7 @@ def test_openrouter_client_can_be_selected_from_environment(monkeypatch):
     monkeypatch.setenv("MARKET_AGENT_LLM_MODEL", "openai/gpt-4.1")
     monkeypatch.setenv("OPENROUTER_SITE_URL", "https://example.com")
     monkeypatch.setenv("OPENROUTER_APP_NAME", "Market Agent Test")
+    monkeypatch.setenv("MARKET_AGENT_LLM_MAX_TOKENS", "4096")
 
     client = get_llm_client_from_env()
 
@@ -578,6 +581,33 @@ def test_openrouter_client_can_be_selected_from_environment(monkeypatch):
     assert client.model == "openai/gpt-4.1"
     assert client.site_url == "https://example.com"
     assert client.app_name == "Market Agent Test"
+    assert client.max_tokens == 4096
+
+
+def test_openrouter_client_sends_explicit_max_tokens(monkeypatch):
+    captured = {}
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return json.dumps(
+                {"choices": [{"message": {"content": "ok"}}]}
+            ).encode("utf-8")
+
+    def fake_urlopen(request, timeout):
+        captured["payload"] = json.loads(request.data.decode("utf-8"))
+        return FakeResponse()
+
+    monkeypatch.setattr("agent.llm_analyst.urllib.request.urlopen", fake_urlopen)
+    client = OpenRouterChatClient(api_key="test", max_tokens=4096)
+
+    assert client.generate("system", "user") == "ok"
+    assert captured["payload"]["max_tokens"] == 4096
 
 
 def test_theme_llm_payload_includes_news_and_fundamental_summaries():

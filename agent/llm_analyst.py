@@ -103,11 +103,13 @@ class OpenRouterChatClient:
         model: str = "openai/gpt-4.1",
         site_url: str | None = None,
         app_name: str | None = None,
+        max_tokens: int = 8192,
     ):
         self.api_key = api_key
         self.model = model
         self.site_url = site_url
         self.app_name = app_name
+        self.max_tokens = max(256, min(32768, int(max_tokens)))
 
     @classmethod
     def from_env(cls):
@@ -121,6 +123,7 @@ class OpenRouterChatClient:
             model=os.getenv("MARKET_AGENT_LLM_MODEL", "openai/gpt-4.1"),
             site_url=os.getenv("OPENROUTER_SITE_URL"),
             app_name=os.getenv("OPENROUTER_APP_NAME", "market-agent"),
+            max_tokens=_read_openrouter_max_tokens(),
         )
 
     def generate(self, system_prompt: str, user_prompt: str) -> str:
@@ -137,6 +140,7 @@ class OpenRouterChatClient:
                 },
             ],
             "temperature": 0.2,
+            "max_tokens": self.max_tokens,
         }
         headers = {
             "Authorization": f"Bearer {self.api_key}",
@@ -168,6 +172,14 @@ class OpenRouterChatClient:
             ) from error
 
         return extract_chat_completion_text(response_data)
+
+
+def _read_openrouter_max_tokens() -> int:
+    try:
+        value = int(os.getenv("MARKET_AGENT_LLM_MAX_TOKENS", "8192"))
+    except ValueError:
+        value = 8192
+    return max(256, min(32768, value))
 
 
 def extract_response_text(response_data: dict) -> str:

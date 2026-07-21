@@ -1,4 +1,5 @@
 import json
+from datetime import UTC, datetime
 
 from data_store.supabase_store import insert_news_events
 from data_store.supabase_store import fetch_news_events
@@ -249,7 +250,7 @@ def test_build_news_summary_aggregates_recent_30_day_events():
             {
                 "title": "Micron beats earnings",
                 "source": "Reuters",
-                "published_at": "2026-06-20T00:00:00+00:00",
+                    "published_at": datetime.now(UTC).isoformat(),
                 "sentiment": "positive",
                 "topic": "earnings_guidance",
                 "importance": "high",
@@ -325,7 +326,7 @@ def test_news_agent_uses_news_events_summary_when_available(monkeypatch):
                 "ticker": ticker,
                 "title": "Micron beats earnings and raises guidance",
                 "source": "Reuters",
-                "published_at": "2026-06-20T00:00:00+00:00",
+                "published_at": datetime.now(UTC).isoformat(),
                 "sentiment": "positive",
                 "topic": "earnings_guidance",
                 "importance": "high",

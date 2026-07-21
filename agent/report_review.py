@@ -469,12 +469,23 @@ def normalize_max_iterations(value: int | None) -> int:
 def _review_required_sections(kind: str, data: dict, report: str, checks: list[dict]) -> None:
     required = {
         "single_stock": ["研究摘要", "基本面分析", "技術面分析", "新聞面分析", "ML Reference", "綜合評估", "風險提醒"],
-        "backtest": ["績效摘要", "風險提醒"],
+        "backtest": ["風險提醒"],
         "theme": ["風險提醒"],
         "portfolio": ["風險提醒"],
     }.get(kind, [])
     for title in required:
         _check(checks, f"required_section:{title}", title in report, f"報告缺少必要段落：{title}。", f"補上「{title}」段落。")
+    if kind == "backtest":
+        has_performance_section = any(
+            title in report for title in ("績效摘要", "訊號歷史統計")
+        )
+        _check(
+            checks,
+            "required_section:績效摘要",
+            has_performance_section,
+            "報告缺少必要段落：績效摘要或訊號歷史統計。",
+            "補上「績效摘要」或「訊號歷史統計」段落。",
+        )
     theme_ml = data.get("theme_ml_reference") or data.get("ml_research") or {}
     if kind == "theme" and theme_ml.get("status") == "success":
         _check(checks, "required_section:ML Reference", "ML Reference" in report, "主題報告缺少 ML Reference。", "補上 ML Reference 段落。")
@@ -570,9 +581,9 @@ def _review_key_numbers(kind: str, data: dict, report: str, checks: list[dict]) 
 def _review_fundamental_numbers(data: dict, report: str, checks: list[dict]) -> None:
     metrics = (data.get("fundamentals") or {}).get("metrics") or {}
     fields = (
-        ("revenue_growth", "營收成長", r"營收成長(?:約|為)?\s*([+-]?[\d,.]+)\s*%"),
-        ("earnings_growth", "獲利成長", r"獲利成長(?:約|為)?\s*([+-]?[\d,.]+)\s*%"),
-        ("gross_margins", "毛利率", r"毛利率(?:約|為)?\s*([+-]?[\d,.]+)\s*%"),
+        ("revenue_growth", "營收成長", r"營收成長(?:\*\*)?\s*(?:約|為)?\s*[:：]?\s*(?:\*\*)?([+-]?[\d,.]+)\s*%(?:\*\*)?"),
+        ("earnings_growth", "獲利成長", r"獲利成長(?:\*\*)?\s*(?:約|為)?\s*[:：]?\s*(?:\*\*)?([+-]?[\d,.]+)\s*%(?:\*\*)?"),
+        ("gross_margins", "毛利率", r"毛利率(?:\*\*)?\s*(?:約|為)?\s*[:：]?\s*(?:\*\*)?([+-]?[\d,.]+)\s*%(?:\*\*)?"),
     )
     for key, label, pattern in fields:
         raw = _to_float(metrics.get(key))
@@ -593,9 +604,9 @@ def _review_fundamental_numbers(data: dict, report: str, checks: list[dict]) -> 
 def _review_technical_numbers(data: dict, report: str, checks: list[dict]) -> None:
     technical = data.get("technical_analysis") or {}
     fields = (
-        ("ma20", "MA20", r"MA20\s*約?\s*\$?([\d,.]+)"),
-        ("ma50", "MA50", r"MA50\s*約?\s*\$?([\d,.]+)"),
-        ("macd_histogram", "MACD histogram", r"histogram\s*為\s*([+-]?[\d,.]+)"),
+        ("ma20", "MA20", r"MA20(?:\*\*)?\s*約?\s*[:：]?\s*(?:\*\*)?\$?([\d,.]+)(?:\*\*)?"),
+        ("ma50", "MA50", r"MA50(?:\*\*)?\s*約?\s*[:：]?\s*(?:\*\*)?\$?([\d,.]+)(?:\*\*)?"),
+        ("macd_histogram", "MACD histogram", r"histogram(?:\*\*)?\s*(?:為|[:：])\s*(?:\*\*)?([+-]?[\d,.]+)(?:\*\*)?"),
     )
     for key, label, pattern in fields:
         expected = _to_float(technical.get(key))
