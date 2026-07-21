@@ -23,6 +23,11 @@ LLM_ANALYST_SYSTEM_PROMPT = """
 - 如果 payload 有 agentic_outputs，只能把它們當成已驗證資料的解釋觀點；所有數字仍以 structured payload 的原始欄位為準。
 - 新聞整體情緒必須以 news_summary.sentiment 為準；Agent 的 stance 只是解讀觀點，不可覆蓋原始情緒欄位。
 - 只有 news_events_summary 真的列出的事件或標題才可以具體提及；如果只提供 topic/count，就只能描述該主題與數量，不可自行補出事件名稱。
+- holding_exit 問題必須具體揭露 news_events_summary 中 importance=high、sentiment=negative、topic=risk_event 的代表事件，不可以只用事件數量帶過。
+- theme 報告必須以 theme_news_summary 說明聚合新聞來源；若該欄位不存在，應清楚說明只能使用成分股 Agent 觀點，不可假裝有底層聚合情緒。
+- ML Reference 每個 target 都要分別保留 signal_quality；不得把 large_drop_20d 的 medium 品質和其他 low 品質訊號混為一談。
+- evidence_quality.backtest_sample=not_applicable 代表本題不適用，不是資料缺失，也不可改寫成 historical-similarity evidence 不足。
+- backtest payload 沒有明確 ML target 時，不得建立 ML Reference 段落或描述 5 / 10 / 20 日 ML 機率。
 - 不要在報告中描述 Agent 的內部 plan、Tool 呼叫或 self-check，除非資料缺口會影響研究結論。
 
 嚴格限制：
@@ -370,6 +375,7 @@ def build_theme_payload(data: dict) -> dict:
         "theme_ml_reference": data.get("theme_ml_reference") or data.get("ml_research"),
         "ml_reference_trust": data.get("theme_ml_reference_trust") or data.get("ml_reference_trust"),
         "evidence_quality": data.get("evidence_quality", {}),
+        "data_freshness": data.get("data_freshness", {}),
         "agentic_plan": (data.get("agentic_orchestration") or {}).get("plan"),
         "agentic_outputs": data.get("agentic_outputs", {}),
         "top_results": top_results,

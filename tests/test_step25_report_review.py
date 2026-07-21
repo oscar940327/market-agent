@@ -8,7 +8,11 @@ from agent.report_review import (
     run_deterministic_review,
     strip_internal_review_metadata,
 )
-from agent.reporting import build_report, normalize_single_stock_section_titles
+from agent.reporting import (
+    apply_required_report_sections,
+    build_report,
+    normalize_single_stock_section_titles,
+)
 
 
 VALID_THEME_REPORT = "主題研究摘要\n目前訊號混合。\n\n風險提醒\n本摘要不構成投資建議。"
@@ -370,6 +374,99 @@ def test_review_context_includes_news_events_used_by_report_writer():
 
     assert context["news_summary"]["sentiment"] == "positive"
     assert context["news_events_summary"]["representative_events"][0]["title"] == "Supported event"
+
+
+def test_theme_review_context_matches_writer_news_aggregation():
+    data = {
+        "theme_key": "memory",
+        "theme_name": "記憶體",
+        "results": [
+            {
+                "status": "success",
+                "analysis": {
+                    "news_analysis": {
+                        "summary": {
+                            "total_items": 5,
+                            "high_importance_count": 1,
+                            "sentiment": "positive",
+                            "top_topics": {"product_demand": 3},
+                        }
+                    },
+                    "fundamentals": {
+                        "status": "success",
+                        "summary": {"stance": "positive", "positives": ["growth"], "risks": []},
+                    },
+                },
+            }
+        ],
+    }
+
+    context = build_review_context(data)
+
+    assert context["theme_news_summary"]["total_items"] == 5
+    assert context["theme_news_summary"]["sentiment_counts"] == {"positive": 1}
+    assert context["news_summary"] == context["theme_news_summary"]
+    assert context["theme_fundamental_summary"]["stance_counts"] == {"positive": 1}
+
+
+def test_holding_report_injects_material_negative_news_risk():
+    title = "Micron Faces Antitrust Lawsuit Over AI Memory Production Cuts"
+    data = {
+        "status": "success",
+        "query": "MU 如果我已經持有，現在要不要減碼",
+        "question_type": "holding_exit",
+        "exit_signal": {"status": "success", "exit_signal": "reduce"},
+        "agent_outputs": {
+            "news": {
+                "news_events_summary": {
+                    "representative_events": [
+                        {
+                            "title": title,
+                            "source": "simplywall.st",
+                            "published_at": "2026-06-30T00:00:00+00:00",
+                            "sentiment": "negative",
+                            "topic": "risk_event",
+                            "importance": "high",
+                        }
+                    ]
+                }
+            }
+        },
+    }
+    report = "\n".join(
+        [
+            "## 研究摘要", "內容", "## 基本面分析", "內容",
+            "## 技術面分析", "內容", "## 新聞面分析", "risk_event 2 則。",
+            "## ML Reference", "內容", "## 持有風險 / 出場觀察", "內容",
+            "## 綜合評估", "內容", "## 風險提醒", "不構成投資建議。",
+        ]
+    )
+
+    updated = apply_required_report_sections(kind="single_stock", data=data, report=report)
+
+    assert title in updated
+    assert "不能單獨決定減碼" in updated
+
+
+def test_backtest_report_removes_unsupported_ml_reference_section():
+    report = "\n".join(
+        [
+            "## 績效摘要", "勝率 53%。",
+            "## ML Reference", "沒有結構化資料支持的 ML 描述。",
+            "## 綜合評估", "歷史優勢有限。",
+            "## 風險提醒", "不構成投資建議。",
+        ]
+    )
+
+    updated = apply_required_report_sections(
+        kind="backtest",
+        data={"status": "success"},
+        report=report,
+    )
+
+    assert "ML Reference" not in updated
+    assert "沒有結構化資料支持的 ML 描述" not in updated
+    assert "綜合評估" in updated
 
 
 def test_backtest_review_accepts_signal_history_statistics_section():

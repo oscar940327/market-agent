@@ -31,10 +31,10 @@
   -> semantic review
   -> 未通過時依 findings 修訂
   -> 重新執行兩層審查
-  -> 最多修訂 3 次
+  -> 最多修訂 2 次
 ```
 
-每次修訂後都必須重新檢查。三次後仍未通過時，系統保留最後一版報告與未解決問題，不會假裝品質合格。
+每次修訂後都必須重新檢查。兩次後仍未通過時，系統保留最後一版報告與未解決問題，不會假裝品質合格。
 
 ## 品質層級不混用
 
@@ -71,7 +71,7 @@
 MARKET_AGENT_REPORT_REVIEW_MODE=hybrid
 MARKET_AGENT_REPORT_REVIEW_PROVIDER=openrouter
 MARKET_AGENT_REPORT_REVIEW_MODEL=openai/gpt-5.4-mini
-MARKET_AGENT_REPORT_REVIEW_MAX_ITERATIONS=3
+MARKET_AGENT_REPORT_REVIEW_MAX_ITERATIONS=2
 ```
 
-GitHub Actions 的 daily / weekly fixture workflow 會將 mode 覆蓋為 `semantic`。
+GitHub Actions 的 daily fixture 使用 `hybrid`，weekly fixture 使用 `semantic`；兩者都使用最多兩次修訂的成本控制策略。

@@ -206,7 +206,15 @@ def _build_report_draft(
 def apply_required_report_sections(*, kind: str, data: dict, report: str) -> str:
     if kind == "theme" and data.get("status") == "success":
         report = ensure_theme_ml_reference_section(data=data, report=report)
-        return enforce_theme_ml_reference_trust(data=data, report=report)
+        report = enforce_theme_ml_reference_trust(data=data, report=report)
+        return enforce_theme_ml_target_quality(data=data, report=report)
+
+    if kind == "backtest" and data.get("status") == "success":
+        return remove_report_section(
+            report,
+            section_titles=["ML Reference"],
+            following_titles=["綜合評估", "風險提醒"],
+        )
 
     if kind != "single_stock" or data.get("status") != "success":
         return report
@@ -220,14 +228,11 @@ def apply_required_report_sections(*, kind: str, data: dict, report: str) -> str
             following_titles=["綜合評估", "資料與風險提醒", "風險提醒"],
         )
 
-    if not context.get("exit_signal"):
-        return report
+    if "持有風險 / 出場觀察" not in report:
+        section = format_required_exit_signal_section(context.get("exit_signal"))
+        report = insert_section_before_summary(report, section)
 
-    if "持有風險 / 出場觀察" in report:
-        return report
-
-    section = format_required_exit_signal_section(context.get("exit_signal"))
-    return insert_section_before_summary(report, section)
+    return ensure_holding_material_news_risks(context=context, report=report)
 
 
 def normalize_single_stock_section_titles(report: str) -> str:
@@ -305,6 +310,74 @@ def enforce_theme_ml_reference_trust(*, data: dict, report: str) -> str:
             )
 
     return updated_report
+
+
+def enforce_theme_ml_target_quality(*, data: dict, report: str) -> str:
+    ml_reference = data.get("theme_ml_reference") or data.get("ml_research") or {}
+    targets = ml_reference.get("targets") or {}
+    labels = (
+        ("up_5d", "5 日上漲"),
+        ("up_10d", "10 日上漲"),
+        ("up_20d", "20 日上漲"),
+        ("large_drop_20d", "20 日大跌風險"),
+    )
+    quality_parts = [
+        f"{label} {str((targets.get(key) or {}).get('signal_quality') or 'unknown')}"
+        for key, label in labels
+        if targets.get(key)
+    ]
+    if not quality_parts or "ML target 訊號品質：" in report:
+        return report
+
+    quality_line = "- ML target 訊號品質：" + "；".join(quality_parts) + "。"
+    heading = re.search(
+        r"(?m)^\s*(?:#{1,6}\s*)?(?:\*\*)?ML Reference(?:\*\*)?\s*$",
+        report,
+    )
+    if not heading:
+        return report
+    return report[: heading.end()] + "\n" + quality_line + report[heading.end() :]
+
+
+def ensure_holding_material_news_risks(*, context: dict, report: str) -> str:
+    news_summary = context.get("news_events_summary") or {}
+    material_events = [
+        event
+        for event in (news_summary.get("representative_events") or [])
+        if event.get("importance") == "high"
+        and event.get("sentiment") == "negative"
+        and event.get("topic") == "risk_event"
+        and event.get("title")
+    ]
+    missing_events = [
+        event for event in material_events if str(event.get("title")) not in report
+    ]
+    if not missing_events:
+        return report
+
+    lines = ["重大負面新聞風險："]
+    for event in missing_events:
+        details = "，".join(
+            str(value)
+            for value in (
+                event.get("source"),
+                str(event.get("published_at") or "")[:10],
+            )
+            if value
+        )
+        suffix = f"（{details}）" if details else ""
+        lines.append(
+            f"- 高重要性負面風險事件：{event['title']}{suffix}。"
+            "此事件需要納入持有風險評估，但不能單獨決定減碼。"
+        )
+    block = "\n".join(lines)
+    heading = re.search(
+        r"(?m)^\s*(?:#{1,6}\s*)?(?:\*\*)?持有風險 / 出場觀察(?:\*\*)?\s*$",
+        report,
+    )
+    if not heading:
+        return insert_section_before_summary(report, "持有風險 / 出場觀察\n" + block)
+    return report[: heading.end()] + "\n" + block + report[heading.end() :]
 
 
 def format_theme_ml_reference_section(ml_reference: dict) -> str:
@@ -439,10 +512,11 @@ def remove_report_section(
 
     for line in lines:
         stripped = line.strip()
-        if stripped in section_titles:
+        normalized_title = stripped.lstrip("#").strip().strip("*").strip()
+        if normalized_title in section_titles:
             skip = True
             continue
-        if skip and stripped in following_titles:
+        if skip and normalized_title in following_titles:
             skip = False
         if not skip:
             result.append(line)
@@ -465,7 +539,8 @@ def build_rule_based_report(kind: str, data: dict) -> str:
             data=data,
             report=format_theme_analysis(data),
         )
-        return enforce_theme_ml_reference_trust(data=data, report=report)
+        report = enforce_theme_ml_reference_trust(data=data, report=report)
+        return enforce_theme_ml_target_quality(data=data, report=report)
 
     if kind == "portfolio":
         return format_portfolio_analysis(data)

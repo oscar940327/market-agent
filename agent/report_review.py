@@ -4,7 +4,11 @@ import json
 import os
 import re
 
-from agent.llm_analyst import OpenRouterChatClient
+from agent.llm_analyst import (
+    OpenRouterChatClient,
+    summarize_theme_fundamentals,
+    summarize_theme_news,
+)
 from agent.json_parsing import parse_first_json_object
 from agent.rule_based_router import SINGLE_STOCK_HOLDING_TERMS, query_contains_any
 
@@ -51,6 +55,14 @@ are interpretations and must not override that field. A concrete news event or
 headline is supported only when it appears in news_events_summary; topic counts
 alone do not support inventing a named event.
 
+For holding_exit questions, every representative news event with importance
+high, sentiment negative, and topic risk_event is a material risk and must be
+disclosed. For theme reports, use theme_news_summary as the aggregate source and
+do not treat backtest_sample=not_applicable as missing historical evidence.
+Each ML target's signal_quality has its own scope; verify that a medium-quality
+large_drop_20d signal is not described as low quality merely because the upside
+targets are low quality.
+
 Interpret quality fields at their documented scope:
 - evidence_quality.level is the overall research evidence level.
 - return_reference.evidence_quality describes only the historical-similarity
@@ -94,6 +106,12 @@ Use news_summary.sentiment as the authoritative aggregate news sentiment. Do
 not replace it with an interpretive specialist stance. Mention a concrete news
 event or headline only when it exists in news_events_summary; otherwise describe
 only the supplied topic and count.
+
+For holding_exit questions, explicitly disclose every representative high-
+importance negative risk_event from news_events_summary. For theme reports,
+identify theme_news_summary as the aggregate source, preserve each ML target's
+own signal_quality, and describe backtest_sample=not_applicable as not applicable
+rather than missing evidence.
 """.strip()
 
 
@@ -321,6 +339,22 @@ def run_llm_revision(*, client, kind: str, data: dict, report: str, findings: di
 
 
 def build_review_context(data: dict) -> dict:
+    successful_theme_results = [
+        result
+        for result in (data.get("results") or [])
+        if result.get("status") == "success"
+    ]
+    theme_news_summary = (
+        summarize_theme_news(successful_theme_results)
+        if data.get("theme_key") or data.get("theme_name")
+        else {}
+    )
+    theme_fundamental_summary = (
+        summarize_theme_fundamentals(successful_theme_results)
+        if data.get("theme_key") or data.get("theme_name")
+        else {}
+    )
+    single_stock_news_summary = (data.get("news_analysis") or {}).get("summary", {})
     return {
         "intent": data.get("intent"),
         "query": data.get("query") or (data.get("route") or {}).get("query"),
@@ -342,7 +376,9 @@ def build_review_context(data: dict) -> dict:
             "metrics": (data.get("fundamentals") or {}).get("metrics", {}),
             "summary": (data.get("fundamentals") or {}).get("summary", {}),
         },
-        "news_summary": (data.get("news_analysis") or {}).get("summary", {}),
+        "news_summary": single_stock_news_summary or theme_news_summary,
+        "theme_news_summary": theme_news_summary,
+        "theme_fundamental_summary": theme_fundamental_summary,
         "news_events_summary": (
             (data.get("agent_outputs", {}).get("news", {}) or {}).get("news_events_summary")
             or (
@@ -553,6 +589,13 @@ def _review_required_sections(kind: str, data: dict, report: str, checks: list[d
             has_performance_section,
             "報告缺少必要段落：績效摘要或訊號歷史統計。",
             "補上「績效摘要」或「訊號歷史統計」段落。",
+        )
+        _check(
+            checks,
+            "backtest_no_unsupported_ml_reference",
+            "ML Reference" not in report,
+            "回測 payload 沒有 ML target，不應出現 ML Reference。",
+            "移除沒有結構化 ML target 支持的 ML Reference 段落。",
         )
     theme_ml = data.get("theme_ml_reference") or data.get("ml_research") or {}
     if kind == "theme" and theme_ml.get("status") == "success":

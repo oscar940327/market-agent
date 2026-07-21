@@ -107,9 +107,9 @@ OPENROUTER_APP_NAME=market-agent
 
 MARKET_AGENT_REPORT_REVIEW_MODE=hybrid
 MARKET_AGENT_REPORT_REVIEW_PROVIDER=openrouter
-MARKET_AGENT_REPORT_REVIEW_MODEL=anthropic/claude-sonnet-4.6
+MARKET_AGENT_REPORT_REVIEW_MODEL=openai/gpt-5.4-mini
 MARKET_AGENT_REPORT_REVISER_MODEL=openai/gpt-5.4-mini
-MARKET_AGENT_REPORT_REVIEW_MAX_ITERATIONS=1
+MARKET_AGENT_REPORT_REVIEW_MAX_ITERATIONS=2
 MARKET_AGENT_LLM_MAX_TOKENS=4096
 
 MARKET_AGENT_ORCHESTRATOR_MODE=llm
@@ -141,9 +141,9 @@ ALERT_EMAIL_TO=
 GMAIL_APP_PASSWORD=
 ```
 
-`MARKET_AGENT_REPORT_REVIEW_MODE=deterministic` 不會增加 LLM token；設為 `hybrid` 時，只有 deterministic review 未通過才會呼叫 reviewer/reviser。每日與每週 fixture workflow 固定使用 `semantic`，每份報告都會由 `openai/gpt-5.4-mini` 評分，不合格時最多修訂 3 次。一般前端仍建議使用 `hybrid` 控制成本。
+`MARKET_AGENT_REPORT_REVIEW_MODE=deterministic` 不會增加 LLM token；設為 `hybrid` 時，只有 deterministic review 未通過才會呼叫 reviewer/reviser。每日 fixture 使用 `hybrid`，每週 fixture 使用 `semantic`；Reviewer 與 Reviser 都使用 `openai/gpt-5.4-mini`，不合格時最多修訂 2 次。一般前端仍建議使用 `hybrid` 控制成本。
 
-`MARKET_AGENT_ORCHESTRATOR_MODE=llm` 會啟用受控研究規劃與專業 Agent；未設定 OpenRouter 或 Agentic 流程失敗時會自動使用 `fixed_fallback`。目前由 GPT 負責規劃、專業分析與報告撰寫，Claude Sonnet 負責獨立的 Risk Agent 與 Final Reviewer。
+`MARKET_AGENT_ORCHESTRATOR_MODE=llm` 會啟用受控研究規劃與專業 Agent；未設定 OpenRouter 或 Agentic 流程失敗時會自動使用 `fixed_fallback`。目前由 GPT 負責規劃、專業分析、報告撰寫、修訂與 Final Reviewer；Risk Agent 的模型仍可由 `MARKET_AGENT_RISK_MODEL` 獨立設定。
 
 ## 部署後遇到的狀況
 

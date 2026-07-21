@@ -133,9 +133,9 @@ def test_fixture_workflows_use_cost_aware_review_policy():
             encoding="utf-8"
         )
         assert f"MARKET_AGENT_REPORT_REVIEW_MODE: {mode}" in workflow
-        assert "MARKET_AGENT_REPORT_REVIEW_MODEL: anthropic/claude-sonnet-4.6" in workflow
+        assert "MARKET_AGENT_REPORT_REVIEW_MODEL: openai/gpt-5.4-mini" in workflow
         assert "MARKET_AGENT_REPORT_REVISER_MODEL: openai/gpt-5.4-mini" in workflow
-        assert 'MARKET_AGENT_REPORT_REVIEW_MAX_ITERATIONS: "1"' in workflow
+        assert 'MARKET_AGENT_REPORT_REVIEW_MAX_ITERATIONS: "2"' in workflow
 
 
 def test_fixture_markdown_exposes_agent_flow_status():

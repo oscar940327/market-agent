@@ -58,7 +58,7 @@ TOOL_EVIDENCE_ROOTS = {
     "evidence": {"evidence", "evidence_quality", "research_profile"},
     "freshness": {"freshness", "data_freshness"},
     "exit_signal": {"exit_signal"},
-    "data_recovery": {"data_recovery"},
+    "data_recovery": {"data_recovery", "recovery"},
     "specialist_outputs": {
         "specialist_outputs",
         "analyst_outputs",

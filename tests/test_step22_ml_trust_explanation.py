@@ -1,6 +1,9 @@
 from agent.fixed_single_stock_report import build_ml_reference
 from agent.ml_reference_trust import build_ml_reference_trust
-from agent.reporting import enforce_theme_ml_reference_trust
+from agent.reporting import (
+    enforce_theme_ml_reference_trust,
+    enforce_theme_ml_target_quality,
+)
 
 
 def make_ml_research(*, source_type="saved_daily_prediction", freshness="fresh"):
@@ -198,3 +201,20 @@ def test_theme_trust_explanation_is_inserted_under_heading_not_summary_text():
 
     assert "且 ML Reference 需要保守解讀。\n\n## ML Reference\nML 信任說明:" in report
     assert "且 ML Reference\nML 信任說明:" not in report
+
+
+def test_theme_report_lists_each_target_signal_quality():
+    ml_reference = make_ml_research()
+    ml_reference["targets"]["up_5d"]["signal_quality"] = "low"
+    ml_reference["targets"]["up_10d"]["signal_quality"] = "low"
+    ml_reference["targets"]["up_20d"]["signal_quality"] = "low"
+    ml_reference["targets"]["large_drop_20d"]["signal_quality"] = "medium"
+
+    report = enforce_theme_ml_target_quality(
+        data={"theme_ml_reference": ml_reference},
+        report="## ML Reference\n- 20 日大跌風險 76%。",
+    )
+
+    assert "5 日上漲 low" in report
+    assert "20 日上漲 low" in report
+    assert "20 日大跌風險 medium" in report

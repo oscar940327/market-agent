@@ -167,6 +167,19 @@ def test_theme_specialist_accepts_indexed_constituent_reference():
     )
 
 
+def test_risk_specialist_accepts_recovery_alias_from_data_recovery_tool():
+    output = json.loads(
+        specialist("risk", references=["recovery.status"])
+    )
+    output["agent"] = "risk"
+
+    validate_specialist_output(
+        output,
+        agent="risk",
+        available_tools={"data_recovery"},
+    )
+
+
 def test_fixed_orchestration_returns_valid_trace_and_outputs():
     result = orchestrate_research(
         kind="single_stock",
