@@ -107,6 +107,22 @@ def test_default_plan_honors_unselected_dimensions():
     assert "technical" not in plan["steps"][-1]["tools"]
 
 
+def test_backtest_plan_gives_risk_agent_direct_backtest_evidence():
+    plan = build_default_plan(
+        "backtest",
+        {
+            "include_news": False,
+            "include_fundamentals": False,
+            "include_technicals": True,
+            "include_ml": False,
+        },
+    )
+
+    risk_step = next(step for step in plan["steps"] if step["agent"] == "risk")
+
+    assert "backtest" in risk_step["tools"]
+
+
 def test_tool_registry_enforces_agent_allowlist():
     registry = build_default_tool_registry()
 
@@ -139,6 +155,19 @@ def test_specialist_rejects_reference_from_unavailable_tool():
             agent="ml",
             available_tools={"ml_reference"},
         )
+
+
+def test_risk_specialist_accepts_backtest_reference_when_tool_is_available():
+    output = json.loads(
+        specialist("risk", references=["backtest.metrics.total_trades"])
+    )
+    output["agent"] = "risk"
+
+    validate_specialist_output(
+        output,
+        agent="risk",
+        available_tools={"backtest", "evidence"},
+    )
 
 
 def test_risk_specialist_accepts_completed_specialist_reference():

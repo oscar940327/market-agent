@@ -26,6 +26,7 @@ AGENT_TOOL_ALLOWLIST = {
     "theme": {"theme", "constituents"},
     "risk": {
         "technical",
+        "backtest",
         "fundamental",
         "news",
         "ml_reference",
@@ -591,6 +592,8 @@ def allowed_risk_tools(options: dict, kind: str) -> list[str]:
     tools = ["evidence", "freshness", "data_recovery", "specialist_outputs"]
     if options["include_technicals"] or kind == "backtest":
         tools.extend(["technical", "exit_signal"])
+    if kind == "backtest":
+        tools.append("backtest")
     if options["include_fundamentals"]:
         tools.append("fundamental")
     if options["include_news"]:
