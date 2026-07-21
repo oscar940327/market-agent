@@ -37,6 +37,31 @@ AGENT_TOOL_ALLOWLIST = {
     },
 }
 
+# Specialist references name fields returned by a tool, while permissions are
+# granted using the tool's public name. Keep this mapping narrow so a specialist
+# can cite nested evidence without gaining access to another tool.
+TOOL_EVIDENCE_ROOTS = {
+    "market_data": {"market_data", "price_source", "ticker"},
+    "technical": {"technical", "technical_analysis", "signals"},
+    "backtest": {"backtest", "backtest_evidence", "report", "metrics"},
+    "fundamental": {"fundamental", "fundamentals"},
+    "news": {"news", "news_analysis", "summary"},
+    "ml_reference": {
+        "ml_reference",
+        "ml_research",
+        "ml_reference_trust",
+        "theme_ml_reference",
+        "theme_ml_reference_trust",
+    },
+    "theme": {"theme", "theme_key", "theme_name", "scan_scope", "sector_summary"},
+    "constituents": {"constituents", "results"},
+    "evidence": {"evidence", "evidence_quality", "research_profile"},
+    "freshness": {"freshness", "data_freshness"},
+    "exit_signal": {"exit_signal"},
+    "data_recovery": {"data_recovery"},
+    "specialist_outputs": {"specialist_outputs", "analyst_outputs"},
+}
+
 
 @dataclass(frozen=True)
 class ToolSpec:
@@ -531,9 +556,12 @@ def validate_specialist_output(output: dict, *, agent: str, available_tools: set
     for key in ("findings", "evidence_references", "missing_data", "warnings"):
         if not isinstance(output.get(key), list):
             raise ValueError(f"Specialist field {key} must be a list.")
+    allowed_reference_roots = set()
+    for tool in available_tools:
+        allowed_reference_roots.update(TOOL_EVIDENCE_ROOTS.get(tool, {tool}))
     for reference in output["evidence_references"]:
         root = str(reference).split(".", 1)[0]
-        if root not in available_tools and root not in {"theme", "evidence", "freshness"}:
+        if root not in allowed_reference_roots:
             raise ValueError(f"Unknown evidence reference: {reference}")
     handoff = output.get("requested_handoff")
     if handoff not in {None, "risk"}:

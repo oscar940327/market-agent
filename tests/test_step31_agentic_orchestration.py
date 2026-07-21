@@ -8,6 +8,7 @@ from agent.agentic_orchestrator import (
     build_default_tool_registry,
     orchestrate_research,
     parse_json_object,
+    validate_specialist_output,
 )
 
 
@@ -111,6 +112,33 @@ def test_tool_registry_enforces_agent_allowlist():
 
     with pytest.raises(PermissionError):
         registry.invoke(agent="news", tool="fundamental", data=single_stock_data())
+
+
+def test_specialist_accepts_nested_reference_from_allowed_ml_tool():
+    output = json.loads(
+        specialist("ml", references=["ml_reference_trust.explanation"])
+    )
+    output["agent"] = "ml"
+
+    validate_specialist_output(
+        output,
+        agent="ml",
+        available_tools={"ml_reference"},
+    )
+
+
+def test_specialist_rejects_reference_from_unavailable_tool():
+    output = json.loads(
+        specialist("ml", references=["fundamentals.metrics.forward_pe"])
+    )
+    output["agent"] = "ml"
+
+    with pytest.raises(ValueError, match="Unknown evidence reference"):
+        validate_specialist_output(
+            output,
+            agent="ml",
+            available_tools={"ml_reference"},
+        )
 
 
 def test_fixed_orchestration_returns_valid_trace_and_outputs():

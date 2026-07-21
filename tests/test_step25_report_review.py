@@ -319,6 +319,37 @@ def test_deterministic_review_accepts_markdown_bold_immutable_numbers():
     assert not {code for code in failed if "_number_matches:" in code}
 
 
+def test_deterministic_review_accepts_natural_bold_holding_report_numbers():
+    data = {
+        "status": "success",
+        "fundamentals": {
+            "metrics": {
+                "revenue_growth": 3.457,
+                "earnings_growth": 13.685,
+                "gross_margins": 0.72569,
+            },
+        },
+        "technical_analysis": {"macd_histogram": -21.6227},
+    }
+    report = "\n".join(
+        [
+            "研究摘要", "摘要", "基本面分析",
+            "營收成長為正（**345.7%**）。",
+            "獲利成長為正（**1368.5%**）。",
+            "毛利率相對較高（**72.6%**）。",
+            "技術面分析",
+            "MACD histogram **-21.6227**，短線動能轉弱。",
+            "新聞面分析", "內容", "ML Reference", "內容",
+            "綜合評估", "內容", "風險提醒", "不構成投資建議。",
+        ]
+    )
+
+    result = run_deterministic_review(kind="single_stock", data=data, report=report)
+    failed = {item["code"] for item in result["checks"] if item["status"] == "fail"}
+
+    assert not {code for code in failed if "_number_matches:" in code}
+
+
 def test_backtest_review_accepts_signal_history_statistics_section():
     data = {"status": "success", "metrics": {"total_trades": 222}}
     report = "\n".join(
