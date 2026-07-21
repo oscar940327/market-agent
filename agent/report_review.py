@@ -5,6 +5,7 @@ import os
 import re
 
 from agent.llm_analyst import OpenRouterChatClient
+from agent.json_parsing import parse_first_json_object
 from agent.rule_based_router import SINGLE_STOCK_HOLDING_TERMS, query_contains_any
 
 
@@ -19,6 +20,15 @@ QUALITY_SCORE_FIELDS = (
     "clarity",
     "hallucination_safety",
     "overall_quality",
+)
+INTERNAL_REVIEW_TERMS = (
+    "deterministic_review",
+    "deterministic review",
+    "semantic_review",
+    "semantic review",
+    "confidence_adjustment",
+    "review_findings",
+    "review findings",
 )
 
 LLM_REVIEW_SYSTEM_PROMPT = """
@@ -69,6 +79,10 @@ replace those values. Keep overall evidence quality, historical-similarity
 evidence quality, and ML trust as separate concepts. For non-holding questions,
 describe material exit/weakening findings only as entry-risk context and do not
 add a holding/exit section.
+
+Never mention the reviewer, review findings, deterministic review, semantic
+review, checks, confidence_adjustment, revision iterations, or internal workflow
+metadata in the revised report. Fix the report content directly.
 """.strip()
 
 
@@ -79,13 +93,14 @@ def review_and_revise_report(
     report: str,
     mode: str | None = None,
     llm_client=None,
+    revision_llm_client=None,
     max_iterations: int | None = None,
 ) -> dict:
     selected_mode = normalize_review_mode(
         mode or os.getenv("MARKET_AGENT_REPORT_REVIEW_MODE", "deterministic")
     )
     limit = normalize_max_iterations(max_iterations)
-    current_report = report
+    current_report = strip_internal_review_metadata(report)
     history = []
     deterministic = run_deterministic_review(kind=kind, data=data, report=current_report)
     history.append(_history_entry(0, "deterministic", deterministic))
@@ -102,6 +117,7 @@ def review_and_revise_report(
             iterations=0,
         )
 
+    supplied_review_client = llm_client is not None
     client = llm_client or get_review_llm_client_from_env()
     if client is None:
         terminal = deterministic
@@ -122,6 +138,9 @@ def review_and_revise_report(
             fallback_reason="Review LLM is not configured.",
         )
 
+    reviser = revision_llm_client or (
+        client if supplied_review_client else get_revision_llm_client_from_env()
+    ) or client
     latest_review = deterministic
     latest_llm_review = None
     llm_calls = 0
@@ -172,7 +191,7 @@ def review_and_revise_report(
         try:
             llm_calls += 1
             revised = run_llm_revision(
-                client=client,
+                client=reviser,
                 kind=kind,
                 data=data,
                 report=current_report,
@@ -193,10 +212,12 @@ def review_and_revise_report(
         if not revised.strip():
             history.append({"iteration": iteration, "stage": "llm_revision", "status": "error", "message": "LLM reviser returned an empty report."})
             break
-        current_report = restore_immutable_report_numbers(
-            kind=kind,
-            data=data,
-            report=revised.strip(),
+        current_report = strip_internal_review_metadata(
+            restore_immutable_report_numbers(
+                kind=kind,
+                data=data,
+                report=revised.strip(),
+            )
         )
         revisions += 1
         latest_review = run_deterministic_review(kind=kind, data=data, report=current_report)
@@ -237,6 +258,7 @@ def run_deterministic_review(*, kind: str, data: dict, report: str) -> dict:
         _review_ml_trust(data, report, checks)
         _review_freshness(data, report, checks)
         _review_overconfidence(data, report, checks)
+        _review_internal_metadata(report, checks)
         _review_key_numbers(kind, data, report, checks)
 
     failed = [check for check in checks if check["status"] == "fail"]
@@ -370,6 +392,15 @@ def restore_immutable_report_numbers(*, kind: str, data: dict, report: str) -> s
     return repaired
 
 
+def strip_internal_review_metadata(report: str) -> str:
+    lines = [
+        line
+        for line in report.splitlines()
+        if not any(term in line.lower() for term in INTERNAL_REVIEW_TERMS)
+    ]
+    return "\n".join(lines).strip()
+
+
 def validate_llm_review(value: dict) -> dict:
     status = value.get("status")
     if status not in {"pass", "needs_revision"}:
@@ -420,13 +451,10 @@ def validate_llm_review(value: dict) -> dict:
 
 
 def parse_json_object(raw: str) -> dict:
-    text = raw.strip()
-    if text.startswith("```"):
-        text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text, flags=re.IGNORECASE)
-    value = json.loads(text)
-    if not isinstance(value, dict):
-        raise ValueError("LLM reviewer response must be a JSON object.")
-    return value
+    return parse_first_json_object(
+        raw,
+        error_message="LLM reviewer response must include a JSON object.",
+    )
 
 
 def merge_review_findings(*reviews: dict) -> dict:
@@ -443,6 +471,22 @@ def get_review_llm_client_from_env():
     if client is None:
         return None
     model = os.getenv("MARKET_AGENT_REPORT_REVIEW_MODEL", "").strip()
+    if model:
+        client.model = model
+    return client
+
+
+def get_revision_llm_client_from_env():
+    if os.getenv("MARKET_AGENT_REPORT_REVIEW_PROVIDER", "openrouter").lower() != "openrouter":
+        return None
+    client = OpenRouterChatClient.from_env()
+    if client is None:
+        return None
+    model = (
+        os.getenv("MARKET_AGENT_REPORT_REVISER_MODEL", "").strip()
+        or os.getenv("MARKET_AGENT_REPORT_WRITER_MODEL", "").strip()
+        or os.getenv("MARKET_AGENT_LLM_MODEL", "").strip()
+    )
     if model:
         client.model = model
     return client
@@ -547,6 +591,17 @@ def _review_overconfidence(data: dict, report: str, checks: list[dict]) -> None:
     if evidence.get("level") == "high":
         conflated = "證據品質高，因此適合買進" in report
         _check(checks, "evidence_not_trade_confidence", not conflated, "報告把 Evidence Quality 誤解成買進信心。", "說明 Evidence Quality 代表資料可信程度，不代表方向。")
+
+
+def _review_internal_metadata(report: str, checks: list[dict]) -> None:
+    leaked = [term for term in INTERNAL_REVIEW_TERMS if term in report.lower()]
+    _check(
+        checks,
+        "no_internal_review_metadata",
+        not leaked,
+        "報告不應揭露 reviewer 或內部品質檢查欄位。",
+        "直接修正報告內容，不要描述 deterministic review、confidence adjustment 或修訂流程。",
+    )
 
 
 def _review_key_numbers(kind: str, data: dict, report: str, checks: list[dict]) -> None:

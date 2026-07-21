@@ -34,6 +34,10 @@ LLM_ANALYST_SYSTEM_PROMPT = """
 輸出格式：
 - 使用繁體中文。
 - 用短段落與條列。
+- single_stock 必須使用這些固定段落名稱：研究摘要、基本面分析、技術面分析、新聞面分析、ML Reference、綜合評估、風險提醒。
+- single_stock 的 question_type 是 holding_exit 時，另外加入「持有風險 / 出場觀察」；否則不可加入該段落。
+- backtest 必須包含「績效摘要」或「訊號歷史統計」，以及「風險提醒」。
+- 不要提到 reviewer、deterministic review、semantic review、confidence_adjustment、內部檢查或修訂次數。
 - 如果 payload 的 data_freshness.warnings 有 warning / stale / missing，請在風險提醒中自然提到；如果沒有 warnings，不要主動新增資料新鮮度段落。
 - 最後一定要保留「不構成投資建議」的風險提醒。
 """.strip()

@@ -1,4 +1,5 @@
 import os
+import re
 
 from agent.analyst import (
     format_backtest_analysis,
@@ -210,6 +211,7 @@ def apply_required_report_sections(*, kind: str, data: dict, report: str) -> str
     if kind != "single_stock" or data.get("status") != "success":
         return report
 
+    report = normalize_single_stock_section_titles(report)
     context = build_single_stock_report_context(data)
     if context.get("question_type") != "holding_exit":
         return remove_report_section(
@@ -226,6 +228,33 @@ def apply_required_report_sections(*, kind: str, data: dict, report: str) -> str
 
     section = format_required_exit_signal_section(context.get("exit_signal"))
     return insert_section_before_summary(report, section)
+
+
+def normalize_single_stock_section_titles(report: str) -> str:
+    aliases = {
+        "研究總結": "研究摘要",
+        "基本面觀察": "基本面分析",
+        "技術面觀察": "技術面分析",
+        "新聞面觀察": "新聞面分析",
+        "多面向整合": "綜合評估",
+        "多面向訊號整合": "綜合評估",
+        "綜合研判": "綜合評估",
+        "整體評估": "綜合評估",
+        "資料與風險提醒": "風險提醒",
+        "持有風險與出場觀察": "持有風險 / 出場觀察",
+        "持有／出場觀察": "持有風險 / 出場觀察",
+        "持有部位風險評估": "持有風險 / 出場觀察",
+    }
+    normalized = []
+    for line in report.splitlines():
+        match = re.match(r"^(\s*#{1,6}\s*)?(.*?)(\s*)$", line)
+        if not match:
+            normalized.append(line)
+            continue
+        title = match.group(2).strip().strip("*").strip()
+        replacement = aliases.get(title)
+        normalized.append(f"{match.group(1) or ''}{replacement}" if replacement else line)
+    return "\n".join(normalized).strip()
 
 
 def ensure_theme_ml_reference_section(*, data: dict, report: str) -> str:

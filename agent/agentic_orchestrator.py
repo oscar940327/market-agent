@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from typing import Any, Callable
 from uuid import uuid4
 
+from agent.json_parsing import parse_first_json_object
 from agent.llm_analyst import OpenRouterChatClient
 
 
@@ -582,13 +583,10 @@ def configure_specialist_model(client, agent: str) -> None:
 
 
 def parse_json_object(raw: str) -> dict:
-    text = raw.strip()
-    if text.startswith("```"):
-        text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text, flags=re.IGNORECASE)
-    value = json.loads(text)
-    if not isinstance(value, dict):
-        raise ValueError("LLM response must be a JSON object.")
-    return value
+    return parse_first_json_object(
+        raw,
+        error_message="LLM response must include a JSON object.",
+    )
 
 
 def detect_stance_conflict(outputs: dict) -> list[str]:

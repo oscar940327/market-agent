@@ -7,6 +7,7 @@ from agent.agentic_orchestrator import (
     build_default_plan,
     build_default_tool_registry,
     orchestrate_research,
+    parse_json_object,
 )
 
 
@@ -284,6 +285,28 @@ def test_malformed_llm_plan_falls_back_without_breaking_report_data():
     assert result["mode_used"] == "fixed_fallback"
     assert result["fallback_used"] is True
     assert result["fallback_reason"].startswith("plan_error:")
+
+
+def test_llm_plan_parser_accepts_fenced_json_with_trailing_text():
+    parsed = parse_json_object(
+        """```json
+        {"version":"research_plan_v1","reason":"test","steps":[]}
+        ```
+        The plan is ready.
+        """
+    )
+
+    assert parsed["version"] == "research_plan_v1"
+    assert parsed["steps"] == []
+
+
+def test_llm_plan_parser_uses_first_object_when_model_returns_extra_json():
+    parsed = parse_json_object(
+        '{"version":"research_plan_v1","reason":"first","steps":[]}\n'
+        '{"debug":true}'
+    )
+
+    assert parsed["reason"] == "first"
 
 
 def test_missing_openrouter_client_is_explicit_fixed_fallback(monkeypatch):

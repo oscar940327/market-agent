@@ -127,6 +127,10 @@ def log_one_fixture(*, query: str, args: argparse.Namespace) -> dict:
             "message": data.get("message") or data.get("status"),
         }
 
+    data.setdefault("query", query)
+    data.setdefault("route", route)
+    data.setdefault("question_type", route.get("question_type"))
+
     request_options = {
         "include_news": args.include_news,
         "include_fundamentals": args.include_fundamentals,

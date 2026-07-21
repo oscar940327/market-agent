@@ -5,8 +5,9 @@ from agent.report_review import (
     restore_immutable_report_numbers,
     review_and_revise_report,
     run_deterministic_review,
+    strip_internal_review_metadata,
 )
-from agent.reporting import build_report
+from agent.reporting import build_report, normalize_single_stock_section_titles
 
 
 VALID_THEME_REPORT = "主題研究摘要\n目前訊號混合。\n\n風險提醒\n本摘要不構成投資建議。"
@@ -105,6 +106,24 @@ def test_hybrid_review_revises_and_stops_after_pass():
     assert result["review"]["iterations"] == 1
     assert len(client.calls) == 3
     assert "analyst_consensus" in client.calls[0]["user"]
+
+
+def test_review_uses_separate_lower_cost_revision_client():
+    reviewer = SequenceClient([llm_review(), llm_review("pass")])
+    reviser = SequenceClient([VALID_THEME_REPORT])
+    result = review_and_revise_report(
+        kind="theme",
+        data={"status": "success"},
+        report="主題摘要\n現在一定要買。\n\n風險提醒\n不構成投資建議。",
+        mode="hybrid",
+        llm_client=reviewer,
+        revision_llm_client=reviser,
+        max_iterations=1,
+    )
+
+    assert result["review"]["status"] == "pass"
+    assert len(reviewer.calls) == 2
+    assert len(reviser.calls) == 1
 
 
 def test_review_loop_is_capped_at_three_iterations_and_seven_calls():
@@ -380,6 +399,52 @@ def test_llm_rescaled_fundamental_percentages_are_restored():
     assert "營收成長約 345.7%" in repaired
     assert "獲利成長約 1368.5%" in repaired
     assert "毛利率約 72.6%" in repaired
+
+
+def test_internal_review_metadata_is_removed_from_report():
+    report = "\n".join(
+        [
+            "績效摘要",
+            "結果偏正向。",
+            "研究信心已依 deterministic_review 的 confidence_adjustment: lower 下調。",
+            "風險提醒",
+            "不構成投資建議。",
+        ]
+    )
+
+    cleaned = strip_internal_review_metadata(report)
+
+    assert "deterministic_review" not in cleaned
+    assert "confidence_adjustment" not in cleaned
+    assert "結果偏正向" in cleaned
+
+
+def test_single_stock_section_aliases_are_normalized():
+    report = "\n".join(
+        [
+            "## 研究總結",
+            "## 基本面觀察",
+            "## 技術面觀察",
+            "## 新聞面觀察",
+            "## ML Reference",
+            "## 持有部位風險評估",
+            "## 多面向整合",
+            "## 資料與風險提醒",
+        ]
+    )
+
+    normalized = normalize_single_stock_section_titles(report)
+
+    for title in (
+        "研究摘要",
+        "基本面分析",
+        "技術面分析",
+        "新聞面分析",
+        "持有風險 / 出場觀察",
+        "綜合評估",
+        "風險提醒",
+    ):
+        assert title in normalized
 
 
 def test_entry_report_discloses_material_risk_without_holding_section():

@@ -99,15 +99,20 @@ def test_quality_failure_makes_fixture_report_partial_but_keeps_report_visible()
     assert "結論沒有回答原始問題" in markdown
 
 
-def test_fixture_workflows_force_semantic_review_with_claude_sonnet():
+def test_fixture_workflows_use_cost_aware_review_policy():
     root = Path(__file__).resolve().parents[1]
-    for name in ("daily-research-fixtures.yml", "weekly-research-fixtures.yml"):
+    expected_modes = {
+        "daily-research-fixtures.yml": "hybrid",
+        "weekly-research-fixtures.yml": "semantic",
+    }
+    for name, mode in expected_modes.items():
         workflow = (root / ".github" / "workflows" / name).read_text(
             encoding="utf-8"
         )
-        assert "MARKET_AGENT_REPORT_REVIEW_MODE: semantic" in workflow
+        assert f"MARKET_AGENT_REPORT_REVIEW_MODE: {mode}" in workflow
         assert "MARKET_AGENT_REPORT_REVIEW_MODEL: anthropic/claude-sonnet-4.6" in workflow
-        assert 'MARKET_AGENT_REPORT_REVIEW_MAX_ITERATIONS: "3"' in workflow
+        assert "MARKET_AGENT_REPORT_REVISER_MODEL: openai/gpt-5.4-mini" in workflow
+        assert 'MARKET_AGENT_REPORT_REVIEW_MAX_ITERATIONS: "1"' in workflow
 
 
 def test_fixture_markdown_exposes_agent_flow_status():
