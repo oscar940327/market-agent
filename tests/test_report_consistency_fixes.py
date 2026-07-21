@@ -145,3 +145,9 @@ def test_momentum_wording_matches_current_state_names():
 def test_theme_prompt_requires_one_ml_reference_section():
     assert "只能有一個「ML Reference」段落" in LLM_ANALYST_SYSTEM_PROMPT
     assert "不要另外建立「ML 訊號與風險」" in LLM_ANALYST_SYSTEM_PROMPT
+
+
+def test_llm_prompt_forbids_unsupported_market_extrapolation():
+    assert "不可用 forward / trailing P/E 的差異自行推論" in LLM_ANALYST_SYSTEM_PROMPT
+    assert "不可補充一般金融常識作為個股事實" in LLM_ANALYST_SYSTEM_PROMPT
+    assert "不可推論某事件是否「主導全局」" in LLM_ANALYST_SYSTEM_PROMPT

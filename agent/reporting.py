@@ -71,6 +71,12 @@ def build_report(
         mode=review_mode,
         llm_client=review_llm_client,
     )
+    reviewed, analyst = apply_single_stock_quality_fallback(
+        kind=kind,
+        data=data,
+        reviewed=reviewed,
+        analyst=draft["analyst"],
+    )
     data["report_review"] = reviewed["review"]
     append_agentic_report_trace(
         data,
@@ -81,9 +87,74 @@ def build_report(
     )
     return {
         **draft,
+        "analyst": analyst,
         "report": reviewed["report"],
         "review": reviewed["review"],
     }
+
+
+def apply_single_stock_quality_fallback(*, kind: str, data: dict, reviewed: dict, analyst: dict):
+    if kind != "single_stock" or reviewed["review"].get("status") == "pass":
+        return reviewed, analyst
+
+    fixed_report = apply_required_report_sections(
+        kind=kind,
+        data=data,
+        report=build_fixed_single_stock_report(data),
+    )
+    fixed = review_and_revise_report(
+        kind=kind,
+        data=data,
+        report=fixed_report,
+        mode="deterministic",
+    )
+    if fixed["review"].get("status") != "pass":
+        return reviewed, analyst
+
+    rejected_review = reviewed["review"]
+    fallback_reason = (
+        "LLM report did not pass semantic quality review; "
+        "used deterministic fixed single-stock report."
+    )
+    final_review = {
+        **fixed["review"],
+        "mode_used": "deterministic_report_fallback",
+        "iterations": rejected_review.get("iterations", 0),
+        "max_iterations": rejected_review.get("max_iterations"),
+        "provider": rejected_review.get("provider"),
+        "model": rejected_review.get("model"),
+        "fallback_used": True,
+        "fallback_reason": fallback_reason,
+        "history": list(rejected_review.get("history") or [])
+        + [
+            {
+                "iteration": rejected_review.get("iterations", 0),
+                "stage": "deterministic_report_fallback",
+                "status": "pass",
+                "risk_notes": [],
+                "suggested_fixes": [],
+                "quality_scores": {},
+            }
+        ],
+        "semantic_quality": {
+            "status": "not_run",
+            "quality_scores": {},
+            "minimum_passing_score": (
+                (fixed["review"].get("semantic_quality") or {}).get(
+                    "minimum_passing_score"
+                )
+            ),
+            "reason": "Final deterministic fallback report was not sent to the semantic reviewer.",
+        },
+        "rejected_semantic_quality": rejected_review.get("semantic_quality"),
+    }
+    final_analyst = {
+        **analyst,
+        "mode_used": "rule_based",
+        "fallback_used": True,
+        "message": fallback_reason,
+    }
+    return {"report": fixed["report"], "review": final_review}, final_analyst
 
 
 def _build_report_draft(

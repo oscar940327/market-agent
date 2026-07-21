@@ -10,6 +10,7 @@ from agent.report_review import (
     validate_llm_review,
 )
 from agent.reporting import (
+    apply_single_stock_quality_fallback,
     apply_required_report_sections,
     build_report,
     normalize_single_stock_section_titles,
@@ -350,6 +351,68 @@ def test_required_report_sections_add_missing_fundamental_percentages():
     assert "獲利成長：1368.5%" in updated
     assert "毛利率：72.6%" in updated
     assert review["status"] == "pass"
+
+
+def test_single_stock_semantic_failure_uses_deterministic_report_fallback():
+    data = {
+        "status": "success",
+        "ticker": "MU",
+        "question_type": "holding_exit",
+        "summary": {},
+        "fundamentals": {"status": "success", "metrics": {}},
+        "technical_analysis": {},
+        "news_analysis": {"summary": {}},
+        "ml_research": {},
+        "exit_signal": {
+            "status": "success",
+            "exit_signal": "reduce",
+            "weakening_signal_20d": "high",
+            "reason": "風險訊號轉弱。",
+        },
+        "evidence_quality": {"level": "medium"},
+    }
+    reviewed = {
+        "report": "包含 unsupported extrapolation 的 LLM report。",
+        "review": {
+            "status": "needs_revision",
+            "iterations": 2,
+            "max_iterations": 2,
+            "provider": "openrouter",
+            "model": "test-reviewer",
+            "history": [],
+            "semantic_quality": {
+                "status": "needs_revision",
+                "quality_scores": {"hallucination_safety": 3},
+                "reason": "Unsupported extrapolation.",
+            },
+        },
+    }
+    analyst = {
+        "requested_mode": "llm",
+        "mode_used": "llm",
+        "fallback_used": False,
+        "message": "LLM report writer used.",
+    }
+
+    final, final_analyst = apply_single_stock_quality_fallback(
+        kind="single_stock",
+        data=data,
+        reviewed=reviewed,
+        analyst=analyst,
+    )
+
+    assert final["review"]["status"] == "pass"
+    assert final["review"]["fallback_used"] is True
+    assert final["review"]["semantic_quality"]["status"] == "not_run"
+    assert (
+        final["review"]["rejected_semantic_quality"]["quality_scores"]
+        ["hallucination_safety"]
+        == 3
+    )
+    assert "持有風險 / 出場觀察" in final["report"]
+    assert "unsupported extrapolation" not in final["report"]
+    assert final_analyst["mode_used"] == "rule_based"
+    assert final_analyst["fallback_used"] is True
 
 
 def test_holding_question_is_detected_from_query_when_question_type_is_absent():

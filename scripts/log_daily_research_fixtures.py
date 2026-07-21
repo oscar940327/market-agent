@@ -184,6 +184,13 @@ def log_one_fixture(*, query: str, args: argparse.Namespace) -> dict:
         data=data,
         analyst_mode=args.analyst_mode,
     )
+    if report_result["analyst"].get("fallback_used"):
+        agent_flow = {
+            "label": "Fallback",
+            "mode_used": report_result["analyst"].get("mode_used"),
+            "fallback_used": True,
+            "fallback_reason": report_result["analyst"].get("message"),
+        }
     request_options = {
         **request_options,
         "analyst_mode": args.analyst_mode,

@@ -114,6 +114,12 @@ importance negative risk_event from news_events_summary. For theme reports,
 identify theme_news_summary as the aggregate source, preserve each ML target's
 own signal_quality, and describe backtest_sample=not_applicable as not applicable
 rather than missing evidence.
+
+Do not introduce general market knowledge during revision. In particular, do
+not infer market expectations from forward/trailing valuation ratios, describe
+a company as cyclical, add industry-cycle claims, invent missing-data lists, or
+claim that a news event does or does not dominate the broader narrative unless
+those statements are explicit in structured_context.
 """.strip()
 
 
