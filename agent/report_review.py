@@ -45,6 +45,12 @@ Use pass only when every score is at least 4 and there is no factual
 inconsistency, omitted material risk, unanswered user intent, overconfidence,
 hallucination, or workflow/section mismatch.
 
+Treat raw structured fields as authoritative. In particular,
+news_summary.sentiment is the factual aggregate sentiment. Specialist stances
+are interpretations and must not override that field. A concrete news event or
+headline is supported only when it appears in news_events_summary; topic counts
+alone do not support inventing a named event.
+
 Interpret quality fields at their documented scope:
 - evidence_quality.level is the overall research evidence level.
 - return_reference.evidence_quality describes only the historical-similarity
@@ -83,6 +89,11 @@ add a holding/exit section.
 Never mention the reviewer, review findings, deterministic review, semantic
 review, checks, confidence_adjustment, revision iterations, or internal workflow
 metadata in the revised report. Fix the report content directly.
+
+Use news_summary.sentiment as the authoritative aggregate news sentiment. Do
+not replace it with an interpretive specialist stance. Mention a concrete news
+event or headline only when it exists in news_events_summary; otherwise describe
+only the supplied topic and count.
 """.strip()
 
 
@@ -115,6 +126,7 @@ def review_and_revise_report(
             history=history,
             mode_used="deterministic",
             iterations=0,
+            max_iterations=limit,
         )
 
     supplied_review_client = llm_client is not None
@@ -135,6 +147,7 @@ def review_and_revise_report(
             history=history,
             mode_used="deterministic_fallback",
             iterations=0,
+            max_iterations=limit,
             fallback_reason="Review LLM is not configured.",
         )
 
@@ -166,6 +179,7 @@ def review_and_revise_report(
                 history=history,
                 mode_used=f"{selected_mode}_fallback",
                 iterations=revisions,
+                max_iterations=limit,
                 client=client,
                 fallback_reason=f"LLM reviewer failed: {error}",
             )
@@ -179,6 +193,7 @@ def review_and_revise_report(
                 history=history,
                 mode_used=selected_mode,
                 iterations=revisions,
+                max_iterations=limit,
                 client=client,
                 semantic_review=llm_review,
             )
@@ -205,6 +220,7 @@ def review_and_revise_report(
                 history=history,
                 mode_used=f"{selected_mode}_fallback",
                 iterations=revisions,
+                max_iterations=limit,
                 client=client,
                 semantic_review=llm_review,
                 fallback_reason=f"LLM reviser failed: {error}",
@@ -238,6 +254,7 @@ def review_and_revise_report(
         history=history,
         mode_used=selected_mode,
         iterations=revisions,
+        max_iterations=limit,
         client=client,
         semantic_review=latest_llm_review,
         fallback_reason=(
@@ -326,6 +343,13 @@ def build_review_context(data: dict) -> dict:
             "summary": (data.get("fundamentals") or {}).get("summary", {}),
         },
         "news_summary": (data.get("news_analysis") or {}).get("summary", {}),
+        "news_events_summary": (
+            (data.get("agent_outputs", {}).get("news", {}) or {}).get("news_events_summary")
+            or (
+                (data.get("agent_outputs", {}).get("news", {}) or {}).get("payload", {})
+                or {}
+            ).get("news_events_summary")
+        ),
         "ml_targets": (data.get("ml_research") or {}).get("targets", {}),
         "return_model": (data.get("ml_research") or {}).get("return_model", {}),
         "quality_scope_definitions": {
@@ -659,9 +683,9 @@ def _review_fundamental_numbers(data: dict, report: str, checks: list[dict]) -> 
 def _review_technical_numbers(data: dict, report: str, checks: list[dict]) -> None:
     technical = data.get("technical_analysis") or {}
     fields = (
-        ("ma20", "MA20", r"MA20(?:\*\*)?\s*約?\s*[:：]?\s*(?:\*\*)?\$?([\d,.]+)(?:\*\*)?"),
-        ("ma50", "MA50", r"MA50(?:\*\*)?\s*約?\s*[:：]?\s*(?:\*\*)?\$?([\d,.]+)(?:\*\*)?"),
-        ("macd_histogram", "MACD histogram", r"histogram(?:\*\*)?\s*(?:(?:為|[:：])\s*)?(?:\*\*)?([+-]?[\d,.]+)(?:\*\*)?"),
+        ("ma20", "MA20", r"MA20(?:\*\*)?\s*(?:約|為)?\s*[:：]?\s*(?:\*\*)?\$?([\d,.]+)(?:\*\*)?"),
+        ("ma50", "MA50", r"MA50(?:\*\*)?\s*(?:約|為)?\s*[:：]?\s*(?:\*\*)?\$?([\d,.]+)(?:\*\*)?"),
+        ("macd_histogram", "MACD histogram", r"(?:histogram|柱狀圖)(?:\*\*)?\s*(?:(?:為|[:：])\s*)?(?:\*\*)?([+-]?[\d,.]+)(?:\*\*)?"),
     )
     for key, label, pattern in fields:
         expected = _to_float(technical.get(key))
@@ -719,6 +743,7 @@ def _result(
     history,
     mode_used,
     iterations,
+    max_iterations,
     client=None,
     semantic_review=None,
     fallback_reason=None,
@@ -727,7 +752,7 @@ def _result(
         **deterministic,
         "mode_used": mode_used,
         "iterations": iterations,
-        "max_iterations": MAX_REVIEW_ITERATIONS,
+        "max_iterations": max_iterations,
         "provider": getattr(client, "provider", None),
         "model": getattr(client, "model", None),
         "fallback_used": bool(fallback_reason),

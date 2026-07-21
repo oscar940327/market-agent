@@ -2,6 +2,7 @@ import json
 
 from agent.fixed_single_stock_report import build_risk_reminder
 from agent.report_review import (
+    build_review_context,
     restore_immutable_report_numbers,
     review_and_revise_report,
     run_deterministic_review,
@@ -329,7 +330,7 @@ def test_deterministic_review_accepts_natural_bold_holding_report_numbers():
                 "gross_margins": 0.72569,
             },
         },
-        "technical_analysis": {"macd_histogram": -21.6227},
+        "technical_analysis": {"ma20": 996.67, "ma50": 943.55, "macd_histogram": -20.7139},
     }
     report = "\n".join(
         [
@@ -338,7 +339,8 @@ def test_deterministic_review_accepts_natural_bold_holding_report_numbers():
             "獲利成長為正（**1368.5%**）。",
             "毛利率相對較高（**72.6%**）。",
             "技術面分析",
-            "MACD histogram **-21.6227**，短線動能轉弱。",
+            "現價低於 MA20 **996.67**，MA50 為 **943.55**。",
+            "MACD 柱狀圖為 **-20.7139**，短線動能轉弱。",
             "新聞面分析", "內容", "ML Reference", "內容",
             "綜合評估", "內容", "風險提醒", "不構成投資建議。",
         ]
@@ -348,6 +350,26 @@ def test_deterministic_review_accepts_natural_bold_holding_report_numbers():
     failed = {item["code"] for item in result["checks"] if item["status"] == "fail"}
 
     assert not {code for code in failed if "_number_matches:" in code}
+
+
+def test_review_context_includes_news_events_used_by_report_writer():
+    data = {
+        "news_analysis": {"summary": {"sentiment": "positive"}},
+        "agent_outputs": {
+            "news": {
+                "news_events_summary": {
+                    "representative_events": [
+                        {"title": "Supported event", "sentiment": "negative"}
+                    ]
+                }
+            }
+        },
+    }
+
+    context = build_review_context(data)
+
+    assert context["news_summary"]["sentiment"] == "positive"
+    assert context["news_events_summary"]["representative_events"][0]["title"] == "Supported event"
 
 
 def test_backtest_review_accepts_signal_history_statistics_section():

@@ -4,6 +4,7 @@ from scripts.log_daily_research_fixtures import (
     build_agent_flow_summary,
     build_daily_research_fixture_markdown,
     build_daily_research_fixture_report,
+    build_fixture_failure_diagnostics,
 )
 
 
@@ -27,6 +28,28 @@ def passing_review(*, overall=5, iterations=0):
             "reason": "Report is supported by the structured context.",
         },
     }
+
+
+def test_fixture_failure_diagnostics_exposes_reason_scores_and_checks():
+    lines = build_fixture_failure_diagnostics(
+        {
+            "report_review": {
+                "checks": [
+                    {"code": "technical_number_matches:ma50", "status": "fail"}
+                ],
+                "fallback_reason": "Maximum review iterations reached.",
+                "semantic_quality": {
+                    "reason": "News stance is inconsistent.",
+                    "quality_scores": {"evidence_consistency": 3},
+                },
+            }
+        }
+    )
+
+    assert "semantic_reason=News stance is inconsistent." in lines
+    assert "quality_scores=evidence_consistency:3" in lines
+    assert "failed_checks=technical_number_matches:ma50" in lines
+    assert "review_fallback_reason=Maximum review iterations reached." in lines
 
 
 def test_fixture_report_aggregates_semantic_quality_scores():

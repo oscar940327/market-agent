@@ -81,6 +81,8 @@ def main() -> int:
         if result["status"] != "success":
             failures += 1
             print(f"message={result.get('message')}")
+            for detail in build_fixture_failure_diagnostics(result):
+                print(detail)
 
     report = build_daily_research_fixture_report(
         fixture_results,
@@ -106,6 +108,28 @@ def main() -> int:
     print(f"fixtures={len(queries)}")
     print(f"failures={failures}")
     return 1 if failures else 0
+
+
+def build_fixture_failure_diagnostics(result: dict) -> list[str]:
+    review = result.get("report_review") or {}
+    semantic = review.get("semantic_quality") or {}
+    lines = []
+    if semantic.get("reason"):
+        lines.append(f"semantic_reason={semantic['reason']}")
+    scores = semantic.get("quality_scores") or {}
+    if scores:
+        rendered = ",".join(f"{key}:{value}" for key, value in scores.items())
+        lines.append(f"quality_scores={rendered}")
+    failed_checks = [
+        check.get("code")
+        for check in review.get("checks", [])
+        if check.get("status") == "fail" and check.get("code")
+    ]
+    if failed_checks:
+        lines.append(f"failed_checks={','.join(failed_checks)}")
+    if review.get("fallback_reason"):
+        lines.append(f"review_fallback_reason={review['fallback_reason']}")
+    return lines
 
 
 def log_one_fixture(*, query: str, args: argparse.Namespace) -> dict:

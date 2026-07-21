@@ -21,6 +21,8 @@ LLM_ANALYST_SYSTEM_PROMPT = """
 - 如果主題分析的 ML Reference 是降低信任，不可以寫成「信任度為一般」或「信任度正常」。
 - 如果新聞 / 基本面偏正，但技術面與 ML 偏弱，請寫「尚未形成多方共振」，不要寫成三者一致偏弱。
 - 如果 payload 有 agentic_outputs，只能把它們當成已驗證資料的解釋觀點；所有數字仍以 structured payload 的原始欄位為準。
+- 新聞整體情緒必須以 news_summary.sentiment 為準；Agent 的 stance 只是解讀觀點，不可覆蓋原始情緒欄位。
+- 只有 news_events_summary 真的列出的事件或標題才可以具體提及；如果只提供 topic/count，就只能描述該主題與數量，不可自行補出事件名稱。
 - 不要在報告中描述 Agent 的內部 plan、Tool 呼叫或 self-check，除非資料缺口會影響研究結論。
 
 嚴格限制：
