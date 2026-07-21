@@ -569,6 +569,10 @@ def validate_specialist_output(output: dict, *, agent: str, available_tools: set
     allowed_reference_roots = set()
     for tool in available_tools:
         allowed_reference_roots.update(TOOL_EVIDENCE_ROOTS.get(tool, {tool}))
+    output["evidence_references"] = [
+        normalize_evidence_reference(reference)
+        for reference in output["evidence_references"]
+    ]
     for reference in output["evidence_references"]:
         root = re.split(r"[.\[]", str(reference), maxsplit=1)[0]
         if root not in allowed_reference_roots:
@@ -576,6 +580,16 @@ def validate_specialist_output(output: dict, *, agent: str, available_tools: set
     handoff = output.get("requested_handoff")
     if handoff not in {None, "risk"}:
         raise ValueError("Unsupported specialist handoff.")
+
+
+def normalize_evidence_reference(reference) -> str:
+    """Remove harmless LLM wrapper prefixes before enforcing tool permissions."""
+    normalized = str(reference or "").strip()
+    if normalized.startswith("$."):
+        normalized = normalized[2:]
+    while normalized.startswith("tool_results."):
+        normalized = normalized[len("tool_results."):]
+    return normalized
 
 
 def normalize_request_options(kind: str, options: dict | None) -> dict:

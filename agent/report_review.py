@@ -462,9 +462,7 @@ def strip_internal_review_metadata(report: str) -> str:
 
 
 def validate_llm_review(value: dict) -> dict:
-    status = value.get("status")
-    if status not in {"pass", "needs_revision"}:
-        raise ValueError("LLM reviewer returned an invalid status.")
+    status = normalize_llm_review_status(value.get("status"))
     adjustment = value.get("confidence_adjustment", "none")
     if adjustment not in {"none", "lower"}:
         raise ValueError("LLM reviewer returned an invalid confidence adjustment.")
@@ -487,6 +485,8 @@ def validate_llm_review(value: dict) -> dict:
         for field, score in quality_scores.items()
         if score < MIN_PASSING_QUALITY_SCORE
     ]
+    if status is None:
+        status = "needs_revision" if low_fields or risk_notes else "pass"
     if status == "pass" and (low_fields or risk_notes):
         status = "needs_revision"
         adjustment = "lower"
@@ -508,6 +508,26 @@ def validate_llm_review(value: dict) -> dict:
         "quality_scores": quality_scores,
         "minimum_passing_score": MIN_PASSING_QUALITY_SCORE,
     }
+
+
+def normalize_llm_review_status(value) -> str | None:
+    normalized = str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+    aliases = {
+        "pass": "pass",
+        "passed": "pass",
+        "approved": "pass",
+        "approve": "pass",
+        "success": "pass",
+        "ok": "pass",
+        "needs_revision": "needs_revision",
+        "need_revision": "needs_revision",
+        "revision_required": "needs_revision",
+        "requires_revision": "needs_revision",
+        "revise": "needs_revision",
+        "fail": "needs_revision",
+        "failed": "needs_revision",
+    }
+    return aliases.get(normalized)
 
 
 def parse_json_object(raw: str) -> dict:

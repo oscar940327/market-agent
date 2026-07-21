@@ -143,9 +143,46 @@ def test_specialist_accepts_nested_reference_from_allowed_ml_tool():
     )
 
 
+def test_specialist_normalizes_tool_results_reference_before_validation():
+    output = json.loads(
+        specialist(
+            "ml",
+            references=["tool_results.ml_reference.ml_research.targets.up_5d"],
+        )
+    )
+    output["agent"] = "ml"
+
+    validate_specialist_output(
+        output,
+        agent="ml",
+        available_tools={"ml_reference"},
+    )
+
+    assert output["evidence_references"] == [
+        "ml_reference.ml_research.targets.up_5d"
+    ]
+
+
 def test_specialist_rejects_reference_from_unavailable_tool():
     output = json.loads(
         specialist("ml", references=["fundamentals.metrics.forward_pe"])
+    )
+    output["agent"] = "ml"
+
+    with pytest.raises(ValueError, match="Unknown evidence reference"):
+        validate_specialist_output(
+            output,
+            agent="ml",
+            available_tools={"ml_reference"},
+        )
+
+
+def test_specialist_still_rejects_forbidden_tool_results_reference():
+    output = json.loads(
+        specialist(
+            "ml",
+            references=["tool_results.fundamentals.metrics.forward_pe"],
+        )
     )
     output["agent"] = "ml"
 

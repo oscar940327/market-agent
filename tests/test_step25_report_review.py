@@ -7,6 +7,7 @@ from agent.report_review import (
     review_and_revise_report,
     run_deterministic_review,
     strip_internal_review_metadata,
+    validate_llm_review,
 )
 from agent.reporting import (
     apply_required_report_sections,
@@ -185,6 +186,74 @@ def test_deterministic_review_verifies_structured_ml_probabilities():
     result = run_deterministic_review(kind="single_stock", data=data, report=report)
     failed = {item["code"] for item in result["checks"] if item["status"] == "fail"}
     assert "ml_number_present:large_drop_20d" in failed
+
+
+def test_required_report_sections_restore_missing_theme_ml_probabilities():
+    data = {
+        "status": "success",
+        "theme_ml_reference": {
+            "status": "success",
+            "targets": {
+                "up_5d": {
+                    "probability_percent": 44.8,
+                    "signal_label": "slightly bearish",
+                    "signal_quality": "low",
+                },
+                "up_10d": {
+                    "probability_percent": 45.1,
+                    "signal_label": "slightly bearish",
+                    "signal_quality": "low",
+                },
+                "up_20d": {
+                    "probability_percent": 53.0,
+                    "signal_label": "unclear direction",
+                    "signal_quality": "low",
+                },
+                "large_drop_20d": {
+                    "probability_percent": 76.0,
+                    "signal_label": "high large-drop risk",
+                    "signal_quality": "medium",
+                },
+            },
+        },
+    }
+    report = "\n".join(
+        [
+            "## 研究摘要",
+            "內容",
+            "## ML Reference",
+            "5 日與 10 日方向訊號偏弱。",
+            "20 日上漲機率為 53.0%。",
+            "20 日大跌風險為 76.0%。",
+            "## 風險提醒",
+            "不構成投資建議。",
+        ]
+    )
+
+    updated = apply_required_report_sections(kind="theme", data=data, report=report)
+    review = run_deterministic_review(kind="theme", data=data, report=updated)
+
+    assert "44.8%" in updated
+    assert "45.1%" in updated
+    assert review["status"] == "pass"
+
+
+def test_llm_review_normalizes_status_aliases():
+    value = json.loads(llm_review("needs_revision"))
+    value["status"] = "revision_required"
+
+    normalized = validate_llm_review(value)
+
+    assert normalized["status"] == "needs_revision"
+
+
+def test_llm_review_derives_missing_status_from_valid_scores():
+    value = json.loads(llm_review("pass"))
+    value.pop("status")
+
+    normalized = validate_llm_review(value)
+
+    assert normalized["status"] == "pass"
 
 
 def test_holding_question_is_detected_from_query_when_question_type_is_absent():

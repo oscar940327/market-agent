@@ -207,6 +207,7 @@ def apply_required_report_sections(*, kind: str, data: dict, report: str) -> str
     if kind == "theme" and data.get("status") == "success":
         report = ensure_theme_ml_reference_section(data=data, report=report)
         report = enforce_theme_ml_reference_trust(data=data, report=report)
+        report = ensure_ml_target_probabilities(data=data, report=report)
         return enforce_theme_ml_target_quality(data=data, report=report)
 
     if kind == "backtest" and data.get("status") == "success":
@@ -220,6 +221,7 @@ def apply_required_report_sections(*, kind: str, data: dict, report: str) -> str
         return report
 
     report = normalize_single_stock_section_titles(report)
+    report = ensure_ml_target_probabilities(data=data, report=report)
     context = build_single_stock_report_context(data)
     if context.get("question_type") != "holding_exit":
         return remove_report_section(
@@ -337,6 +339,47 @@ def enforce_theme_ml_target_quality(*, data: dict, report: str) -> str:
     if not heading:
         return report
     return report[: heading.end()] + "\n" + quality_line + report[heading.end() :]
+
+
+def ensure_ml_target_probabilities(*, data: dict, report: str) -> str:
+    """Deterministically preserve required ML probabilities in the report."""
+    ml_reference = data.get("ml_research") or data.get("theme_ml_reference") or {}
+    if ml_reference.get("status") != "success" or "ML Reference" not in report:
+        return report
+
+    labels = (
+        ("up_5d", "5 個交易日後上漲機率"),
+        ("up_10d", "10 個交易日後上漲機率"),
+        ("up_20d", "20 個交易日後上漲機率"),
+        ("large_drop_20d", "20 個交易日內中途大跌風險"),
+    )
+    missing_lines = []
+    for target_name, label in labels:
+        target = (ml_reference.get("targets") or {}).get(target_name) or {}
+        probability = target.get("probability_percent")
+        if probability is None and target.get("probability") is not None:
+            probability = float(target["probability"]) * 100
+        if probability is None:
+            continue
+        formatted = f"{float(probability):.1f}%"
+        if formatted in report:
+            continue
+        signal_label = target.get("signal_label") or "unknown"
+        signal_quality = target.get("signal_quality") or "unknown"
+        missing_lines.append(
+            f"- {label}：{formatted}，{signal_label}，訊號品質 {signal_quality}。"
+        )
+
+    if not missing_lines:
+        return report
+    heading = re.search(
+        r"(?m)^\s*(?:#{1,6}\s*)?(?:\*\*)?ML Reference(?:\*\*)?\s*$",
+        report,
+    )
+    if not heading:
+        return report
+    block = "\n".join(missing_lines)
+    return report[: heading.end()] + "\n" + block + report[heading.end() :]
 
 
 def ensure_holding_material_news_risks(*, context: dict, report: str) -> str:
@@ -540,6 +583,7 @@ def build_rule_based_report(kind: str, data: dict) -> str:
             report=format_theme_analysis(data),
         )
         report = enforce_theme_ml_reference_trust(data=data, report=report)
+        report = ensure_ml_target_probabilities(data=data, report=report)
         return enforce_theme_ml_target_quality(data=data, report=report)
 
     if kind == "portfolio":
