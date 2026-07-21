@@ -141,6 +141,32 @@ def test_specialist_rejects_reference_from_unavailable_tool():
         )
 
 
+def test_risk_specialist_accepts_completed_specialist_reference():
+    output = json.loads(
+        specialist("risk", references=["technical.findings"])
+    )
+    output["agent"] = "risk"
+
+    validate_specialist_output(
+        output,
+        agent="risk",
+        available_tools={"specialist_outputs"},
+    )
+
+
+def test_theme_specialist_accepts_indexed_constituent_reference():
+    output = json.loads(
+        specialist("theme", references=["constituents[0].reasons"])
+    )
+    output["agent"] = "theme"
+
+    validate_specialist_output(
+        output,
+        agent="theme",
+        available_tools={"constituents"},
+    )
+
+
 def test_fixed_orchestration_returns_valid_trace_and_outputs():
     result = orchestrate_research(
         kind="single_stock",

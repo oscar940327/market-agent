@@ -171,3 +171,30 @@ def test_theme_report_inserts_structured_trust_explanation():
     assert "ML 信任說明:" in report
     assert "信任狀態：降低信任" in report
     assert "版本化模型政策記錄 4 項校準改善事項" in report
+
+
+def test_theme_trust_explanation_is_inserted_under_heading_not_summary_text():
+    trust = build_ml_reference_trust(
+        make_ml_research(),
+        model_policy={
+            "status": "reduced_trust",
+            "model_version": "baseline_v1",
+            "source": "test_policy",
+            "calibration_findings": 4,
+            "candidate_promoted": False,
+        },
+    )
+    report = enforce_theme_ml_reference_trust(
+        data={"theme_ml_reference_trust": trust},
+        report=(
+            "## 研究摘要\n"
+            "技術面偏弱，且 ML Reference 需要保守解讀。\n\n"
+            "## ML Reference\n"
+            "- 20 日上漲機率 50%。\n\n"
+            "## 風險提醒\n"
+            "- test"
+        ),
+    )
+
+    assert "且 ML Reference 需要保守解讀。\n\n## ML Reference\nML 信任說明:" in report
+    assert "且 ML Reference\nML 信任說明:" not in report

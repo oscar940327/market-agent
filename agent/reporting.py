@@ -292,11 +292,17 @@ def enforce_theme_ml_reference_trust(*, data: dict, report: str) -> str:
         and "ML 信任說明:" not in updated_report
     ):
         explanation_block = "ML 信任說明:\n" + "\n".join(explanation_lines)
-        updated_report = updated_report.replace(
-            "ML Reference",
-            f"ML Reference\n{explanation_block}",
-            1,
+        heading = re.search(
+            r"(?m)^\s*(?:#{1,6}\s*)?(?:\*\*)?ML Reference(?:\*\*)?\s*$",
+            updated_report,
         )
+        if heading:
+            updated_report = (
+                updated_report[: heading.end()]
+                + "\n"
+                + explanation_block
+                + updated_report[heading.end() :]
+            )
 
     return updated_report
 

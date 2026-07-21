@@ -59,7 +59,16 @@ TOOL_EVIDENCE_ROOTS = {
     "freshness": {"freshness", "data_freshness"},
     "exit_signal": {"exit_signal"},
     "data_recovery": {"data_recovery"},
-    "specialist_outputs": {"specialist_outputs", "analyst_outputs"},
+    "specialist_outputs": {
+        "specialist_outputs",
+        "analyst_outputs",
+        "technical",
+        "fundamental",
+        "news",
+        "ml",
+        "theme",
+        "risk",
+    },
 }
 
 
@@ -560,7 +569,7 @@ def validate_specialist_output(output: dict, *, agent: str, available_tools: set
     for tool in available_tools:
         allowed_reference_roots.update(TOOL_EVIDENCE_ROOTS.get(tool, {tool}))
     for reference in output["evidence_references"]:
-        root = str(reference).split(".", 1)[0]
+        root = re.split(r"[.\[]", str(reference), maxsplit=1)[0]
         if root not in allowed_reference_roots:
             raise ValueError(f"Unknown evidence reference: {reference}")
     handoff = output.get("requested_handoff")
