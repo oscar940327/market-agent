@@ -1,20 +1,38 @@
-FROM python:3.11-slim-bookworm
+FROM python:3.11-slim-bookworm AS base
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
-WORKDIR /app
-
 RUN apt-get update \
     && apt-get install --no-install-recommends -y libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
+WORKDIR /tmp/dependencies
+
 COPY requirements.txt .
 RUN python -m pip install --no-cache-dir -r requirements.txt
 
-RUN addgroup --system app \
-    && adduser --system --ingroup app app
+RUN groupadd --gid 1000 app \
+    && useradd --uid 1000 --gid app --create-home --shell /bin/bash app
+
+FROM base AS development
+
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y curl git openssh-client sudo \
+    && echo "app ALL=(root) NOPASSWD:ALL" > /etc/sudoers.d/app \
+    && chmod 0440 /etc/sudoers.d/app \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspaces/market-agent
+
+USER app
+
+CMD ["sleep", "infinity"]
+
+FROM base AS runtime
+
+WORKDIR /app
 
 COPY --chown=app:app . .
 

@@ -1,0 +1,42 @@
+{
+  "name": "Market Agent",
+  "build": {
+    "dockerfile": "../Dockerfile",
+    "context": "..",
+    "target": "development"
+  },
+  "workspaceFolder": "/workspaces/market-agent",
+  "runArgs": [
+    "--init"
+  ],
+  "remoteUser": "app",
+  "containerUser": "app",
+  "forwardPorts": [
+    8000
+  ],
+  "portsAttributes": {
+    "8000": {
+      "label": "Market Agent API",
+      "onAutoForward": "notify"
+    }
+  },
+  "postCreateCommand": "python -m pip check",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-python.debugpy",
+        "ms-azuretools.vscode-docker"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.testing.pytestEnabled": true,
+        "python.testing.unittestEnabled": false,
+        "python.testing.pytestArgs": [
+          "tests"
+        ]
+      }
+    }
+  }
+}
