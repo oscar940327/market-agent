@@ -1,0 +1,10 @@
+services:
+  market-agent:
+    build:
+      context: .
+    image: market-agent:local
+    env_file:
+      - .env
+    ports:
+      - "8000:8080"
+    init: true
