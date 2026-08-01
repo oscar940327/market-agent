@@ -89,6 +89,30 @@ def test_success_without_findings_does_not_create_issue():
     assert "No actionable finding" in render_diagnosis_markdown(diagnosis)
 
 
+def test_universe_component_table_failure_has_actionable_diagnosis():
+    diagnosis = build_pipeline_diagnosis(
+        pipeline="monthly-universe",
+        workflow_status="failed",
+        sources=[
+            {
+                "status": "failed",
+                "errors": [
+                    {
+                        "step": "fetch_nasdaq100_components",
+                        "status": "failed",
+                        "message": "Could not find Nasdaq-100 components table.",
+                    }
+                ],
+            }
+        ],
+    )
+
+    finding = diagnosis["findings"][0]
+    assert finding["category"] == "provider_schema"
+    assert finding["retryable"] is False
+    assert "parser" in finding["recommended_action"]
+
+
 def test_degraded_ml_health_report_creates_trackable_issue():
     diagnosis = build_pipeline_diagnosis(
         pipeline="daily-outcomes",
@@ -252,3 +276,8 @@ def test_all_scheduled_workflows_use_diagnosis_without_contents_write():
         assert "contents: read" in text
         assert "contents: write" not in text
         assert "data/maintenance/diagnoses/*" in text
+
+    monthly_workflow = Path(".github/workflows/monthly-universe.yml").read_text(
+        encoding="utf-8"
+    )
+    assert "data/market/universe/monthly_universe_run.json" in monthly_workflow

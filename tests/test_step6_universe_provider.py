@@ -2,6 +2,7 @@ import json
 
 from data_providers.universe_provider import (
     NASDAQ100_PROVIDER,
+    WIKIPEDIA_NASDAQ100_API_URL,
     build_missing_metadata_rows,
     fetch_nasdaq100_components,
     normalize_universe_record,
@@ -36,6 +37,20 @@ SAMPLE_HTML = """
 """
 
 
+class FakeResponse:
+    def __init__(self, payload):
+        self.payload = payload
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, traceback):
+        return False
+
+    def read(self):
+        return json.dumps(self.payload).encode("utf-8")
+
+
 def test_parse_nasdaq100_components_html_finds_component_table():
     components = parse_nasdaq100_components_html(SAMPLE_HTML)
 
@@ -63,6 +78,44 @@ def test_fetch_nasdaq100_components_reports_provider_error():
     assert result.provider == NASDAQ100_PROVIDER
     assert result.records == []
     assert result.errors[0]["message"] == "network unavailable"
+
+
+def test_fetch_nasdaq100_components_uses_dedicated_components_page():
+    captured = {}
+    rows = "".join(
+        f"<tr><td>T{index:03d}</td><td>Company {index}</td><td>Technology</td></tr>"
+        for index in range(100)
+    )
+    html = (
+        '<table class="wikitable sortable"><tbody>'
+        "<tr><th>Ticker</th><th>Company</th><th>ICB Industry</th></tr>"
+        f"{rows}</tbody></table>"
+    )
+
+    def fake_open_url(request, timeout):
+        captured["url"] = request.full_url
+        captured["timeout"] = timeout
+        return FakeResponse({"parse": {"text": {"*": html}}})
+
+    result = fetch_nasdaq100_components(open_url=fake_open_url)
+
+    assert result.status == "success"
+    assert len(result.records) == 100
+    assert captured == {
+        "url": WIKIPEDIA_NASDAQ100_API_URL,
+        "timeout": 30,
+    }
+    assert "List_of_NASDAQ-100_companies" in captured["url"]
+
+
+def test_fetch_nasdaq100_components_rejects_implausible_component_count():
+    def fake_open_url(request, timeout):
+        return FakeResponse({"parse": {"text": {"*": SAMPLE_HTML}}})
+
+    result = fetch_nasdaq100_components(open_url=fake_open_url)
+
+    assert result.status == "invalid_components"
+    assert "records=2" in result.errors[0]["message"]
 
 
 def test_normalize_universe_record_adds_metadata_and_local_themes():

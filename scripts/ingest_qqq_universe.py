@@ -1,4 +1,5 @@
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -12,6 +13,9 @@ from data_providers.universe_provider import (  # noqa: E402
     write_universe_snapshot,
 )
 from data_store.supabase_store import upsert_tickers  # noqa: E402
+
+
+RUN_REPORT_FILENAME = "monthly_universe_run.json"
 
 
 def main() -> int:
@@ -35,6 +39,21 @@ def main() -> int:
         print(f"status={result.status}")
         for error in result.errors:
             print(f"error={error.get('message')}")
+        write_run_report(
+            output_dir=args.output_dir,
+            status="failed",
+            provider=result.provider,
+            provider_status=result.status,
+            records=0,
+            errors=[
+                {
+                    "step": "fetch_nasdaq100_components",
+                    "status": "failed",
+                    "message": error.get("message") or result.status,
+                }
+                for error in result.errors
+            ],
+        )
         return 1
 
     snapshot_path = write_universe_snapshot(
@@ -54,6 +73,14 @@ def main() -> int:
 
     if args.skip_supabase:
         print("supabase=skipped")
+        write_run_report(
+            output_dir=args.output_dir,
+            status="success",
+            provider=result.provider,
+            provider_status=result.status,
+            records=len(result.records),
+            supabase_status="skipped",
+        )
         return 0
 
     upsert_result = upsert_tickers(result.records)
@@ -62,9 +89,65 @@ def main() -> int:
 
     if upsert_result["status"] != "success":
         print(f"supabase_message={upsert_result.get('message')}")
+        write_run_report(
+            output_dir=args.output_dir,
+            status="failed",
+            provider=result.provider,
+            provider_status=result.status,
+            records=len(result.records),
+            supabase_status=upsert_result["status"],
+            errors=[
+                {
+                    "step": "upsert_tickers",
+                    "status": "failed",
+                    "message": upsert_result.get("message") or "Supabase upsert failed.",
+                }
+            ],
+        )
         return 1
 
+    write_run_report(
+        output_dir=args.output_dir,
+        status="success",
+        provider=result.provider,
+        provider_status=result.status,
+        records=len(result.records),
+        supabase_status=upsert_result["status"],
+        supabase_upserted=upsert_result["upserted_count"],
+    )
+
     return 0
+
+
+def write_run_report(
+    *,
+    output_dir: str | Path,
+    status: str,
+    provider: str,
+    provider_status: str,
+    records: int,
+    supabase_status: str | None = None,
+    supabase_upserted: int = 0,
+    errors: list[dict] | None = None,
+) -> Path:
+    output_path = Path(output_dir) / RUN_REPORT_FILENAME
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "pipeline": "monthly-universe",
+        "status": status,
+        "provider": provider,
+        "provider_status": provider_status,
+        "records": records,
+        "supabase_status": supabase_status,
+        "supabase_upserted": supabase_upserted,
+        "errors": errors or [],
+    }
+    output_path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    print(f"run_report={output_path}")
+    return output_path
 
 
 if __name__ == "__main__":

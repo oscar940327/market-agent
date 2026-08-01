@@ -20,6 +20,18 @@ STATUS_PRIORITY = {
 
 CATEGORY_RULES = (
     (
+        "provider_schema",
+        (
+            "no_components",
+            "could not find nasdaq-100 components table",
+            "component validation failed",
+            "invalid_components",
+        ),
+        "The external universe provider responded, but its component-table format or contents were not valid.",
+        "Inspect the provider page structure, update the universe parser, and verify the expected component count before retrying.",
+        False,
+    ),
+    (
         "supabase_schema",
         ("pgrst", "all object keys must match", "schema cache", "column", "relation does not exist"),
         "Supabase schema or payload shape does not match the write request.",

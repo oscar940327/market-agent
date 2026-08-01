@@ -12,10 +12,12 @@ from data.themes import THEMES
 
 WIKIPEDIA_NASDAQ100_API_URL = (
     "https://en.wikipedia.org/w/api.php?"
-    "action=parse&page=Nasdaq-100&prop=text&format=json"
+    "action=parse&page=List_of_NASDAQ-100_companies&prop=text&format=json"
 )
 NASDAQ100_PROVIDER = "wikipedia_nasdaq100_components"
 QQQ100_UNIVERSE = "QQQ100"
+MIN_EXPECTED_COMPONENTS = 90
+MAX_EXPECTED_COMPONENTS = 110
 
 
 @dataclass
@@ -123,6 +125,26 @@ def fetch_nasdaq100_components(open_url=urlopen) -> UniverseFetchResult:
             status="no_components",
             provider=NASDAQ100_PROVIDER,
             errors=[{"message": "Could not find Nasdaq-100 components table."}],
+            fetched_at=fetched_at,
+        )
+
+    component_count = len(components)
+    unique_ticker_count = len({component["ticker"] for component in components})
+    if (
+        not MIN_EXPECTED_COMPONENTS <= component_count <= MAX_EXPECTED_COMPONENTS
+        or unique_ticker_count != component_count
+    ):
+        return UniverseFetchResult(
+            status="invalid_components",
+            provider=NASDAQ100_PROVIDER,
+            errors=[
+                {
+                    "message": (
+                        "Nasdaq-100 component validation failed: "
+                        f"records={component_count}, unique_tickers={unique_ticker_count}."
+                    )
+                }
+            ],
             fetched_at=fetched_at,
         )
 
