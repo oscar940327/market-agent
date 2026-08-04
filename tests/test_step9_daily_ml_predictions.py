@@ -8,6 +8,7 @@ from daily_ml_predictions import (
     build_snapshot_states,
 )
 from data_store.supabase_store import (
+    insert_research_log,
     insert_ml_model_run,
     upsert_ml_predictions,
 )
@@ -268,3 +269,94 @@ def test_upsert_ml_predictions_uses_unique_conflict_key():
     assert result == {"status": "success", "upserted_count": 1}
     assert "on_conflict=ticker,prediction_date,model_version,feature_version,universe" in captured["url"]
     assert captured["payload"][0]["ticker"] == "MU"
+
+
+def test_upsert_ml_predictions_normalizes_mixed_record_keys():
+    captured = {}
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return b""
+
+    def fake_open_url(request, timeout):
+        captured["payload"] = json.loads(request.data.decode("utf-8"))
+        return FakeResponse()
+
+    result = upsert_ml_predictions(
+        [
+            {
+                "ticker": "MU",
+                "prediction_date": "2026-08-04",
+                "model_version": "baseline_v1",
+                "feature_version": "ml_features_v1",
+                "universe": "QQQ100",
+                "prediction_status": "ready",
+                "up_probability_5d": 0.55,
+            },
+            {
+                "ticker": "HONA",
+                "prediction_date": "2026-08-04",
+                "model_version": "baseline_v1",
+                "feature_version": "ml_features_v1",
+                "universe": "QQQ100",
+                "prediction_status": "failed",
+                "prediction_payload": {"error": "missing feature row"},
+            },
+        ],
+        supabase_url="https://example.supabase.co",
+        supabase_key="secret",
+        open_url=fake_open_url,
+    )
+
+    assert result == {"status": "success", "upserted_count": 2}
+    assert set(captured["payload"][0]) == set(captured["payload"][1])
+    assert captured["payload"][0]["prediction_payload"] is None
+    assert captured["payload"][1]["up_probability_5d"] is None
+
+
+def test_insert_research_log_replaces_nonfinite_json_numbers():
+    captured = {}
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return b'[{"id":"research-1"}]'
+
+    def fake_open_url(request, timeout):
+        captured["raw_payload"] = request.data.decode("utf-8")
+        captured["payload"] = json.loads(captured["raw_payload"])
+        return FakeResponse()
+
+    result = insert_research_log(
+        {
+            "query": "MU entry research",
+            "research_signal_score": float("nan"),
+            "output_snapshot": {
+                "positive_infinity": float("inf"),
+                "negative_infinity": float("-inf"),
+            },
+        },
+        supabase_url="https://example.supabase.co",
+        supabase_key="secret",
+        open_url=fake_open_url,
+    )
+
+    assert result == {"status": "success", "row": {"id": "research-1"}}
+    assert "NaN" not in captured["raw_payload"]
+    assert "Infinity" not in captured["raw_payload"]
+    assert captured["payload"]["research_signal_score"] is None
+    assert captured["payload"]["output_snapshot"] == {
+        "positive_infinity": None,
+        "negative_infinity": None,
+    }

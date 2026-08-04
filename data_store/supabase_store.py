@@ -1,4 +1,5 @@
 import json
+import math
 import os
 from datetime import UTC, datetime, timedelta
 from urllib.error import HTTPError
@@ -373,11 +374,12 @@ def upsert_ml_predictions(
     total_count = 0
 
     for chunk in chunk_records(records, chunk_size):
+        normalized_chunk = normalize_record_keys(chunk)
         endpoint = (
             f"{base_url}/rest/v1/ml_predictions?"
             "on_conflict=ticker,prediction_date,model_version,feature_version,universe"
         )
-        payload = json.dumps(chunk, allow_nan=False).encode("utf-8")
+        payload = encode_json_payload(normalized_chunk)
         request = Request(
             endpoint,
             data=payload,
@@ -1129,7 +1131,7 @@ def insert_research_log(
         supabase_key=supabase_key,
     )
     endpoint = f"{base_url}/rest/v1/research_logs"
-    payload = json.dumps(row).encode("utf-8")
+    payload = encode_json_payload(row)
     request = Request(
         endpoint,
         data=payload,
@@ -1719,3 +1721,35 @@ def chunk_records(records: list[dict], chunk_size: int) -> list[list[dict]]:
         records[index : index + chunk_size]
         for index in range(0, len(records), chunk_size)
     ]
+
+
+def normalize_record_keys(records: list[dict]) -> list[dict]:
+    """Give every row in a PostgREST bulk request the same top-level keys."""
+    if not records:
+        return []
+
+    keys = set().union(*(record.keys() for record in records))
+    return [
+        {key: record.get(key) for key in keys}
+        for record in records
+    ]
+
+
+def encode_json_payload(value) -> bytes:
+    return json.dumps(
+        sanitize_json_value(value),
+        allow_nan=False,
+        default=str,
+    ).encode("utf-8")
+
+
+def sanitize_json_value(value):
+    if isinstance(value, float) and (math.isnan(value) or math.isinf(value)):
+        return None
+    if hasattr(value, "item"):
+        return sanitize_json_value(value.item())
+    if isinstance(value, dict):
+        return {key: sanitize_json_value(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [sanitize_json_value(item) for item in value]
+    return value

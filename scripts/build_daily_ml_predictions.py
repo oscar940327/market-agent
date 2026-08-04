@@ -280,6 +280,8 @@ def main() -> int:
     print(f"model_run_id={model_run_id}")
     print(f"supabase={upsert_result['status']}")
     print(f"upserted={upsert_result.get('upserted_count', 0)}")
+    if upsert_result["status"] == "error":
+        print(f"message={upsert_result.get('message', 'Unknown Supabase error.')}")
     if failures:
         print(f"failed_tickers={','.join(failure['ticker'] for failure in failures)}")
     if args.dry_run and records:
