@@ -1,4 +1,5 @@
 import argparse
+import json
 import os
 import sys
 from pathlib import Path
@@ -46,10 +47,14 @@ def main() -> int:
         else:
             result = send_pipeline_alert_if_needed(log)
     else:
+        message = add_preflight_failure_context(
+            args.message
+            or "GitHub Actions workflow failed before a pipeline log was available."
+        )
         alert = build_github_action_alert(
             pipeline=args.pipeline,
             status=args.status,
-            message=args.message or "GitHub Actions workflow failed before a pipeline log was available.",
+            message=message,
             log_path=args.log_path,
             run_url=args.run_url or build_github_run_url(),
         )
@@ -73,6 +78,21 @@ def build_github_run_url() -> str | None:
     if not (server_url and repository and run_id):
         return None
     return f"{server_url}/{repository}/actions/runs/{run_id}"
+
+
+def add_preflight_failure_context(message: str) -> str:
+    path = PROJECT_ROOT / "data" / "maintenance" / "supabase_preflight.json"
+    if not path.exists():
+        return message
+    try:
+        report = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return message
+    if report.get("status") != "failed":
+        return message
+    errors = report.get("errors") or []
+    detail = errors[0].get("message") if errors and isinstance(errors[0], dict) else None
+    return f"{message} {detail}" if detail else message
 
 
 if __name__ == "__main__":

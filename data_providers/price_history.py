@@ -22,6 +22,7 @@ class PriceIngestPlan:
     fetch_start_date: date
     research_years: int = RESEARCH_YEARS
     buffer_months: int = BUFFER_MONTHS
+    incremental: bool = False
 
 
 @dataclass
@@ -64,6 +65,29 @@ def build_price_ingest_plan(
         fetch_start_date=fetch_start_date,
         research_years=research_years,
         buffer_months=buffer_months,
+    )
+
+
+def build_incremental_price_ingest_plan(
+    *,
+    latest_date: date | None,
+    data_end_date: date | None = None,
+    overlap_days: int = 10,
+) -> PriceIngestPlan:
+    resolved_end_date = data_end_date or date.today()
+    if latest_date is None:
+        return build_price_ingest_plan(data_end_date=resolved_end_date)
+
+    fetch_start_date = min(latest_date, resolved_end_date) - timedelta(
+        days=max(overlap_days, 0)
+    )
+    return PriceIngestPlan(
+        data_end_date=resolved_end_date,
+        research_start_date=fetch_start_date,
+        fetch_start_date=fetch_start_date,
+        research_years=0,
+        buffer_months=0,
+        incremental=True,
     )
 
 
@@ -238,6 +262,9 @@ def classify_price_history_status(
     trading_days_in_research_window: int,
     plan: PriceIngestPlan,
 ) -> str:
+    if plan.incremental:
+        return "success"
+
     if first_date > plan.research_start_date:
         return "insufficient_history"
 
@@ -254,6 +281,9 @@ def classify_insufficient_reason(
     trading_days_in_research_window: int,
     plan: PriceIngestPlan,
 ) -> str | None:
+    if plan.incremental:
+        return None
+
     if status == "success":
         return None
 

@@ -113,31 +113,44 @@ def build_price_steps(args: argparse.Namespace) -> list[PipelineStep]:
     return [
         PipelineStep(
             name="benchmark_prices",
-            command=script_command("ingest_benchmark.py"),
+            command=script_command("ingest_benchmark.py", "--incremental"),
             core=True,
             retryable=True,
         ),
         PipelineStep(
             name="daily_prices",
-            command=script_command("ingest_daily_prices.py", *tickers_args),
+            command=script_command(
+                "ingest_daily_prices.py",
+                "--incremental",
+                *tickers_args,
+            ),
             core=True,
             retryable=True,
         ),
         PipelineStep(
             name="benchmark_technical_features",
-            command=script_command("compute_technical_features.py", "--tickers", "QQQ"),
+            command=script_command(
+                "compute_technical_features.py",
+                "--incremental",
+                "--tickers",
+                "QQQ",
+            ),
             core=True,
             retryable=True,
         ),
         PipelineStep(
             name="technical_features",
-            command=script_command("compute_technical_features.py", *tickers_args),
+            command=script_command(
+                "compute_technical_features.py",
+                "--incremental",
+                *tickers_args,
+            ),
             core=True,
             retryable=True,
         ),
         PipelineStep(
             name="market_regimes",
-            command=script_command("compute_market_regime.py"),
+            command=script_command("compute_market_regime.py", "--incremental"),
             core=True,
             retryable=True,
         ),

@@ -39,6 +39,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Check Supabase access
+        run: python scripts/check_supabase_access.py
+
       - name: Update QQQ100 universe
         run: python scripts/ingest_qqq_universe.py
 
@@ -48,7 +51,7 @@ jobs:
         with:
           pipeline: monthly-universe
           status: ${{ job.status }}
-          input-paths: data/market/universe/monthly_universe_run.json
+          input-paths: data/maintenance/supabase_preflight.json,data/market/universe/monthly_universe_run.json
 
       - name: Send failure alert
         if: failure()

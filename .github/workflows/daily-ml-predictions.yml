@@ -2,6 +2,7 @@ name: Daily ML Predictions
 
 permissions:
   contents: read
+  actions: read
   issues: write
 
 on:
@@ -65,8 +66,41 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Build fresh ML training dataset
-        run: python scripts/build_ml_training_dataset.py
+      - name: Check Supabase access
+        run: python scripts/check_supabase_access.py
+
+      - name: Restore latest weekly ML dataset
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p data/ml
+          RUN_ID=$(gh run list \
+            --workflow weekly-ml-dataset.yml \
+            --branch "${GITHUB_REF_NAME}" \
+            --status success \
+            --limit 1 \
+            --json databaseId \
+            --jq '.[0].databaseId')
+          if [ -z "$RUN_ID" ]; then
+            echo "No successful weekly ML dataset workflow was found."
+            exit 1
+          fi
+          rm -rf data/ml/weekly-artifact
+          gh run download "$RUN_ID" \
+            --name weekly-ml-training-dataset \
+            --dir data/ml/weekly-artifact
+          CSV_PATH=$(find data/ml/weekly-artifact -name training_dataset_v1.csv -print -quit)
+          METADATA_PATH=$(find data/ml/weekly-artifact -name training_dataset_v1_metadata.json -print -quit)
+          if [ -z "$CSV_PATH" ] || [ -z "$METADATA_PATH" ]; then
+            echo "The weekly ML dataset artifact is incomplete."
+            exit 1
+          fi
+          cp "$CSV_PATH" data/ml/training_dataset_v1.csv
+          cp "$METADATA_PATH" data/ml/training_dataset_v1_metadata.json
+
+      - name: Refresh recent ML dataset rows
+        run: python scripts/refresh_ml_training_dataset.py
 
       - name: Build similar-case accumulation
         run: python scripts/build_similar_case_results.py
@@ -100,7 +134,7 @@ jobs:
         with:
           pipeline: daily-ml-predictions
           status: ${{ job.status }}
-          input-paths: data/ml/training_dataset_v1_metadata.json,data/ml/monitoring/similar_case_accumulation_v1.json
+          input-paths: data/maintenance/supabase_preflight.json,data/ml/training_dataset_v1_metadata.json,data/ml/monitoring/similar_case_accumulation_v1.json
 
       - name: Send failure alert
         if: failure()

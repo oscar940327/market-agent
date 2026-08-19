@@ -48,6 +48,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Check Supabase access
+        run: python scripts/check_supabase_access.py
+
       - name: Build current ML dataset
         run: python scripts/build_ml_training_dataset.py
 
@@ -69,7 +72,7 @@ jobs:
         with:
           pipeline: monthly-model-promotion
           status: ${{ job.status }}
-          input-paths: data/ml/model_reports/step28_model_quality_upgrade_v1.json,data/ml/promotion
+          input-paths: data/maintenance/supabase_preflight.json,data/ml/model_reports/step28_model_quality_upgrade_v1.json,data/ml/promotion
 
       - name: Send failure alert
         if: failure()
@@ -90,4 +93,3 @@ jobs:
             data/ml/promotion/*
             data/maintenance/diagnoses/*
           if-no-files-found: ignore
-

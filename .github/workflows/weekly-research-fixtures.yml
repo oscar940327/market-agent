@@ -63,6 +63,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Check Supabase access
+        run: python scripts/check_supabase_access.py
+
       - name: Run weekly research fixtures and send report
         run: >
           python scripts/log_daily_research_fixtures.py
@@ -81,6 +84,7 @@ jobs:
         with:
           pipeline: weekly-research-fixtures
           status: ${{ job.status }}
+          input-paths: data/maintenance/supabase_preflight.json,data/research_reports/weekly_research_fixture_report_v1.json
 
       - name: Send failure alert
         if: failure()

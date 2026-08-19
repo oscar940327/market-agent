@@ -20,6 +20,18 @@ STATUS_PRIORITY = {
 
 CATEGORY_RULES = (
     (
+        "supabase_quota",
+        (
+            "exceed_egress_quota",
+            "exceeded egress quota",
+            "supabase preflight failed with http 402",
+            "service for this project is restricted",
+        ),
+        "Supabase restricted the project after its data-transfer quota was exceeded.",
+        "Restore Supabase service by increasing the available quota or waiting for the quota reset, then rerun the workflow. The workflow stopped early to avoid downstream failures and LLM cost.",
+        False,
+    ),
+    (
         "provider_schema",
         (
             "no_components",

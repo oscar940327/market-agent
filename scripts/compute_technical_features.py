@@ -1,5 +1,6 @@
 import argparse
 import sys
+from datetime import date, timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -11,6 +12,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from data_store.supabase_store import (  # noqa: E402
     fetch_active_tickers,
     fetch_daily_prices,
+    fetch_latest_date,
     upsert_technical_features,
 )
 from technical_features import build_technical_feature_records  # noqa: E402
@@ -31,6 +33,14 @@ def main() -> int:
     parser.add_argument("--limit", type=int, help="Limit active universe tickers.")
     parser.add_argument("--universe", default="QQQ100")
     parser.add_argument("--provider", default="yfinance")
+    parser.add_argument("--feature-version", default="v1")
+    parser.add_argument(
+        "--incremental",
+        action="store_true",
+        help="Read only the warmup window and upsert newly affected feature rows.",
+    )
+    parser.add_argument("--warmup-days", type=int, default=420)
+    parser.add_argument("--overlap-days", type=int, default=10)
     parser.add_argument(
         "--skip-supabase",
         action="store_true",
@@ -58,18 +68,45 @@ def main() -> int:
     total_upserted = 0
 
     for ticker in tickers:
-        rows = fetch_daily_prices(ticker=ticker, provider=args.provider)
+        latest_value = None
+        price_start_date = None
+        if args.incremental:
+            latest_value = fetch_latest_date(
+                table="technical_features",
+                filters={
+                    "ticker": f"eq.{ticker}",
+                    "price_provider": f"eq.{args.provider}",
+                    "feature_version": f"eq.{args.feature_version}",
+                },
+            )
+            if latest_value:
+                price_start_date = (
+                    date.fromisoformat(latest_value) - timedelta(days=args.warmup_days)
+                ).isoformat()
+
+        rows = fetch_daily_prices(
+            ticker=ticker,
+            provider=args.provider,
+            start_date=price_start_date,
+        )
         price_data = pd.DataFrame(rows)
         records = build_technical_feature_records(
             ticker=ticker,
             price_provider=args.provider,
             price_data=price_data,
+            feature_version=args.feature_version,
         )
+        if args.incremental and latest_value:
+            affected_start = (
+                date.fromisoformat(latest_value) - timedelta(days=args.overlap_days)
+            ).isoformat()
+            records = [record for record in records if record["date"] >= affected_start]
         total_features += len(records)
 
         if args.skip_supabase:
             print(
-                f"ticker={ticker} price_rows={len(rows)} feature_rows={len(records)} supabase_rows=0"
+                f"ticker={ticker} price_rows={len(rows)} feature_rows={len(records)} "
+                f"stored_latest={latest_value or 'missing'} supabase_rows=0"
             )
             continue
 
@@ -87,6 +124,7 @@ def main() -> int:
         total_upserted += upsert_result["upserted_count"]
         print(
             f"ticker={ticker} price_rows={len(rows)} feature_rows={len(records)} "
+            f"stored_latest={latest_value or 'missing'} "
             f"supabase_rows={upsert_result['upserted_count']}"
         )
 

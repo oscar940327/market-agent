@@ -42,7 +42,7 @@ GitHub Actions 實際設定仍是 UTC cron，且不會自動依照美國日光�
 | `daily-prices.yml` | 週二到週六 `06:15` | 週一到週五 `22:15 UTC` | 更新 QQQ、QQQ100 價格、技術特徵、市場環境、基本面 |
 | `daily-news.yml` | 週二到週六 `07:30` | 週一到週五 `23:30 UTC` | 抓新聞、分類新聞、產生新聞摘要 |
 | `daily-outcomes.yml` | 週二到週六 `08:15` | 週二到週六 `00:15 UTC` | 計算成熟 research outcomes、ML prediction outcomes、metrics、calibration、ML health |
-| `daily-ml-predictions.yml` | 週二到週六 `09:30` | 週二到週六 `01:30 UTC` | 建立最新 ML dataset artifact、similar-case accumulation、每日 ML predictions |
+| `daily-ml-predictions.yml` | 週二到週六 `09:30` | 週二到週六 `01:30 UTC` | 復用 weekly dataset、刷新近期成熟資料、建立 similar-case accumulation 與每日 ML predictions |
 | `daily-research-fixtures.yml` | 週二到週六 `09:45` | 週二到週六 `01:45 UTC` | 執行四個固定測資、寫入 research logs / outcomes、寄出 daily research report |
 | `weekly-research-fixtures.yml` | 週六 `10:30` | 週六 `02:30 UTC` | 執行 NVDA、AAPL、半導體主題、MU 放量與拉回策略測資，寄出 weekly research report |
 | `weekly-ml-dataset.yml` | 週日 `13:00` | 週日 `05:00 UTC` | 建立 weekly ML dataset 與完整 monitoring reports |
@@ -50,6 +50,8 @@ GitHub Actions 實際設定仍是 UTC cron，且不會自動依照美國日光�
 | `monthly-model-promotion.yml` | 每月 2 日 `15:00` | 每月 2 日 `07:00 UTC` | 重訓候選模型、執行 walk-forward 比較、shadow review 並寄出明確模型建議 |
 
 所有排程完成後都會執行 rule-based maintenance diagnosis，並將 JSON / Markdown 報告放入 workflow artifact。失敗、partial success、degraded、stale 或 missing 狀態會建立或更新 GitHub Issue；相同 fingerprint 只更新原 Issue，不會每天重複建立。
+
+需要 Supabase 的 workflow 會先執行小型 preflight。若專案被配額限制或憑證無效，流程會在大型查詢與 LLM 呼叫前停止，並把實際 HTTP 原因交給 maintenance diagnosis。
 
 完整說明：[Automation and Self-Maintenance](automation_maintenance.md)
 
@@ -74,9 +76,9 @@ python scripts/run_daily_pipeline.py --only prices
    - 更新 universe 股票價格。
    - 目前是補齊 Supabase 缺少或需要更新的每日 OHLCV，不是每天重抓完整 15 年資料。
 3. `benchmark_technical_features`
-   - 計算 QQQ 技術特徵。
+   - 使用足夠計算 MA200 的近期 warmup window，更新 QQQ 技術特徵。
 4. `technical_features`
-   - 計算 universe 股票技術特徵。
+   - 使用近期 warmup window 計算 universe 股票技術特徵，只回寫新資料與短期重疊區間。
 5. `market_regimes`
    - 用 QQQ 判斷市場環境。
 6. `freshness_check`
@@ -130,13 +132,16 @@ Daily ML Predictions
 
 主要步驟：
 
-1. 建立最新 ML training dataset artifact。
-2. 建立 similar-case accumulation。
-3. 針對 universe 產生每日 ML predictions。
-4. 寫入 `ml_predictions`。
+1. 下載最近一次成功的 weekly ML training dataset artifact。
+2. 從 Supabase 只讀取近期窗口，補入新成熟的 labels 與 feature rows。
+3. 建立 similar-case accumulation。
+4. 針對 universe 產生每日 ML predictions。
+5. 寫入 `ml_predictions`。
 
-這裡的 prediction 是每天用最新資料做 inference / reference。  
-它不代表每天重新訓練模型。
+這裡的 prediction 是每天用最新已成熟的 dataset rows 更新 inference / reference；當日價格與技術狀態仍由 research pipeline 另外讀取。
+它不代表每天重新訓練模型，也不會把尚未成熟的 5 / 10 / 20 日 labels 當成已知結果。
+
+完整 15 年 dataset 仍由 `weekly-ml-dataset.yml` 每週重建；每日流程不再重複下載所有歷史資料。
 
 ## Outcome Pipeline
 

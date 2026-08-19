@@ -39,6 +39,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Check Supabase access
+        run: python scripts/check_supabase_access.py
+
       - name: Build ML training dataset
         run: python scripts/build_ml_training_dataset.py
 
@@ -66,7 +69,7 @@ jobs:
         with:
           pipeline: weekly-ml-dataset
           status: ${{ job.status }}
-          input-paths: data/ml/monitoring/ml_health_report_v1.json,data/ml/monitoring/ml_drift_report_v1.json,data/maintenance/data_recovery/latest_data_recovery.json
+          input-paths: data/maintenance/supabase_preflight.json,data/ml/monitoring/ml_health_report_v1.json,data/ml/monitoring/ml_drift_report_v1.json,data/maintenance/data_recovery/latest_data_recovery.json
 
       - name: Send failure alert
         if: failure()

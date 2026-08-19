@@ -48,6 +48,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Check Supabase access
+        run: python scripts/check_supabase_access.py
+
       - name: Run daily news pipeline
         run: python scripts/run_daily_pipeline.py --only news
 
@@ -57,7 +60,7 @@ jobs:
         with:
           pipeline: daily-news
           status: ${{ job.status }}
-          input-paths: data/pipeline_runs/latest_daily_pipeline.json
+          input-paths: data/maintenance/supabase_preflight.json,data/pipeline_runs/latest_daily_pipeline.json
 
       - name: Send failure alert
         if: failure()

@@ -8,11 +8,16 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from data_providers.price_history import (  # noqa: E402
+    build_incremental_price_ingest_plan,
     build_price_ingest_plan,
     fetch_daily_price_history,
     write_price_ingest_report,
 )
-from data_store.supabase_store import fetch_active_tickers, upsert_daily_prices  # noqa: E402
+from data_store.supabase_store import (  # noqa: E402
+    fetch_active_tickers,
+    fetch_latest_date,
+    upsert_daily_prices,
+)
 
 
 def parse_tickers(value: str | None) -> list[str] | None:
@@ -30,6 +35,17 @@ def main() -> int:
     parser.add_argument("--limit", type=int, help="Limit active universe tickers.")
     parser.add_argument("--universe", default="QQQ100")
     parser.add_argument("--data-end-date", help="YYYY-MM-DD. Defaults to today.")
+    parser.add_argument(
+        "--incremental",
+        action="store_true",
+        help="Fetch only a short overlap after the latest stored price date.",
+    )
+    parser.add_argument(
+        "--overlap-days",
+        type=int,
+        default=10,
+        help="Calendar-day overlap used by incremental updates.",
+    )
     parser.add_argument(
         "--output-dir",
         default="data/market/prices",
@@ -58,18 +74,33 @@ def main() -> int:
     data_end_date = (
         date.fromisoformat(args.data_end_date) if args.data_end_date else date.today()
     )
-    plan = build_price_ingest_plan(data_end_date=data_end_date)
-
     print(f"tickers={len(tickers)}")
-    print(f"data_end_date={plan.data_end_date}")
-    print(f"research_start_date={plan.research_start_date}")
-    print(f"fetch_start_date={plan.fetch_start_date}")
+    print(f"data_end_date={data_end_date}")
+    print(f"mode={'incremental' if args.incremental else 'full_history'}")
 
     results = []
     supabase_status = "skipped"
     supabase_upserted = 0
 
     for ticker in tickers:
+        if args.incremental:
+            latest_value = fetch_latest_date(
+                table="daily_prices",
+                filters={
+                    "ticker": f"eq.{ticker}",
+                    "provider": "eq.yfinance",
+                },
+            )
+            latest_date = date.fromisoformat(latest_value) if latest_value else None
+            plan = build_incremental_price_ingest_plan(
+                latest_date=latest_date,
+                data_end_date=data_end_date,
+                overlap_days=args.overlap_days,
+            )
+        else:
+            latest_value = None
+            plan = build_price_ingest_plan(data_end_date=data_end_date)
+
         result = fetch_daily_price_history(ticker=ticker, plan=plan)
         results.append(result)
 
@@ -85,6 +116,8 @@ def main() -> int:
                     " ".join(
                         [
                             f"ticker={result.ticker}",
+                            f"stored_latest={latest_value or 'missing'}",
+                            f"fetch_start={plan.fetch_start_date}",
                             f"supabase={upsert_result['status']}",
                             f"message={upsert_result.get('message')}",
                         ]
@@ -98,6 +131,8 @@ def main() -> int:
                     f"ticker={result.ticker}",
                     f"status={result.status}",
                     f"provider={result.provider}",
+                    f"stored_latest={latest_value or 'missing'}",
+                    f"fetch_start={plan.fetch_start_date}",
                     f"rows={result.row_count}",
                     f"supabase_rows={len(result.records) if not args.skip_supabase else 0}",
                 ]

@@ -757,6 +757,9 @@ def fetch_daily_prices(
     *,
     ticker: str,
     provider: str = "yfinance",
+    start_date: str | None = None,
+    end_date: str | None = None,
+    recent_limit: int | None = None,
     supabase_url: str | None = None,
     supabase_key: str | None = None,
     open_url=urlopen,
@@ -769,12 +772,24 @@ def fetch_daily_prices(
     rows = []
     offset = 0
 
+    if recent_limit is not None and recent_limit <= 0:
+        return []
+
     while True:
+        remaining = recent_limit - len(rows) if recent_limit is not None else None
+        request_limit = min(page_size, remaining) if remaining is not None else page_size
+        order_direction = "desc" if recent_limit is not None else "asc"
+        date_filters = ""
+        if start_date:
+            date_filters += f"&date=gte.{start_date}"
+        if end_date:
+            date_filters += f"&date=lte.{end_date}"
         endpoint = (
             f"{base_url}/rest/v1/daily_prices?"
             "select=date,open,high,low,close,volume,provider"
             f"&ticker=eq.{ticker.upper()}&provider=eq.{provider}"
-            f"&order=date.asc&limit={page_size}&offset={offset}"
+            f"{date_filters}&order=date.{order_direction}"
+            f"&limit={request_limit}&offset={offset}"
         )
         request = Request(
             endpoint,
@@ -791,10 +806,12 @@ def fetch_daily_prices(
 
         rows.extend(page_rows)
 
-        if len(page_rows) < page_size:
-            return rows
+        if len(page_rows) < request_limit or (
+            recent_limit is not None and len(rows) >= recent_limit
+        ):
+            return list(reversed(rows)) if recent_limit is not None else rows
 
-        offset += page_size
+        offset += request_limit
 
 
 def fetch_technical_features(
@@ -802,6 +819,7 @@ def fetch_technical_features(
     ticker: str,
     price_provider: str = "yfinance",
     feature_version: str = "v1",
+    start_date: str | None = None,
     supabase_url: str | None = None,
     supabase_key: str | None = None,
     open_url=urlopen,
@@ -815,6 +833,7 @@ def fetch_technical_features(
     offset = 0
 
     while True:
+        date_filter = f"&date=gte.{start_date}" if start_date else ""
         endpoint = (
             f"{base_url}/rest/v1/technical_features?"
             "select=ticker,date,price_provider,close,volume,ma5,ma10,ma20,ma50,"
@@ -826,6 +845,7 @@ def fetch_technical_features(
             "volatility_regime,feature_version"
             f"&ticker=eq.{ticker.upper()}&price_provider=eq.{price_provider}"
             f"&feature_version=eq.{feature_version}"
+            f"{date_filter}"
             f"&order=date.asc&limit={page_size}&offset={offset}"
         )
         request = Request(
@@ -1078,6 +1098,7 @@ def fetch_market_regimes(
     *,
     benchmark: str = "QQQ",
     rule_version: str = "v1",
+    start_date: str | None = None,
     supabase_url: str | None = None,
     supabase_key: str | None = None,
     open_url=urlopen,
@@ -1091,11 +1112,13 @@ def fetch_market_regimes(
     offset = 0
 
     while True:
+        date_filter = f"&date=gte.{start_date}" if start_date else ""
         endpoint = (
             f"{base_url}/rest/v1/market_regimes?"
             "select=date,benchmark,regime,close,ma200,three_month_return,"
             "regime_changed,previous_regime,rule_version,data_as_of"
             f"&benchmark=eq.{benchmark.upper()}&rule_version=eq.{rule_version}"
+            f"{date_filter}"
             f"&order=date.asc&limit={page_size}&offset={offset}"
         )
         request = Request(
@@ -1319,6 +1342,7 @@ def fetch_news_events(
 def fetch_news_events_for_dataset(
     *,
     ticker: str,
+    start_date: str | None = None,
     supabase_url: str | None = None,
     supabase_key: str | None = None,
     open_url=urlopen,
@@ -1332,11 +1356,15 @@ def fetch_news_events_for_dataset(
     offset = 0
 
     while True:
+        published_filter = (
+            f"&published_at=gte.{start_date}T00:00:00Z" if start_date else ""
+        )
         endpoint = (
             f"{base_url}/rest/v1/news_events?"
             "select=ticker,published_at,sentiment,topic,importance,source_quality,"
             "ticker_relevance"
             f"&ticker=eq.{ticker.upper()}"
+            f"{published_filter}"
             f"&order=published_at.asc&limit={page_size}&offset={offset}"
         )
         request = Request(
@@ -1518,6 +1546,7 @@ def fetch_research_outcomes_for_summary(
 def fetch_similar_case_results(
     *,
     ticker: str,
+    start_date: str | None = None,
     supabase_url: str | None = None,
     supabase_key: str | None = None,
     open_url=urlopen,
@@ -1531,6 +1560,7 @@ def fetch_similar_case_results(
     offset = 0
 
     while True:
+        date_filter = f"&query_date=gte.{start_date}" if start_date else ""
         endpoint = (
             f"{base_url}/rest/v1/similar_case_results?"
             "select=query_ticker,query_date,scope,relaxation_step,technical_pattern,"
@@ -1538,6 +1568,7 @@ def fetch_similar_case_results(
             "win_rate_20d,average_forward_return_20d,max_loss_20d,"
             "evidence_quality,source_data_as_of,result_status"
             f"&query_ticker=eq.{ticker.upper()}"
+            f"{date_filter}"
             f"&order=query_date.asc&limit={page_size}&offset={offset}"
         )
         request = Request(

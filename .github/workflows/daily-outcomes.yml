@@ -39,6 +39,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Check Supabase access
+        run: python scripts/check_supabase_access.py
+
       - name: Update matured research outcomes
         run: python scripts/compute_research_outcomes.py --limit 100
 
@@ -66,7 +69,7 @@ jobs:
         with:
           pipeline: daily-outcomes
           status: ${{ job.status }}
-          input-paths: data/ml/monitoring/ml_health_report_v1.json
+          input-paths: data/maintenance/supabase_preflight.json,data/ml/monitoring/ml_health_report_v1.json
 
       - name: Send failure alert
         if: failure()
