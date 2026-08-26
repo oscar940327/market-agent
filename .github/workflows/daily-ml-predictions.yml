@@ -100,7 +100,7 @@ jobs:
           cp "$METADATA_PATH" data/ml/training_dataset_v1_metadata.json
 
       - name: Refresh recent ML dataset rows
-        run: python scripts/refresh_ml_training_dataset.py
+        run: python scripts/refresh_ml_training_dataset.py --window-days 140
 
       - name: Build similar-case accumulation
         run: python scripts/build_similar_case_results.py

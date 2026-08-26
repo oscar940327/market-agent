@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 
 from data_store.supabase_store import insert_news_events
 from data_store.supabase_store import fetch_news_events
+from data_store.supabase_store import fetch_news_events_for_summary
 from data_store.supabase_store import update_news_event_classification
 from agent.experts.news_agent import run_news_agent
 from agent.analyst import format_single_stock_analysis
@@ -316,6 +317,38 @@ def test_fetch_news_events_filters_by_ticker():
     )
 
     assert rows == [{"ticker": "MU", "title": "Micron news"}]
+
+
+def test_fetch_news_events_for_summary_filters_date_and_uses_compact_fields():
+    captured = {}
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return None
+
+        def read(self):
+            return b'[{"ticker":"MU","title":"Recent news"}]'
+
+    def fake_open_url(request, timeout):
+        captured["url"] = request.full_url
+        return FakeResponse()
+
+    rows = fetch_news_events_for_summary(
+        ticker="MU",
+        start_at="2026-07-28T00:00:00+00:00",
+        supabase_url="https://example.supabase.co",
+        supabase_key="secret",
+        open_url=fake_open_url,
+    )
+
+    assert rows == [{"ticker": "MU", "title": "Recent news"}]
+    assert "ticker=eq.MU" in captured["url"]
+    assert "published_at=gte." in captured["url"]
+    assert "content_snippet" not in captured["url"]
+    assert "extractor_model" not in captured["url"]
 
 
 def test_news_agent_uses_news_events_summary_when_available(monkeypatch):

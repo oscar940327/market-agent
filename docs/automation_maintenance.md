@@ -17,6 +17,17 @@ Workflow 執行
 
 診斷本身不使用 LLM，也不消耗 OpenRouter token。
 
+## 資料流量維護
+
+自動化同時遵守低 egress 原則：
+
+- Daily workflow 使用增量查詢與短窗口 monitoring。
+- Weekly ML workflow 優先重用上一份 dataset artifact；只有找不到任何可用 artifact 時才完整 bootstrap。
+- Monthly promotion 必須使用最新 weekly artifact。若 artifact 不存在，workflow 會明確失敗並通知，不會默默改成完整資料庫掃描。
+- Artifact 只存在 GitHub Actions，不會寫回 repository，也不會增加 Supabase database size。
+
+Supabase Usage 顯示的是實際傳輸量；程式只能降低讀取，不能保證外部服務一定低於固定配額。應定期查看 Dashboard 的 usage，若流量仍異常，先檢查是否反覆執行手動 workflow、artifact 是否過期，以及 API 是否有大量查詢。
+
 ## 可以判斷哪些問題
 
 | Category | 意思 | 第一個動作 |

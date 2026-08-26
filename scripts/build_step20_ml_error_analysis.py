@@ -35,6 +35,7 @@ def main(argv: list[str] | None = None) -> int:
         model_version=args.model_version,
         days=args.days,
         limit=args.limit,
+        include_feature_snapshot=True,
     )
     report = build_step20_error_analysis_report(
         outcomes,

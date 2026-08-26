@@ -7,13 +7,15 @@
 `monthly-model-promotion.yml` 於每月 2 日台灣時間 15:00 執行：
 
 ```text
-更新 training dataset
+下載最新 weekly training dataset artifact
 -> 執行 Step 28 walk-forward 比較
 -> 檢查既有 shadow outcomes
 -> 產生明確 recommendation
 -> 寫入 Supabase
 -> 寄送 Email
 ```
+
+Monthly promotion 不會重新從 Supabase 掃描完整歷史資料。若找不到成功的 weekly dataset artifact，流程會停止並寄出失敗通知，應先重新執行 `weekly-ml-dataset.yml`。
 
 Email 一定會明確顯示以下其中一種結論：
 

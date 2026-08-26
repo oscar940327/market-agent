@@ -171,7 +171,13 @@ def test_upsert_ml_prediction_outcomes_uses_prediction_horizon_conflict_key():
 
 def test_compute_ml_prediction_outcomes_script_groups_prices_and_writes(monkeypatch, tmp_path, capsys):
     monkeypatch.setattr(script, "fetch_ml_predictions_for_outcomes", lambda universe, limit: [make_prediction()])
-    monkeypatch.setattr(script, "fetch_daily_prices", lambda ticker, provider: make_price_rows())
+    captured_price_query = {}
+
+    def fake_fetch_prices(ticker, provider, start_date=None):
+        captured_price_query["start_date"] = start_date
+        return make_price_rows()
+
+    monkeypatch.setattr(script, "fetch_daily_prices", fake_fetch_prices)
 
     captured = {}
 
@@ -191,6 +197,7 @@ def test_compute_ml_prediction_outcomes_script_groups_prices_and_writes(monkeypa
     assert "json_path=" in output
     assert "supabase=success" in output
     assert len(captured["updates"]) == 3
+    assert captured_price_query["start_date"] == "2026-06-23"
 
 
 def test_compute_ml_prediction_outcomes_skips_completed_predictions(monkeypatch, tmp_path, capsys):
@@ -205,7 +212,11 @@ def test_compute_ml_prediction_outcomes_skips_completed_predictions(monkeypatch,
         "fetch_ml_predictions_for_outcomes",
         lambda universe, limit: [prediction],
     )
-    monkeypatch.setattr(script, "fetch_daily_prices", lambda ticker, provider: [])
+    monkeypatch.setattr(
+        script,
+        "fetch_daily_prices",
+        lambda ticker, provider, start_date=None: [],
+    )
 
     captured = {}
 

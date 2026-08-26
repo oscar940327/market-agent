@@ -10,6 +10,7 @@ from data_store.supabase_store import fetch_daily_prices
 from maintenance.diagnostics import build_pipeline_diagnosis
 from scripts.check_supabase_access import classify_http_failure
 from scripts.refresh_ml_training_dataset import merge_rows
+from scripts.compute_research_outcomes import build_price_window_start
 from scripts.send_pipeline_alert import add_preflight_failure_context
 
 
@@ -120,9 +121,53 @@ def test_daily_ml_workflow_restores_weekly_base_and_refreshes_recent_rows():
     )
 
     assert "Restore latest weekly ML dataset" in workflow
-    assert "python scripts/refresh_ml_training_dataset.py" in workflow
+    assert "python scripts/refresh_ml_training_dataset.py --window-days 140" in workflow
     assert "python scripts/build_ml_training_dataset.py" not in workflow
     assert "python scripts/check_supabase_access.py" in workflow
+
+
+def test_outcome_price_window_starts_before_earliest_pending_record():
+    start_date = build_price_window_start(
+        [
+            {"query_date": "2026-08-20"},
+            {"query_date": "2026-08-10"},
+        ],
+        date_field="query_date",
+    )
+
+    assert start_date == "2026-08-03"
+
+
+def test_weekly_ml_workflow_reuses_artifact_after_one_time_bootstrap():
+    workflow = Path(".github/workflows/weekly-ml-dataset.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert "Restore previous weekly ML dataset" in workflow
+    assert "Bootstrap ML training dataset" in workflow
+    assert "steps.restore_dataset.outputs.restored != 'true'" in workflow
+    assert "python scripts/refresh_ml_training_dataset.py --window-days 140" in workflow
+
+
+def test_monthly_promotion_reuses_weekly_dataset_without_full_supabase_build():
+    workflow = Path(".github/workflows/monthly-model-promotion.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert "Restore latest weekly ML dataset" in workflow
+    assert "weekly-ml-training-dataset" in workflow
+    assert "python scripts/build_ml_training_dataset.py" not in workflow
+
+
+def test_daily_monitoring_uses_shorter_window_than_weekly_monitoring():
+    daily = Path(".github/workflows/daily-outcomes.yml").read_text(encoding="utf-8")
+    weekly = Path(".github/workflows/weekly-ml-dataset.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert "build_ml_monitoring_metrics.py --days 30 --limit 4000" in daily
+    assert "build_ml_calibration_report.py --days 30 --limit 4000" in daily
+    assert "build_ml_monitoring_metrics.py --days 90" in weekly
 
 
 def test_failure_email_includes_failed_supabase_preflight(tmp_path, monkeypatch):

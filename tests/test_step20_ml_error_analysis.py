@@ -77,7 +77,9 @@ def test_step20_error_analysis_script_writes_reports(tmp_path, monkeypatch, caps
     monkeypatch.setattr(
         script,
         "fetch_ml_prediction_outcomes_for_metrics",
-        lambda universe, model_version, days, limit: [make_outcome()],
+        lambda universe, model_version, days, limit, include_feature_snapshot: [
+            make_outcome()
+        ],
     )
 
     exit_code = script.main(

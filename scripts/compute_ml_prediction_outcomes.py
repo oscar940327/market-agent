@@ -2,7 +2,7 @@ import argparse
 import json
 import sys
 from collections import defaultdict
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -57,7 +57,15 @@ def main(argv: list[str] | None = None) -> int:
 
     price_rows_by_ticker = {}
     for ticker, provider in grouped:
-        rows = fetch_daily_prices(ticker=ticker, provider=provider)
+        start_date = build_price_window_start(
+            grouped[(ticker, provider)],
+            date_field="prediction_date",
+        )
+        rows = fetch_daily_prices(
+            ticker=ticker,
+            provider=provider,
+            start_date=start_date,
+        )
         price_rows_by_ticker[(ticker, provider)] = rows
         print(f"ticker={ticker} provider={provider} prices={len(rows)} predictions={len(grouped[(ticker, provider)])}")
 
@@ -206,6 +214,22 @@ def safe_int(value) -> int | None:
         return int(value)
     except (TypeError, ValueError):
         return None
+
+
+def build_price_window_start(
+    rows: list[dict],
+    *,
+    date_field: str,
+    padding_days: int = 7,
+) -> str | None:
+    dates = [
+        date.fromisoformat(str(row[date_field])[:10])
+        for row in rows
+        if row.get(date_field)
+    ]
+    if not dates:
+        return None
+    return (min(dates) - timedelta(days=padding_days)).isoformat()
 
 
 if __name__ == "__main__":

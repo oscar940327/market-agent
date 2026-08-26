@@ -175,6 +175,18 @@ def test_fetch_ml_prediction_outcomes_for_metrics_queries_joined_prediction_fiel
     assert "outcome_status=eq.computed" in captured["url"]
     assert "ml_predictions.universe=eq.QQQ100" in captured["url"]
     assert "ml_predictions.model_version=eq.daily_prediction_v1" in captured["url"]
+    assert "feature_snapshot" not in captured["url"]
+
+    fetch_ml_prediction_outcomes_for_metrics(
+        universe="QQQ100",
+        days=90,
+        include_feature_snapshot=True,
+        supabase_url="https://example.supabase.co",
+        supabase_key="secret",
+        open_url=fake_open_url,
+    )
+
+    assert "feature_snapshot" in captured["url"]
 
 
 def test_build_ml_monitoring_metrics_script_writes_json_and_markdown(tmp_path, monkeypatch, capsys):

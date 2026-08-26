@@ -41,13 +41,13 @@ GitHub Actions 實際設定仍是 UTC cron，且不會自動依照美國日光�
 | --- | --- | --- | --- |
 | `daily-prices.yml` | 週二到週六 `06:15` | 週一到週五 `22:15 UTC` | 更新 QQQ、QQQ100 價格、技術特徵、市場環境、基本面 |
 | `daily-news.yml` | 週二到週六 `07:30` | 週一到週五 `23:30 UTC` | 抓新聞、分類新聞、產生新聞摘要 |
-| `daily-outcomes.yml` | 週二到週六 `08:15` | 週二到週六 `00:15 UTC` | 計算成熟 research outcomes、ML prediction outcomes、metrics、calibration、ML health |
-| `daily-ml-predictions.yml` | 週二到週六 `09:30` | 週二到週六 `01:30 UTC` | 復用 weekly dataset、刷新近期成熟資料、建立 similar-case accumulation 與每日 ML predictions |
+| `daily-outcomes.yml` | 週二到週六 `08:15` | 週二到週六 `00:15 UTC` | 計算成熟 outcomes，並以 30 日窗口產生日常 metrics、calibration 與 ML health |
+| `daily-ml-predictions.yml` | 週二到週六 `09:30` | 週二到週六 `01:30 UTC` | 復用 weekly dataset、刷新最近 140 日資料、建立 similar-case accumulation 與每日 ML predictions |
 | `daily-research-fixtures.yml` | 週二到週六 `09:45` | 週二到週六 `01:45 UTC` | 執行四個固定測資、寫入 research logs / outcomes、寄出 daily research report |
 | `weekly-research-fixtures.yml` | 週六 `10:30` | 週六 `02:30 UTC` | 執行 NVDA、AAPL、半導體主題、MU 放量與拉回策略測資，寄出 weekly research report |
-| `weekly-ml-dataset.yml` | 週日 `13:00` | 週日 `05:00 UTC` | 建立 weekly ML dataset 與完整 monitoring reports |
+| `weekly-ml-dataset.yml` | 週日 `13:00` | 週日 `05:00 UTC` | 復用上一份 weekly dataset、刷新最近 140 日資料，並建立完整 monitoring reports |
 | `monthly-universe.yml` | 每月 1 日 `14:00` | 每月 1 日 `06:00 UTC` | 更新 QQQ100 / Nasdaq-100 universe |
-| `monthly-model-promotion.yml` | 每月 2 日 `15:00` | 每月 2 日 `07:00 UTC` | 重訓候選模型、執行 walk-forward 比較、shadow review 並寄出明確模型建議 |
+| `monthly-model-promotion.yml` | 每月 2 日 `15:00` | 每月 2 日 `07:00 UTC` | 下載最新 weekly dataset、重訓候選模型、執行 walk-forward 比較與 shadow review |
 
 所有排程完成後都會執行 rule-based maintenance diagnosis，並將 JSON / Markdown 報告放入 workflow artifact。失敗、partial success、degraded、stale 或 missing 狀態會建立或更新 GitHub Issue；相同 fingerprint 只更新原 Issue，不會每天重複建立。
 
@@ -59,6 +59,23 @@ GitHub Actions 實際設定仍是 UTC cron，且不會自動依照美國日光�
 
 價格資料通常安排在美股收盤後約 2 小時更新。  
 新聞排程放在價格更新之後，因為盤後新聞通常比較密集。
+
+## Supabase Egress 控制
+
+Supabase Free plan 的 egress 是資料從 Supabase 傳到 GitHub Actions、Render 或本地時產生的流量。為避免排程反覆下載完整歷史資料，目前採用以下策略：
+
+- 價格 pipeline 只補最新缺口與短期重疊區間。
+- 技術指標只讀足以計算 MA200 的 warmup window。
+- 新聞摘要由 Supabase 先限制最近 30 日，且只回傳摘要必要欄位。
+- Research / ML outcomes 只讀最早待驗證日期之後的價格，不下載整段歷史。
+- Daily ML 與 weekly ML 都以 GitHub Actions artifact 保存完整 dataset，只刷新最近 140 日。
+- Daily metrics / calibration 使用 30 日、最多 4,000 筆；weekly monitoring 才使用 90 日與 drift 所需的較長窗口。
+- Monthly model promotion 直接下載最新 weekly artifact，不再重新從 Supabase 建立完整 dataset。
+- 一般 metrics 不讀大型 `feature_snapshot`；只有專門的 ML error analysis 才會要求該欄位。
+
+第一次完全沒有 weekly artifact 時，`weekly-ml-dataset.yml` 仍會執行一次完整 bootstrap。之後只要 artifact 沒有被刪除或過期，就會走增量流程。這些限制減少的是重複傳輸，不會刪除 Supabase 中的歷史資料。
+
+配額定義與 Dashboard 使用量說明可參考 [Supabase Egress documentation](https://supabase.com/docs/guides/platform/manage-your-usage/egress)。
 
 ## Daily Prices Pipeline
 
@@ -141,7 +158,7 @@ Daily ML Predictions
 這裡的 prediction 是每天用最新已成熟的 dataset rows 更新 inference / reference；當日價格與技術狀態仍由 research pipeline 另外讀取。
 它不代表每天重新訓練模型，也不會把尚未成熟的 5 / 10 / 20 日 labels 當成已知結果。
 
-完整 15 年 dataset 仍由 `weekly-ml-dataset.yml` 每週重建；每日流程不再重複下載所有歷史資料。
+完整歷史 dataset 第一次由 `weekly-ml-dataset.yml` bootstrap。後續 daily 與 weekly workflow 都下載最近成功的 artifact，再以 140 日窗口替換近期資料；monthly promotion 也直接復用 weekly artifact，不重複下載完整歷史資料。
 
 ## Outcome Pipeline
 
@@ -155,10 +172,12 @@ Daily Research Outcomes
 
 - 計算成熟的 research outcomes。
 - 計算成熟的 ML prediction outcomes。
-- 建立 ML monitoring metrics。
-- 建立 calibration report。
+- 只讀待驗證日期之後的價格，避免為少量 outcomes 下載完整股價歷史。
+- 以 30 日窗口建立日常 ML monitoring metrics 與 calibration report。
 - 建立 model upgrade review。
 - 建立 ML health report。
+
+90 日 metrics / calibration 與 30 日對 365 日 drift 由 weekly workflow 執行，保留完整的週期檢查，同時降低每日重複讀取。
 
 ### 什麼是成熟 outcome
 

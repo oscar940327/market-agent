@@ -22,6 +22,7 @@ Render 不是主要資料更新器。
 | 本地環境 | 開發、測試、手動跑 pipeline。 |
 | GitHub Actions | 定期更新資料、計算 outcomes、產生 monitoring、寄錯誤信。 |
 | Supabase | 儲存價格、技術特徵、新聞、基本面、ML predictions、outcomes。 |
+| GitHub Actions artifacts | 保存 weekly ML dataset 與 monitoring reports，讓 daily / monthly workflow 不必重讀完整 Supabase 歷史。 |
 | Render | 部署 FastAPI 後端，提供 `/query` 等 API。 |
 | 個人網站前端 | 呼叫後端 API，展示 Research Report 與 Structured Data。 |
 
@@ -78,6 +79,8 @@ Step 29 起，`ml_dataset_metadata` 也會保存 weekly training dataset 的共�
 Step 30 需要再執行 `supabase/migrations/015_create_model_promotion_tables.sql`。它會新增 production / shadow prediction role、模型 registry 與每月 promotion review；未執行 migration 前不要啟動 monthly promotion workflow。
 
 它讓 Render 後端不需要每次 query 都重新抓完整資料。
+
+為控制 egress，GitHub Actions 的價格、新聞摘要、outcome 與 ML workflow 都使用增量或限制窗口的讀取。完整 ML dataset 由 weekly artifact 跨 workflow 復用；artifact 不是 Supabase table，也不會占用 Supabase database storage。
 
 主要儲存：
 

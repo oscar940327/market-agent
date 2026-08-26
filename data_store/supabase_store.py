@@ -658,19 +658,26 @@ def fetch_ml_prediction_outcomes_for_metrics(
     supabase_key: str | None = None,
     open_url=urlopen,
     limit: int = 10000,
+    include_feature_snapshot: bool = False,
 ) -> list[dict]:
     base_url, api_key = resolve_supabase_credentials(
         supabase_url=supabase_url,
         supabase_key=supabase_key,
     )
+    prediction_fields = (
+        "model_version,feature_version,universe,prediction_status,"
+        "prediction_freshness,predicted_max_drop_20d"
+    )
+    if include_feature_snapshot:
+        prediction_fields += ",feature_snapshot"
+
     select = (
         "id,ml_prediction_id,ticker,prediction_date,horizon_trading_days,target_date,"
         "actual_date,actual_return_pct,actual_up,actual_max_drop_pct,"
         "actual_max_runup_pct,predicted_up_probability,predicted_return,"
         "predicted_large_drop_risk,up_prediction_correct,"
         "large_drop_prediction_correct,return_error,outcome_status,price_provider,"
-        "computed_at,ml_predictions!inner(model_version,feature_version,universe,"
-        "prediction_status,prediction_freshness,predicted_max_drop_20d,feature_snapshot)"
+        f"computed_at,ml_predictions!inner({prediction_fields})"
     )
     query = {
         "select": select,
@@ -1386,6 +1393,45 @@ def fetch_news_events_for_dataset(
             return rows
 
         offset += page_size
+
+
+def fetch_news_events_for_summary(
+    *,
+    ticker: str,
+    start_at: str,
+    supabase_url: str | None = None,
+    supabase_key: str | None = None,
+    open_url=urlopen,
+    limit: int = 100,
+) -> list[dict]:
+    """Fetch only recent fields needed to build the user-facing news summary."""
+    base_url, api_key = resolve_supabase_credentials(
+        supabase_url=supabase_url,
+        supabase_key=supabase_key,
+    )
+    query = {
+        "select": (
+            "ticker,source,title,url,published_at,sentiment,topic,importance,"
+            "source_quality"
+        ),
+        "ticker": f"eq.{ticker.upper()}",
+        "published_at": f"gte.{start_at}",
+        "order": "published_at.desc",
+        "limit": str(limit),
+    }
+    endpoint = f"{base_url}/rest/v1/news_events?{urlencode(query)}"
+    request = Request(
+        endpoint,
+        method="GET",
+        headers={
+            "apikey": api_key,
+            "Authorization": f"Bearer {api_key}",
+            "Accept": "application/json",
+        },
+    )
+
+    with open_url(request, timeout=30) as response:
+        return json.loads(response.read().decode("utf-8"))
 
 
 def update_news_event_classification(

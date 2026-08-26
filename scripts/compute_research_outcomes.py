@@ -1,6 +1,7 @@
 import argparse
 import sys
 from collections import defaultdict
+from datetime import date, timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -36,7 +37,12 @@ def main() -> int:
 
     updates = []
     for (ticker, provider), outcomes in grouped.items():
-        price_rows = fetch_daily_prices(ticker=ticker, provider=provider)
+        start_date = build_price_window_start(outcomes, date_field="query_date")
+        price_rows = fetch_daily_prices(
+            ticker=ticker,
+            provider=provider,
+            start_date=start_date,
+        )
         ticker_updates = build_outcome_updates(
             pending_outcomes=outcomes,
             price_data=pd.DataFrame(price_rows),
@@ -60,6 +66,22 @@ def main() -> int:
         return 1
 
     return 0
+
+
+def build_price_window_start(
+    rows: list[dict],
+    *,
+    date_field: str,
+    padding_days: int = 7,
+) -> str | None:
+    dates = [
+        date.fromisoformat(str(row[date_field])[:10])
+        for row in rows
+        if row.get(date_field)
+    ]
+    if not dates:
+        return None
+    return (min(dates) - timedelta(days=padding_days)).isoformat()
 
 
 if __name__ == "__main__":

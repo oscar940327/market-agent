@@ -33,7 +33,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Refresh the recent labeled rows in an existing weekly ML dataset."
     )
-    parser.add_argument("--window-days", type=int, default=240)
+    parser.add_argument("--window-days", type=int, default=140)
     parser.add_argument("--universe", default="QQQ100")
     parser.add_argument("--provider", default="yfinance")
     parser.add_argument("--technical-version", default="v1")

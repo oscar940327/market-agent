@@ -200,6 +200,8 @@ ML Reference 是輔助研究訊號，不會直接改變最後結論或價格計�
 GitHub Actions 負責排程執行。  
 Render 負責部署後端 API。
 
+為控制 Supabase Free plan 的 egress，排程不會每天重抓完整歷史資料。價格與 outcomes 採增量查詢；新聞摘要只讀最近 30 日必要欄位；ML dataset 透過 GitHub Actions artifact 復用，daily / weekly 只刷新最近 140 日，monthly model promotion 也直接使用最新 weekly artifact。完整策略與首次 bootstrap 行為記錄在 [Data Pipeline](docs/data_pipeline.md)。
+
 詳細說明：
 
 - [Data Pipeline](docs/data_pipeline.md)

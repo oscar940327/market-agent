@@ -2,6 +2,7 @@ name: Weekly ML Dataset Build
 
 permissions:
   contents: read
+  actions: read
   issues: write
 
 on:
@@ -42,8 +43,54 @@ jobs:
       - name: Check Supabase access
         run: python scripts/check_supabase_access.py
 
-      - name: Build ML training dataset
+      - name: Restore previous weekly ML dataset
+        id: restore_dataset
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p data/ml
+          RUN_ID=$(gh run list \
+            --workflow weekly-ml-dataset.yml \
+            --branch "${GITHUB_REF_NAME}" \
+            --status success \
+            --limit 1 \
+            --json databaseId \
+            --jq '.[0].databaseId')
+          if [ -z "$RUN_ID" ]; then
+            echo "restored=false" >> "$GITHUB_OUTPUT"
+            echo "No previous weekly dataset artifact found; bootstrap is required."
+            exit 0
+          fi
+
+          rm -rf data/ml/weekly-artifact
+          if ! gh run download "$RUN_ID" \
+            --name weekly-ml-training-dataset \
+            --dir data/ml/weekly-artifact; then
+            echo "restored=false" >> "$GITHUB_OUTPUT"
+            echo "Previous dataset artifact could not be downloaded; bootstrap is required."
+            exit 0
+          fi
+
+          CSV_PATH=$(find data/ml/weekly-artifact -name training_dataset_v1.csv -print -quit)
+          METADATA_PATH=$(find data/ml/weekly-artifact -name training_dataset_v1_metadata.json -print -quit)
+          if [ -z "$CSV_PATH" ] || [ -z "$METADATA_PATH" ]; then
+            echo "restored=false" >> "$GITHUB_OUTPUT"
+            echo "Previous dataset artifact is incomplete; bootstrap is required."
+            exit 0
+          fi
+
+          cp "$CSV_PATH" data/ml/training_dataset_v1.csv
+          cp "$METADATA_PATH" data/ml/training_dataset_v1_metadata.json
+          echo "restored=true" >> "$GITHUB_OUTPUT"
+
+      - name: Bootstrap ML training dataset
+        if: steps.restore_dataset.outputs.restored != 'true'
         run: python scripts/build_ml_training_dataset.py
+
+      - name: Refresh recent ML dataset rows
+        if: steps.restore_dataset.outputs.restored == 'true'
+        run: python scripts/refresh_ml_training_dataset.py --window-days 140
 
       - name: Verify shared dataset metadata
         run: python scripts/check_freshness.py --scope ml_training --json

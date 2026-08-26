@@ -1,7 +1,7 @@
 import argparse
 import json
 import sys
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -10,7 +10,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from data_store.supabase_store import (  # noqa: E402
     fetch_active_tickers,
-    fetch_news_events,
+    fetch_news_events_for_summary,
     upsert_news_event_summaries,
 )
 from news_events import build_news_summary  # noqa: E402
@@ -71,15 +71,30 @@ def main() -> int:
         tickers = fetch_active_tickers(universe=args.universe)
 
     generated_at = datetime.now(UTC).isoformat()
+    summary_date = date.fromisoformat(args.summary_date)
+    start_at = datetime.combine(
+        summary_date - timedelta(days=args.lookback_days),
+        datetime.min.time(),
+        tzinfo=UTC,
+    ).isoformat()
     summaries = []
     records = []
 
     for ticker in tickers:
-        rows = fetch_news_events(ticker=ticker, limit=args.limit)
+        rows = fetch_news_events_for_summary(
+            ticker=ticker,
+            start_at=start_at,
+            limit=args.limit,
+        )
         summary = build_news_summary(
             ticker=ticker,
             news_events=rows,
             lookback_days=args.lookback_days,
+            now=datetime.combine(
+                summary_date + timedelta(days=1),
+                datetime.min.time(),
+                tzinfo=UTC,
+            ),
         )
         summaries.append(summary)
         records.append(
